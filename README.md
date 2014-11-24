@@ -3,12 +3,12 @@
 
 
 ## Usage
-1. Import provided templates.  
+* Import provided templates.  
 Allow Zabbix to create necessary groups. (Just to check that everything works as expected. You can modify all the details to suit your needs later.)
 
-2.  Copy provided PowerShell script to the desired location on your HyperV host machine.
+*  Copy provided PowerShell script to the desired location on your HyperV host machine.
 
-3. Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
+* Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
  Adjust the paths according to the previous step.
 
 `UserParameter=hyperv.discovery,powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1"`
@@ -19,7 +19,7 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 
  Restart agent
 
-3. Set-up Hyper-V host. 
+* Set-up Hyper-V host. 
 	* Add a new host as usual.
 	* Link it with "Template Windows HyperV Host" template. 
 	* Wait for a guest discovery to fire, it will:
@@ -28,7 +28,7 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 		* put discovered VM host into "Hyper-V VM" group,
 		* link VM host with "Template Windows HyperV VM Guest"
 
-4. Template Windows Hyper-V Guest  
+* Template Windows Hyper-V Guest  
 Intended to discover VM guest performance counters and create Zabbix items for each of them.
 The following parameters are monitored:
 
