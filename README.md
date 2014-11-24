@@ -17,10 +17,10 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 
 `UserParameter=hyperv.check[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2" "$3"`
 
- Restart agent
+* Restart zabbix agent.
 
-* Set-up Hyper-V host. 
-	* Add a new host as usual.
+* Set-up Hyper-V host in Zabbix interface. 
+	* Add a new host, if needed.
 	* Link it with "Template Windows HyperV Host" template. 
 	* Wait for a guest discovery to fire, it will:
 		* discover Hyper-V guests, 
@@ -30,10 +30,27 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 
 * Template Windows Hyper-V Guest  
 Intended to discover VM guest performance counters and create Zabbix items for each of them.
-The following parameters are monitored:
+The following parameters are discovered and monitored:
+	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
+	* Hyper-V Virtual Network Adapter (Bytes/s)
+	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
 
-
-
+* Template Windows HyperV Host  
+The following _host_ parameters are monitored:
+	* Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time
+	* Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time
+	* Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time
+	* Hyper-V Virtual Switch(*)\Bytes
+	* Hyper-V Virtual Machine Health Summary\Health Critical
+	
 
 ## License:
 
