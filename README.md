@@ -5,7 +5,6 @@ Simple Hyper-V Guest and Host templates
 
 * Template Windows Hyper-V Guest  
 Intended to discover VM guest performance counters and create Zabbix items for each of them.
-
 The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
@@ -13,7 +12,6 @@ The following parameters are discovered and monitored:
 
 
 * Template Windows HyperV Host  
-
 The following _host_ parameters are monitored:
 	* Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time
 	* Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time
