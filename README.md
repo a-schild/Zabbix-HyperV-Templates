@@ -1,5 +1,34 @@
 #Zabbix Agent Templates for Hyper-V monitoring 
 
+## Description
+Simple Hyper-V Guest and Host templates
+
+* Template Windows Hyper-V Guest  
+Intended to discover VM guest performance counters and create Zabbix items for each of them.
+
+The following parameters are discovered and monitored:
+	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
+	* Hyper-V Virtual Network Adapter (Bytes/s)
+	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
+
+
+* Template Windows HyperV Host  
+
+The following _host_ parameters are monitored:
+	* Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time
+	* Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time
+	* Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time
+	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time
+	* Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time
+	* Hyper-V Virtual Switch(*)\Bytes
+	* Hyper-V Virtual Machine Health Summary\Health Critical
+	
 
 
 ## Usage
@@ -28,29 +57,7 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 		* put discovered VM host into "Hyper-V VM" group,
 		* link VM host with "Template Windows HyperV VM Guest"
 
-* Template Windows Hyper-V Guest  
-Intended to discover VM guest performance counters and create Zabbix items for each of them.
-The following parameters are discovered and monitored:
-	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
-	* Hyper-V Virtual Network Adapter (Bytes/s)
-	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
 
-* Template Windows HyperV Host  
-The following _host_ parameters are monitored:
-	* Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time
-	* Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time
-	* Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time
-	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time
-	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time
-	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time
-	* Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time
-	* Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time
-	* Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time
-	* Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time
-	* Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time
-	* Hyper-V Virtual Switch(*)\Bytes
-	* Hyper-V Virtual Machine Health Summary\Health Critical
-	
 
 ## License:
 
