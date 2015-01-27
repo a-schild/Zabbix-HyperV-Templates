@@ -55,6 +55,8 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 		* put discovered VM host into "Hyper-V VM" group,
 		* link VM host with "Template Windows HyperV VM Guest"
 
+## Bugs
+* There's no Triggers for VM Guest.
 
 
 ## License:
