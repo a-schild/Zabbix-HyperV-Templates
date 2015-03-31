@@ -12,6 +12,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #>
 
+
 param(
 	[Parameter(Mandatory=$False)]
 	[string]$QueryName,
@@ -30,12 +31,17 @@ if ($QueryName -eq '') {
     write-host " `"data`":["
     write-host
 
+    $n = $colItems.Count
+
     foreach ($objItem in $colItems) {
-        $line =  " { `"{#VMNAME}`":`"" + $objItem.Name + "`" , `"{#VMSTATE}`":`"" + $objItem.State + "`" },"
+        $line =  " { `"{#VMNAME}`":`"" + $objItem.Name + "`" , `"{#VMSTATE}`":`"" + $objItem.State + "`" }"
+        if ($n -gt 1){
+            $line += ","
+        }
         write-host $line
+        $n--
     }
 
-    write-host " {} "
     write-host " ]"
     write-host "}"
     write-host
@@ -70,18 +76,27 @@ if ($psboundparameters.Count -eq 2) {
 
     write-host "{"
     write-host " `"data`":["
+    write-host      
+    #write-host $Results
                
        
-            foreach ($objItem in $Results) {
-                $line = " { `"{#"+$ItemType+"}`":`""+$objItem.InstanceName+"`"},"
-                 write-host $line;
-            }
-        
+    $n = ($Results | measure).Count
 
-    write-host " {} "
+            foreach ($objItem in $Results) {
+                $line = " { `"{#"+$ItemType+"}`":`""+$objItem.InstanceName+"`"}"
+                 
+                if ($n -gt 1 ){
+                    $line += ","
+                }
+
+                write-host $line
+                $n--
+            }
+    
     write-host " ]"
     write-host "}"
     write-host
+
 
     exit
 }
@@ -90,6 +105,7 @@ if ($psboundparameters.Count -eq 2) {
 
 <# Zabbix Hyper-V VM Get Performance Counter Value #>
 if ($psboundparameters.Count -eq 3) {
+
 
     switch ($QueryName){
             <# Disk Counters #>
@@ -135,12 +151,15 @@ if ($psboundparameters.Count -eq 3) {
             default {$Results = "Bad Request"; exit}
     }
 
+    
             foreach ($objItem in $Results) {
                 $line = [int]$objItem.CookedValue
-                 write-host $line
+                write-host $line
             }
         
-		
+
+
+
     exit
 }
 
