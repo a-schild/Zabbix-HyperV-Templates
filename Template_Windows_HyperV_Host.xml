@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>2.0</version>
-    <date>2014-11-24T16:04:57Z</date>
+    <date>2015-04-01T13:25:06Z</date>
     <groups>
         <group>
             <name>HyperV VM</name>
@@ -9,20 +9,15 @@
         <group>
             <name>Templates</name>
         </group>
-        <group>
-            <name>Windows</name>
-        </group>
     </groups>
     <templates>
         <template>
             <template>Template Windows HyperV Host</template>
             <name>Template Windows HyperV Host</name>
+            <description/>
             <groups>
                 <group>
                     <name>Templates</name>
-                </group>
-                <group>
-                    <name>Windows</name>
                 </group>
             </groups>
             <applications>
@@ -945,7 +940,7 @@
                     <snmp_community/>
                     <snmp_oid/>
                     <key>hyperv.discovery</key>
-                    <delay>600</delay>
+                    <delay>3600</delay>
                     <status>0</status>
                     <allowed_hosts/>
                     <snmpv3_contextname/>
@@ -964,7 +959,11 @@
                     <publickey/>
                     <privatekey/>
                     <port/>
-                    <filter>:</filter>
+                    <filter>
+                        <evaltype>0</evaltype>
+                        <formula/>
+                        <conditions/>
+                    </filter>
                     <lifetime>30</lifetime>
                     <description>HyperV Guest VM Discovery&#13;
 Requires PowerShell script installed on HyperV Host.</description>
@@ -973,8 +972,8 @@ Requires PowerShell script installed on HyperV Host.</description>
                     <graph_prototypes/>
                     <host_prototypes>
                         <host_prototype>
-                            <host>{#VMNAME}</host>
-                            <name>{#VMNAME}</name>
+                            <host>{#VMNAME}_{#VMHOST}</host>
+                            <name>{#VMNAME}_{#VMHOST}</name>
                             <status>0</status>
                             <group_links>
                                 <group_link>
@@ -1047,7 +1046,7 @@ Requires PowerShell script installed on HyperV Host.</description>
             <dependencies/>
         </trigger>
         <trigger>
-            <expression>{Template Windows HyperV Host:service_state[vmms].last(0)}#0</expression>
+            <expression>{Template Windows HyperV Host:service_state[vmms].last(0)}&lt;&gt;0</expression>
             <name>HyperV service state</name>
             <url/>
             <status>1</status>
