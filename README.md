@@ -9,6 +9,7 @@ The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
 	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
+        * Hyper-V VM replication status
 
 
 * Template Windows HyperV Host  
