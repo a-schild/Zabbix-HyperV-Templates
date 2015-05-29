@@ -32,9 +32,12 @@ The following _host_ parameters are monitored:
 
 ## Usage
 * Import provided templates.  
-Allow Zabbix to create necessary groups. (Just to check that everything works as expected. You can modify all the details to suit your needs later.)
+Allow Zabbix to create necessary groups. 
+(Just to check that everything works as expected. You can modify all the details to suit your needs later.)
 
 *  Copy provided PowerShell script to the desired location on your HyperV host machine.
+   If your server(s) are not running a english version of windows, you will have to modify
+   the performance counters to match the names in the server OS language.
 
 * Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
  Adjust the paths according to the previous step.
