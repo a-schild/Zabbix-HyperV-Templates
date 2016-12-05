@@ -1,7 +1,7 @@
 #Zabbix Agent Templates for Hyper-V monitoring 
 
 ## Description
-Simple Hyper-V Guest and Host templates
+Simple Hyper-V Guest and Host templates.
 Compatible with Zabbix Server 2.0
 
 * Template Windows Hyper-V Guest  
