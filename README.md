@@ -66,6 +66,8 @@ Allow Zabbix to create necessary groups.
 
 ## F.A.Q.
 
+Depending on the load of your Hyper-V server, you will have to increase the default
+Zabbix Temout from 3 to 10-30 seconds
 
 
 ## Bugs
