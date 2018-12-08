@@ -1,4 +1,4 @@
-#Zabbix Agent Templates for Hyper-V monitoring 
+# Zabbix Agent Templates for Hyper-V monitoring 
 
 ## Description
 Simple Hyper-V Guest and Host templates.
@@ -10,6 +10,7 @@ The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
 	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
+        * Hyper-V VM replication status
 
 
 * Template Windows HyperV Host  
@@ -32,10 +33,18 @@ The following _host_ parameters are monitored:
 
 ## Usage
 * Import provided templates.  
-Allow Zabbix to create necessary groups. (Just to check that everything works as expected. You can modify all the details to suit your needs later.)
+Allow Zabbix to create necessary groups. 
+(Just to check that everything works as expected. You can modify all the details to suit your needs later.)
 
 *  Copy provided PowerShell script to the desired location on your HyperV host machine.
+   If your server(s) are not running a english version of windows, you will have to modify
+   the performance counters to match the names in the server OS language.
 
+*  Depending on your powershell security settings, you need to lower the restrictions
+   If you downloaded the script from internet, then make sure windows is not blocking it.
+   
+   Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine
+   
 * Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
  Adjust the paths according to the previous step.
 
@@ -58,6 +67,8 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 
 ## F.A.Q.
 
+Depending on the load of your Hyper-V server, you will have to increase the default
+Zabbix Temout from 3 to 10-30 seconds
 
 
 ## Bugs
@@ -67,7 +78,8 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 ## License:
 
 
-Copyright (c) 2014, Dmitry Sarkisov <ait.meijin@gmail.com>
+Copyright (c) 2014     , Dmitry Sarkisov <ait.meijin@gmail.com>
+Copyright (c) 2016-2017, Andre Schild <a.schild@aarboard.ch>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
