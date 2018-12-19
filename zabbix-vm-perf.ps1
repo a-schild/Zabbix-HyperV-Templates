@@ -206,6 +206,12 @@ if ($psboundparameters.Count -eq 3)
         write-host $Results
         exit
     }
+    elseif ($QueryName -eq 'GetVMStatus')
+    {
+        $Results =  (Get-VM | Where-Object {$_.Name -eq $VMName}).State
+        write-host $Results
+        exit
+    }
     else
     {
         switch ($QueryName){
