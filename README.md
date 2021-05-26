@@ -1,7 +1,8 @@
 # Zabbix Agent Templates for Hyper-V monitoring 
 
 ## Note
-This repository is not supported anymore!
+**! This repository is not supported anymore!**
+
 Some issues were fixed here https://github.com/a-schild/Zabbix-HyperV-Templates
 
 ## Description
