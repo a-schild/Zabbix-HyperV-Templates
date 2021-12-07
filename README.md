@@ -44,14 +44,9 @@ Allow Zabbix to create necessary groups.
    
    Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine
    
-* Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
- Adjust the paths according to the previous step.
+* Put the file hyper-v.conf in C:\Program files\Zabbix Agent\zabbix_asgentd.d
+  Adjust the paths according to the previous step if needed
 
-`UserParameter=hyperv.discovery,powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1"`
-
-`UserParameter=hyperv.discoveryitem[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2"`
-
-`UserParameter=hyperv.check[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2" "$3"`
 
 * Restart zabbix agent.
 
