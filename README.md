@@ -39,10 +39,21 @@ Allow Zabbix to create necessary groups.
    If your server(s) are not running a english version of windows, you will have to modify
    the performance counters to match the names in the server OS language.
 
-*  Depending on your powershell security settings, you need to lower the restrictions
+*  Assuming your host is called my-hyperv-hostname, you can create a self siged certificate and sign it as follow:
+```$cert = New-SelfSignedCertificate -DnsName "my-hyperv-hostname" -type codesigning
+ Set-AuthenticodeSignature -Certificate $cert -FilePath 'C:\Program Files\Zabbix Agent 2\zabbix-vm-perf.ps1
+$exportPath = "C:\myCert.cer"
+Export-Certificate -Cert $cert -FilePath $exportPath
+Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\Root
+Remove-Item -Path $exportPath
+```
+
+*  In case you don't care about security, you can lower the restrictions
    If you downloaded the script from internet, then make sure windows is not blocking it.
    
    Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine
+   
    
 * Put the file hyper-v.conf in C:\Program files\Zabbix Agent\zabbix_asgentd.d
   Adjust the paths according to the previous step if needed
