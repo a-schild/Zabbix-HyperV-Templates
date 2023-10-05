@@ -55,9 +55,8 @@ Remove-Item -Path $exportPath
    Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine
    
    
-* Put the file hyper-v.conf in C:\Program files\Zabbix Agent\zabbix_asgentd.d
+* Put the file hyper-v.conf in C:\Program files\Zabbix Agent 2\zabbix_agentd.d
   Adjust the paths according to the previous step if needed
-
 
 * Restart zabbix agent.
 
@@ -69,6 +68,16 @@ Remove-Item -Path $exportPath
 		* create a new host for each VM,
 		* put discovered VM host into "Hyper-V VM" group,
 		* link VM host with "Template Windows HyperV VM Guest"
+* Go to the Hyper-V host in the Zabbix interface and click on the discoveries, and click on test.
+	* If you get an error check
+		* If your certificate is signed/you changed the policy to unrestricted.
+		* If your path in the config file is correct.
+```The argument 'C:\Program Files\Zabbix\zabbix-vm-perf.ps1' to the -File parameter does not exist. 
+Provide the path to an existing '.ps1' file as an argument to the -File parameter.
+Windows PowerShell 
+Copyright (C) 2016 Microsoft Corporation. All rights reserved.
+```
+
 
 ## F.A.Q.
 
