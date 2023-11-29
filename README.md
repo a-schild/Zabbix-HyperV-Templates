@@ -1,10 +1,15 @@
 # Zabbix Agent Templates for Hyper-V monitoring 
 
+## Note
+This repository is not supported anymore!
+Some issues were fixed here https://github.com/a-schild/Zabbix-HyperV-Templates
+
 ## Description
-Simple Hyper-V Guest and Host templates
+Simple Hyper-V Guest and Host templates.
+Compatible with Zabbix Server 2.0
 
 * Template Windows Hyper-V Guest  
-Intended to discover VM guest performance counters and create Zabbix items for each of them.
+Discovers VM guest performance counters and creates Zabbix items for each of them.
 The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
