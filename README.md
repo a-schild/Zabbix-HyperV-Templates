@@ -6,7 +6,7 @@ Some issues were fixed here https://github.com/a-schild/Zabbix-HyperV-Templates
 
 ## Description
 Simple Hyper-V Guest and Host templates.
-Compatible with Zabbix Server 2.0
+Compatible with Zabbix Server 5.0
 
 * Template Windows Hyper-V Guest  
 Discovers VM guest performance counters and creates Zabbix items for each of them.
