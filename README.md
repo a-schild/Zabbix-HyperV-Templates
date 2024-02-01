@@ -6,7 +6,7 @@ Some issues were fixed here https://github.com/a-schild/Zabbix-HyperV-Templates
 
 ## Description
 Simple Hyper-V Guest and Host templates.
-Compatible with Zabbix Server 2.0
+Compatible with Zabbix Server 5.0
 
 * Template Windows Hyper-V Guest  
 Discovers VM guest performance counters and creates Zabbix items for each of them.
@@ -44,19 +44,24 @@ Allow Zabbix to create necessary groups.
    If your server(s) are not running a english version of windows, you will have to modify
    the performance counters to match the names in the server OS language.
 
-*  Depending on your powershell security settings, you need to lower the restrictions
+*  Assuming your host is called my-hyperv-hostname, you can create a self siged certificate and sign it as follow:
+```$cert = New-SelfSignedCertificate -DnsName "my-hyperv-hostname" -type codesigning
+ Set-AuthenticodeSignature -Certificate $cert -FilePath 'C:\Program Files\Zabbix Agent 2\zabbix-vm-perf.ps1
+$exportPath = "C:\myCert.cer"
+Export-Certificate -Cert $cert -FilePath $exportPath
+Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\Root
+Remove-Item -Path $exportPath
+```
+
+*  In case you don't care about security, you can lower the restrictions
    If you downloaded the script from internet, then make sure windows is not blocking it.
    
    Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine
    
-* Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
- Adjust the paths according to the previous step.
-
-`UserParameter=hyperv.discovery,powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1"`
-
-`UserParameter=hyperv.discoveryitem[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2"`
-
-`UserParameter=hyperv.check[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2" "$3"`
+   
+* Put the file hyper-v.conf in C:\Program files\Zabbix Agent 2\zabbix_agentd.d
+  Adjust the paths according to the previous step if needed
 
 * Restart zabbix agent.
 
@@ -68,6 +73,16 @@ Allow Zabbix to create necessary groups.
 		* create a new host for each VM,
 		* put discovered VM host into "Hyper-V VM" group,
 		* link VM host with "Template Windows HyperV VM Guest"
+* Go to the Hyper-V host in the Zabbix interface and click on the discoveries, and click on test.
+	* If you get an error check
+		* If your certificate is signed/you changed the policy to unrestricted.
+		* If your path in the config file is correct.
+```The argument 'C:\Program Files\Zabbix\zabbix-vm-perf.ps1' to the -File parameter does not exist. 
+Provide the path to an existing '.ps1' file as an argument to the -File parameter.
+Windows PowerShell 
+Copyright (C) 2016 Microsoft Corporation. All rights reserved.
+```
+
 
 ## F.A.Q.
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
-    <version>2.0</version>
-    <date>2015-05-29T13:03:05Z</date>
+    <version>5.0</version>
+    <date>2023-11-29T07:43:27Z</date>
     <groups>
         <group>
             <name>HyperV VM</name>
@@ -14,7 +14,8 @@
         <template>
             <template>Template Windows HyperV Host</template>
             <name>Template Windows HyperV Host</name>
-            <description/>
+            <description>See https://github.com/ameiji/Zabbix-HyperV-Templates&#13;
+and https://github.com/a-schild/Zabbix-HyperV-Templates</description>
             <groups>
                 <group>
                     <name>Templates</name>
@@ -30,1014 +31,754 @@
             </applications>
             <items>
                 <item>
-                    <name>HyperV Logical CPU Guest Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the processor in guest code.</description>
-                    <inventory_link>0</inventory_link>
+                    <name>HyperV Total Pages</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V-Hypervisor\Gesamtanzahl von Seiten]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Logical CPU Hypervisor Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the processor in hypervisor code.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Logical CPU Idle Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the processor in an idle state.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Monitored Notifications</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor\Monitored Notifications]</key>
-                    <delay>300</delay>
-                    <history>14</history>
-                    <trends>90</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
                 </item>
                 <item>
                     <name>HyperV Number of Logical CPUs</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor\Logical Processors]</key>
-                    <delay>300</delay>
-                    <history>14</history>
-                    <trends>90</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V-Hypervisor\Logische Prozessoren]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
                 </item>
                 <item>
                     <name>HyperV Number of Partitions (VMs)</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor\Partitions]</key>
-                    <delay>300</delay>
-                    <history>14</history>
-                    <trends>90</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V-Hypervisor\Partitionen]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Number of Virtual CPUs</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor\Virtual Processors]</key>
-                    <delay>300</delay>
-                    <history>14</history>
-                    <trends>90</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Root Virtual CPU Guest Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor in guest code.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Root Virtual CPU Hypervisor Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor in hypervisor code.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Root Virtual CPU Remote Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor running on a remote node.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Root Virtual CPU Total Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor in guest and hypervisor code.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Service State</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>service_state[vmms]</key>
-                    <delay>300</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
                 </item>
                 <item>
                     <name>HyperV Total Pages</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor\Total Pages]</key>
-                    <delay>300</delay>
-                    <history>14</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V-Hypervisor\Seiten gesamt]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
                 </item>
                 <item>
-                    <name>HyperV Virtual CPU Guest Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor in guest code.</description>
-                    <inventory_link>0</inventory_link>
+                    <name>HyperV Number of Virtual CPUs</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V-Hypervisor\Virtuelle Prozessoren]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
                 </item>
                 <item>
-                    <name>HyperV Virtual CPU Hypervisor Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor in hypervisor code.</description>
-                    <inventory_link>0</inventory_link>
+                    <name>HyperV Monitored Notifications</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V-Hypervisor\Überwachte Benachrichtigungen]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Virtual CPU Remote Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor running on a remote node.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Virtual CPU Total Runtime %</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>%</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description>The percentage of time spent by the virtual processor in guest and hypervisor code.</description>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Virtual Switch B/s Received</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>1</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Virtual Switch(*)\Bytes Received/sec]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>Bits/sec</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>8</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
-                </item>
-                <item>
-                    <name>HyperV Virtual Switch B/s Sent</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>1</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>365</trends>
-                    <status>0</status>
-                    <value_type>0</value_type>
-                    <allowed_hosts/>
-                    <units>Bits/sec</units>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>8</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <description/>
-                    <inventory_link>0</inventory_link>
-                    <applications>
-                        <application>
-                            <name>HyperV Host</name>
-                        </application>
-                    </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
                 </item>
                 <item>
                     <name>HyperV VMs Critical</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>90</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität kritisch]</key>
+                    <history>30d</history>
+                    <trends>90d</trends>
                     <description>The number of critical VMs on a host.</description>
-                    <inventory_link>0</inventory_link>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{last(0)}&gt;0</expression>
+                            <name>Hyper-V host has critical VMs</name>
+                            <priority>HIGH</priority>
+                            <description>The number of VMs running in a critical state.</description>
+                        </trigger>
+                    </triggers>
                 </item>
                 <item>
                     <name>HyperV VMs OK</name>
-                    <type>7</type>
-                    <snmp_community/>
-                    <multiplier>0</multiplier>
-                    <snmp_oid/>
-                    <key>perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok]</key>
-                    <delay>60</delay>
-                    <history>30</history>
-                    <trends>90</trends>
-                    <status>0</status>
-                    <value_type>3</value_type>
-                    <allowed_hosts/>
-                    <units/>
-                    <delta>0</delta>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <formula>1</formula>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <data_type>0</data_type>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität OK]</key>
+                    <history>30d</history>
+                    <trends>90d</trends>
                     <description>The number of OK VM's on a host.</description>
-                    <inventory_link>0</inventory_link>
                     <applications>
                         <application>
                             <name>HyperV Host</name>
                         </application>
                     </applications>
-                    <valuemap/>
-                    <logtimefmt/>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{last(0)}=0</expression>
+                            <name>Hyper-V host has 0 VMs in OK state</name>
+                            <priority>WARNING</priority>
+                            <description>Number of VMs in an OK state.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Guest Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Gastausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Total Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Gesamtausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest and hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Hypervisor Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Hypervisorausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Remote Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Remoteausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor running on a remote node.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Logical CPU Guest Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the processor in guest code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Logical CPU Hypervisor Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the processor in hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Logical CPU Idle Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the processor in an idle state.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{avg(#3)}&lt;10</expression>
+                            <name>HyperV Host Idle CPU &lt; 10%</name>
+                            <priority>WARNING</priority>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Guest Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Hypervisor Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Remote Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor running on a remote node.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Total Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest and hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Guest Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Hypervisor Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Remote Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor running on a remote node.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual CPU Total Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest and hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Number of Logical CPUs</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor\Logical Processors]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Monitored Notifications</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor\Monitored Notifications]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Number of Partitions (VMs)</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor\Partitions]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Total Pages</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor\Total Pages]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Number of Virtual CPUs</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Hypervisor\Virtual Processors]</key>
+                    <delay>5m</delay>
+                    <history>2w</history>
+                    <trends>90d</trends>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV VMs Critical</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical]</key>
+                    <history>30d</history>
+                    <trends>90d</trends>
+                    <description>The number of critical VMs on a host.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{last(0)}&gt;0</expression>
+                            <name>Hyper-V host has critical VMs</name>
+                            <priority>HIGH</priority>
+                            <description>The number of VMs running in a critical state.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <name>HyperV VMs OK</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok]</key>
+                    <history>30d</history>
+                    <trends>90d</trends>
+                    <description>The number of OK VM's on a host.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{last(0)}=0</expression>
+                            <name>Hyper-V host has 0 VMs in OK state</name>
+                            <priority>WARNING</priority>
+                            <description>Number of VMs in an OK state.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <name>HyperV Virtual Switch B/s Received</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Virtual Switch(*)\Bytes Received/sec]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>Bits/sec</units>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <preprocessing>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <params>8</params>
+                        </step>
+                    </preprocessing>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual Switch B/s Sent</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>Bits/sec</units>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <preprocessing>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <params>8</params>
+                        </step>
+                    </preprocessing>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Logical CPU Guest Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Gastausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the processor in guest code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Logical CPU Hypervisor Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Hypervisorausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the processor in hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Logical CPU Idle Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Leerlaufzeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the processor in an idle state.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{avg(#3)}&lt;10</expression>
+                            <name>HyperV Host Idle CPU &lt; 10%</name>
+                            <priority>WARNING</priority>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <name>HyperV Virtual Switch B/s Received</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Virtueller Hyper-V-Switch(*)\Empfangene Bytes/s]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>Bits/sec</units>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <preprocessing>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <params>8</params>
+                        </step>
+                    </preprocessing>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Virtual Switch B/s Sent</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Virtueller Hyper-V-Switch(*)\Gesendete Bytes/s]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>Bits/sec</units>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <preprocessing>
+                        <step>
+                            <type>MULTIPLIER</type>
+                            <params>8</params>
+                        </step>
+                    </preprocessing>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Guest Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Gastausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Total Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Gesamtausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in guest and hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Hypervisor Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Hypervisorausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor in hypervisor code.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Root Virtual CPU Remote Runtime %</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Remoteausführungszeit]</key>
+                    <history>30d</history>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <description>The percentage of time spent by the virtual processor running on a remote node.</description>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                </item>
+                <item>
+                    <name>HyperV Service State</name>
+                    <type>ZABBIX_ACTIVE</type>
+                    <key>service_state[vmms]</key>
+                    <delay>5m</delay>
+                    <history>30d</history>
+                    <applications>
+                        <application>
+                            <name>HyperV Host</name>
+                        </application>
+                    </applications>
+                    <request_method>POST</request_method>
+                    <triggers>
+                        <trigger>
+                            <expression>{last(0)}&lt;&gt;0</expression>
+                            <name>HyperV service state</name>
+                            <priority>HIGH</priority>
+                        </trigger>
+                    </triggers>
                 </item>
             </items>
             <discovery_rules>
                 <discovery_rule>
                     <name>Hyper-V VM Discovery</name>
-                    <type>0</type>
-                    <snmp_community/>
-                    <snmp_oid/>
                     <key>hyperv.discovery</key>
-                    <delay>600</delay>
-                    <status>0</status>
-                    <allowed_hosts/>
-                    <snmpv3_contextname/>
-                    <snmpv3_securityname/>
-                    <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                    <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                    <snmpv3_authpassphrase/>
-                    <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                    <snmpv3_privpassphrase/>
-                    <delay_flex/>
-                    <params/>
-                    <ipmi_sensor/>
-                    <authtype>0</authtype>
-                    <username/>
-                    <password/>
-                    <publickey/>
-                    <privatekey/>
-                    <port/>
-                    <filter>
-                        <evaltype>0</evaltype>
-                        <formula/>
-                        <conditions/>
-                    </filter>
-                    <lifetime>30</lifetime>
+                    <delay>1h</delay>
+                    <lifetime>15d</lifetime>
                     <description>HyperV Guest VM Discovery&#13;
 Requires PowerShell script installed on HyperV Host.</description>
                     <item_prototypes>
                         <item_prototype>
                             <name>Replication {#VMNAME}</name>
-                            <type>0</type>
-                            <snmp_community/>
-                            <multiplier>0</multiplier>
-                            <snmp_oid/>
+                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[GetVMReplication,{#VMNAME}]</key>
-                            <delay>30</delay>
-                            <history>90</history>
-                            <trends>365</trends>
-                            <status>0</status>
-                            <value_type>4</value_type>
-                            <allowed_hosts/>
-                            <units/>
-                            <delta>0</delta>
-                            <snmpv3_contextname/>
-                            <snmpv3_securityname/>
-                            <snmpv3_securitylevel>0</snmpv3_securitylevel>
-                            <snmpv3_authprotocol>0</snmpv3_authprotocol>
-                            <snmpv3_authpassphrase/>
-                            <snmpv3_privprotocol>0</snmpv3_privprotocol>
-                            <snmpv3_privpassphrase/>
-                            <formula>1</formula>
-                            <delay_flex/>
-                            <params/>
-                            <ipmi_sensor/>
-                            <data_type>0</data_type>
-                            <authtype>0</authtype>
-                            <username/>
-                            <password/>
-                            <publickey/>
-                            <privatekey/>
-                            <port/>
-                            <description/>
-                            <inventory_link>0</inventory_link>
+                            <delay>10m</delay>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
                             <applications>
                                 <application>
                                     <name>HyperV Host</name>
                                 </application>
                             </applications>
-                            <valuemap/>
-                            <logtimefmt/>
+                            <request_method>POST</request_method>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{regexp(Critical)}=1</expression>
+                                    <name>Replication state {#VMNAME} critical</name>
+                                    <priority>HIGH</priority>
+                                </trigger_prototype>
+                                <trigger_prototype>
+                                    <expression>{regexp(Warning)}=1</expression>
+                                    <name>Replication state {#VMNAME} warning</name>
+                                    <priority>WARNING</priority>
+                                </trigger_prototype>
+                            </trigger_prototypes>
+                        </item_prototype>
+                        <item_prototype>
+                            <name>VM status {#VMNAME}</name>
+                            <type>ZABBIX_ACTIVE</type>
+                            <key>hyperv.check[GetVMStatus,{#VMNAME}]</key>
+                            <delay>5m</delay>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <applications>
+                                <application>
+                                    <name>HyperV Host</name>
+                                </application>
+                            </applications>
+                            <trigger_prototypes>
+                                <trigger_prototype>
+                                    <expression>{str(Saved,1)}=1</expression>
+                                    <name>{#VMNAME} in saved state</name>
+                                    <priority>HIGH</priority>
+                                </trigger_prototype>
+                                <trigger_prototype>
+                                    <expression>{str(Off,1)}=1</expression>
+                                    <name>{#VMNAME} is Off</name>
+                                    <priority>INFO</priority>
+                                </trigger_prototype>
+                            </trigger_prototypes>
                         </item_prototype>
                     </item_prototypes>
-                    <trigger_prototypes>
-                        <trigger_prototype>
-                            <expression>{Template Windows HyperV Host:hyperv.check[GetVMReplication,{#VMNAME}].regexp(Critical)}=1</expression>
-                            <name>Replication state {#VMNAME} critical</name>
-                            <url/>
-                            <status>0</status>
-                            <priority>4</priority>
-                            <description/>
-                            <type>0</type>
-                        </trigger_prototype>
-                        <trigger_prototype>
-                            <expression>{Template Windows HyperV Host:hyperv.check[GetVMReplication,{#VMNAME}].regexp(Warning)}=1</expression>
-                            <name>Replication state {#VMNAME} warning</name>
-                            <url/>
-                            <status>0</status>
-                            <priority>2</priority>
-                            <description/>
-                            <type>0</type>
-                        </trigger_prototype>
-                    </trigger_prototypes>
-                    <graph_prototypes/>
                     <host_prototypes>
                         <host_prototype>
                             <host>{#VMNAME}_{#VMHOST}</host>
                             <name>{#VMNAME}_{#VMHOST}</name>
-                            <status>0</status>
                             <group_links>
                                 <group_link>
                                     <group>
@@ -1045,7 +786,6 @@ Requires PowerShell script installed on HyperV Host.</description>
                                     </group>
                                 </group_link>
                             </group_links>
-                            <group_prototypes/>
                             <templates>
                                 <template>
                                     <name>Template Windows HyperV VM Guest</name>
@@ -1053,98 +793,39 @@ Requires PowerShell script installed on HyperV Host.</description>
                             </templates>
                         </host_prototype>
                     </host_prototypes>
+                    <request_method>POST</request_method>
                 </discovery_rule>
             </discovery_rules>
-            <macros/>
-            <templates/>
             <screens>
                 <screen>
                     <name>{HOSTNAME} Status</name>
                     <hsize>2</hsize>
                     <vsize>2</vsize>
-                    <screen_items/>
                 </screen>
             </screens>
         </template>
     </templates>
     <triggers>
         <trigger>
-            <expression>{Template Windows HyperV Host:perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok].last(0)}=0</expression>
-            <name>Hyper-V host has 0 VMs in OK state</name>
-            <url/>
-            <status>1</status>
-            <priority>2</priority>
-            <description>Number of VMs in an OK state.</description>
-            <type>0</type>
-            <dependencies/>
-        </trigger>
-        <trigger>
-            <expression>{Template Windows HyperV Host:perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical].last(0)}&gt;0</expression>
-            <name>Hyper-V host has critical VMs</name>
-            <url/>
-            <status>1</status>
-            <priority>4</priority>
-            <description>The number of VMs running in a critical state.</description>
-            <type>0</type>
-            <dependencies/>
+            <expression>{Template Windows HyperV Host:perf_counter[\Hyper-V-Hypervisor\Virtuelle Prozessoren].last(0)}/{Template Windows HyperV Host:perf_counter[\Hyper-V-Hypervisor\Logische Prozessoren].last(0)}&gt;5</expression>
+            <name>Hyper-V Virtual to Logical CPU Ratio &gt; 5:1</name>
+            <priority>WARNING</priority>
         </trigger>
         <trigger>
             <expression>{Template Windows HyperV Host:perf_counter[\Hyper-V Hypervisor\Virtual Processors].last(0)}/{Template Windows HyperV Host:perf_counter[\Hyper-V Hypervisor\Logical Processors].last(0)}&gt;5</expression>
             <name>Hyper-V Virtual to Logical CPU Ratio &gt; 5:1</name>
-            <url/>
-            <status>1</status>
-            <priority>2</priority>
-            <description/>
-            <type>0</type>
-            <dependencies/>
-        </trigger>
-        <trigger>
-            <expression>{Template Windows HyperV Host:perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time].avg(#3)}&lt;10</expression>
-            <name>HyperV Host Idle CPU &lt; 10%</name>
-            <url/>
-            <status>1</status>
-            <priority>2</priority>
-            <description/>
-            <type>0</type>
-            <dependencies/>
-        </trigger>
-        <trigger>
-            <expression>{Template Windows HyperV Host:service_state[vmms].last(0)}&lt;&gt;0</expression>
-            <name>HyperV service state</name>
-            <url/>
-            <status>1</status>
-            <priority>4</priority>
-            <description/>
-            <type>0</type>
-            <dependencies/>
+            <priority>WARNING</priority>
         </trigger>
     </triggers>
     <graphs>
         <graph>
             <name>HyperV CPUs, VMs &amp; Notifications</name>
-            <width>900</width>
             <height>300</height>
-            <yaxismin>0.0000</yaxismin>
-            <yaxismax>100.0000</yaxismax>
-            <show_work_period>1</show_work_period>
-            <show_triggers>1</show_triggers>
-            <type>0</type>
-            <show_legend>1</show_legend>
-            <show_3d>0</show_3d>
-            <percent_left>0.0000</percent_left>
-            <percent_right>0.0000</percent_right>
-            <ymin_type_1>1</ymin_type_1>
-            <ymax_type_1>0</ymax_type_1>
-            <ymin_item_1>0</ymin_item_1>
-            <ymax_item_1>0</ymax_item_1>
+            <ymin_type_1>FIXED</ymin_type_1>
             <graph_items>
                 <graph_item>
-                    <sortorder>0</sortorder>
-                    <drawtype>2</drawtype>
+                    <drawtype>BOLD_LINE</drawtype>
                     <color>0000EE</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor\Logical Processors]</key>
@@ -1152,11 +833,8 @@ Requires PowerShell script installed on HyperV Host.</description>
                 </graph_item>
                 <graph_item>
                     <sortorder>1</sortorder>
-                    <drawtype>2</drawtype>
+                    <drawtype>BOLD_LINE</drawtype>
                     <color>33FFFF</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor\Virtual Processors]</key>
@@ -1164,11 +842,8 @@ Requires PowerShell script installed on HyperV Host.</description>
                 </graph_item>
                 <graph_item>
                     <sortorder>2</sortorder>
-                    <drawtype>2</drawtype>
+                    <drawtype>BOLD_LINE</drawtype>
                     <color>DD0000</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor\Partitions]</key>
@@ -1176,11 +851,8 @@ Requires PowerShell script installed on HyperV Host.</description>
                 </graph_item>
                 <graph_item>
                     <sortorder>3</sortorder>
-                    <drawtype>2</drawtype>
+                    <drawtype>BOLD_LINE</drawtype>
                     <color>00CC00</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor\Monitored Notifications]</key>
@@ -1189,30 +861,56 @@ Requires PowerShell script installed on HyperV Host.</description>
             </graph_items>
         </graph>
         <graph>
-            <name>HyperV CPU Total</name>
-            <width>900</width>
-            <height>400</height>
-            <yaxismin>0.0000</yaxismin>
-            <yaxismax>100.0000</yaxismax>
-            <show_work_period>1</show_work_period>
-            <show_triggers>0</show_triggers>
-            <type>1</type>
-            <show_legend>1</show_legend>
-            <show_3d>0</show_3d>
-            <percent_left>0.0000</percent_left>
-            <percent_right>0.0000</percent_right>
-            <ymin_type_1>0</ymin_type_1>
-            <ymax_type_1>1</ymax_type_1>
-            <ymin_item_1>0</ymin_item_1>
-            <ymax_item_1>0</ymax_item_1>
+            <name>HyperV CPUs, VMs &amp; Notifications DE</name>
+            <height>300</height>
+            <ymin_type_1>FIXED</ymin_type_1>
             <graph_items>
                 <graph_item>
-                    <sortorder>0</sortorder>
-                    <drawtype>0</drawtype>
+                    <drawtype>BOLD_LINE</drawtype>
+                    <color>0000EE</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V-Hypervisor\Logische Prozessoren]</key>
+                    </item>
+                </graph_item>
+                <graph_item>
+                    <sortorder>1</sortorder>
+                    <drawtype>BOLD_LINE</drawtype>
+                    <color>33FFFF</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V-Hypervisor\Virtuelle Prozessoren]</key>
+                    </item>
+                </graph_item>
+                <graph_item>
+                    <sortorder>2</sortorder>
+                    <drawtype>BOLD_LINE</drawtype>
+                    <color>DD0000</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V Hypervisor\Partitions]</key>
+                    </item>
+                </graph_item>
+                <graph_item>
+                    <sortorder>3</sortorder>
+                    <drawtype>BOLD_LINE</drawtype>
                     <color>00CC00</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V-Hypervisor\Überwachte Benachrichtigungen]</key>
+                    </item>
+                </graph_item>
+            </graph_items>
+        </graph>
+        <graph>
+            <name>HyperV CPU Total</name>
+            <height>400</height>
+            <show_triggers>NO</show_triggers>
+            <type>STACKED</type>
+            <ymax_type_1>FIXED</ymax_type_1>
+            <graph_items>
+                <graph_item>
+                    <color>00CC00</color>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]</key>
@@ -1220,11 +918,7 @@ Requires PowerShell script installed on HyperV Host.</description>
                 </graph_item>
                 <graph_item>
                     <sortorder>1</sortorder>
-                    <drawtype>0</drawtype>
                     <color>DD0000</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]</key>
@@ -1233,30 +927,36 @@ Requires PowerShell script installed on HyperV Host.</description>
             </graph_items>
         </graph>
         <graph>
-            <name>HyperV Network</name>
-            <width>900</width>
-            <height>300</height>
-            <yaxismin>0.0000</yaxismin>
-            <yaxismax>100.0000</yaxismax>
-            <show_work_period>1</show_work_period>
-            <show_triggers>1</show_triggers>
-            <type>0</type>
-            <show_legend>1</show_legend>
-            <show_3d>0</show_3d>
-            <percent_left>0.0000</percent_left>
-            <percent_right>0.0000</percent_right>
-            <ymin_type_1>0</ymin_type_1>
-            <ymax_type_1>0</ymax_type_1>
-            <ymin_item_1>0</ymin_item_1>
-            <ymax_item_1>0</ymax_item_1>
+            <name>HyperV CPU Total DE</name>
+            <height>400</height>
+            <show_triggers>NO</show_triggers>
+            <type>STACKED</type>
+            <ymax_type_1>FIXED</ymax_type_1>
             <graph_items>
                 <graph_item>
-                    <sortorder>0</sortorder>
-                    <drawtype>5</drawtype>
+                    <color>00CC00</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Gastausführungszeit]</key>
+                    </item>
+                </graph_item>
+                <graph_item>
+                    <sortorder>1</sortorder>
+                    <color>DD0000</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Hypervisorausführungszeit]</key>
+                    </item>
+                </graph_item>
+            </graph_items>
+        </graph>
+        <graph>
+            <name>HyperV Network</name>
+            <height>300</height>
+            <graph_items>
+                <graph_item>
+                    <drawtype>GRADIENT_LINE</drawtype>
                     <color>3333FF</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Virtual Switch(*)\Bytes Received/sec]</key>
@@ -1264,11 +964,8 @@ Requires PowerShell script installed on HyperV Host.</description>
                 </graph_item>
                 <graph_item>
                     <sortorder>1</sortorder>
-                    <drawtype>5</drawtype>
+                    <drawtype>GRADIENT_LINE</drawtype>
                     <color>00DD00</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]</key>
@@ -1277,30 +974,36 @@ Requires PowerShell script installed on HyperV Host.</description>
             </graph_items>
         </graph>
         <graph>
-            <name>HyperV Total Pages</name>
-            <width>900</width>
+            <name>HyperV Network DE</name>
             <height>300</height>
-            <yaxismin>0.0000</yaxismin>
-            <yaxismax>100.0000</yaxismax>
-            <show_work_period>1</show_work_period>
-            <show_triggers>1</show_triggers>
-            <type>0</type>
-            <show_legend>1</show_legend>
-            <show_3d>0</show_3d>
-            <percent_left>0.0000</percent_left>
-            <percent_right>0.0000</percent_right>
-            <ymin_type_1>1</ymin_type_1>
-            <ymax_type_1>0</ymax_type_1>
-            <ymin_item_1>0</ymin_item_1>
-            <ymax_item_1>0</ymax_item_1>
             <graph_items>
                 <graph_item>
-                    <sortorder>0</sortorder>
-                    <drawtype>5</drawtype>
+                    <drawtype>GRADIENT_LINE</drawtype>
+                    <color>3333FF</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Virtueller Hyper-V-Switch(*)\Empfangene Bytes/s]</key>
+                    </item>
+                </graph_item>
+                <graph_item>
+                    <sortorder>1</sortorder>
+                    <drawtype>GRADIENT_LINE</drawtype>
+                    <color>00DD00</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Virtueller Hyper-V-Switch(*)\Gesendete Bytes/s]</key>
+                    </item>
+                </graph_item>
+            </graph_items>
+        </graph>
+        <graph>
+            <name>HyperV Total Pages</name>
+            <height>300</height>
+            <ymin_type_1>FIXED</ymin_type_1>
+            <graph_items>
+                <graph_item>
+                    <drawtype>GRADIENT_LINE</drawtype>
                     <color>C80000</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Hypervisor\Total Pages]</key>
@@ -1309,30 +1012,28 @@ Requires PowerShell script installed on HyperV Host.</description>
             </graph_items>
         </graph>
         <graph>
-            <name>HyperV VM Status</name>
-            <width>900</width>
+            <name>HyperV Total Pages DE</name>
             <height>300</height>
-            <yaxismin>0.0000</yaxismin>
-            <yaxismax>100.0000</yaxismax>
-            <show_work_period>1</show_work_period>
-            <show_triggers>1</show_triggers>
-            <type>0</type>
-            <show_legend>1</show_legend>
-            <show_3d>0</show_3d>
-            <percent_left>0.0000</percent_left>
-            <percent_right>0.0000</percent_right>
-            <ymin_type_1>1</ymin_type_1>
-            <ymax_type_1>0</ymax_type_1>
-            <ymin_item_1>0</ymin_item_1>
-            <ymax_item_1>0</ymax_item_1>
+            <ymin_type_1>FIXED</ymin_type_1>
             <graph_items>
                 <graph_item>
-                    <sortorder>0</sortorder>
-                    <drawtype>2</drawtype>
+                    <drawtype>GRADIENT_LINE</drawtype>
                     <color>C80000</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V-Hypervisor\Gesamtanzahl von Seiten]</key>
+                    </item>
+                </graph_item>
+            </graph_items>
+        </graph>
+        <graph>
+            <name>HyperV VM Status</name>
+            <height>300</height>
+            <ymin_type_1>FIXED</ymin_type_1>
+            <graph_items>
+                <graph_item>
+                    <drawtype>BOLD_LINE</drawtype>
+                    <color>C80000</color>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical]</key>
@@ -1340,14 +1041,35 @@ Requires PowerShell script installed on HyperV Host.</description>
                 </graph_item>
                 <graph_item>
                     <sortorder>1</sortorder>
-                    <drawtype>2</drawtype>
+                    <drawtype>BOLD_LINE</drawtype>
                     <color>00C800</color>
-                    <yaxisside>0</yaxisside>
-                    <calc_fnc>2</calc_fnc>
-                    <type>0</type>
                     <item>
                         <host>Template Windows HyperV Host</host>
                         <key>perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok]</key>
+                    </item>
+                </graph_item>
+            </graph_items>
+        </graph>
+        <graph>
+            <name>HyperV VM Status DE</name>
+            <height>300</height>
+            <ymin_type_1>FIXED</ymin_type_1>
+            <graph_items>
+                <graph_item>
+                    <drawtype>BOLD_LINE</drawtype>
+                    <color>C80000</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität kritisch]</key>
+                    </item>
+                </graph_item>
+                <graph_item>
+                    <sortorder>1</sortorder>
+                    <drawtype>BOLD_LINE</drawtype>
+                    <color>00C800</color>
+                    <item>
+                        <host>Template Windows HyperV Host</host>
+                        <key>perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität OK]</key>
                     </item>
                 </graph_item>
             </graph_items>
