@@ -2,16 +2,17 @@
 
 ## Description
 Simple Hyper-V Guest and Host templates.
+
 Compatible with Zabbix Server 5.0+
 
 * Template Windows Hyper-V Guest  
 Discovers VM guest performance counters and creates Zabbix items for each of them.
+
 The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
 	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
-        * Hyper-V VM replication status
-
+    * Hyper-V VM replication status
 
 * Template Windows HyperV Host  
 The following _host_ parameters are monitored:
