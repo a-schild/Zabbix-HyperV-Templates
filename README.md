@@ -1,13 +1,8 @@
 # Zabbix Agent Templates for Hyper-V monitoring 
 
-## Note
-**! This repository is not supported anymore!**
-
-Some issues were fixed here https://github.com/a-schild/Zabbix-HyperV-Templates
-
 ## Description
 Simple Hyper-V Guest and Host templates.
-Compatible with Zabbix Server 3.0
+Compatible with Zabbix Server 5.0+
 
 * Template Windows Hyper-V Guest  
 Discovers VM guest performance counters and creates Zabbix items for each of them.
@@ -15,6 +10,7 @@ The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
 	* Hyper-V Hypervisor Virtual Processor(Total Run Time, %)
+        * Hyper-V VM replication status
 
 
 * Template Windows HyperV Host  
@@ -37,18 +33,31 @@ The following _host_ parameters are monitored:
 
 ## Usage
 * Import provided templates.  
-Allow Zabbix to create necessary groups. (Just to check that everything works as expected. You can modify all the details to suit your needs later.)
+Allow Zabbix to create necessary groups. 
+(Just to check that everything works as expected. You can modify all the details to suit your needs later.)
 
 *  Copy provided PowerShell script to the desired location on your HyperV host machine.
+   If your server(s) are not running a english version of windows, you will have to modify
+   the performance counters to match the names in the server OS language.
 
-* Put these lines in your _zabbix_agentd.conf_ on Hyper-V Host  
- Adjust the paths according to the previous step.
+*  Assuming your host is called my-hyperv-hostname, you can create a self siged certificate and sign it as follow:
+```$cert = New-SelfSignedCertificate -DnsName "my-hyperv-hostname" -type codesigning
+ Set-AuthenticodeSignature -Certificate $cert -FilePath 'C:\Program Files\Zabbix Agent 2\zabbix-vm-perf.ps1
+$exportPath = "C:\myCert.cer"
+Export-Certificate -Cert $cert -FilePath $exportPath
+Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\Root
+Remove-Item -Path $exportPath
+```
 
-`UserParameter=hyperv.discovery,powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1"`
-
-`UserParameter=hyperv.discoveryitem[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2"`
-
-`UserParameter=hyperv.check[*],powershell.exe -file "C:\Program Files\Zabbix\zabbix-vm-perf.ps1" "$1" "$2" "$3"`
+*  In case you don't care about security, you can lower the restrictions
+   If you downloaded the script from internet, then make sure windows is not blocking it.
+   
+   Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine
+   
+   
+* Put the file hyper-v.conf in C:\Program files\Zabbix Agent 2\zabbix_agentd.d
+  Adjust the paths according to the previous step if needed
 
 * Restart zabbix agent.
 
@@ -60,9 +69,21 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 		* create a new host for each VM,
 		* put discovered VM host into "Hyper-V VM" group,
 		* link VM host with "Template Windows HyperV VM Guest"
+* Go to the Hyper-V host in the Zabbix interface and click on the discoveries, and click on test.
+	* If you get an error check
+		* If your certificate is signed/you changed the policy to unrestricted.
+		* If your path in the config file is correct.
+```The argument 'C:\Program Files\Zabbix\zabbix-vm-perf.ps1' to the -File parameter does not exist. 
+Provide the path to an existing '.ps1' file as an argument to the -File parameter.
+Windows PowerShell 
+Copyright (C) 2016 Microsoft Corporation. All rights reserved.
+```
+
 
 ## F.A.Q.
 
+Depending on the load of your Hyper-V server, you will have to increase the default
+Zabbix Temout from 3 to 10-30 seconds
 
 
 ## Bugs
@@ -72,7 +93,8 @@ Allow Zabbix to create necessary groups. (Just to check that everything works as
 ## License:
 
 
-Copyright (c) 2014,2016 Dmitry Sarkisov <ait.meijin@gmail.com>
+Copyright (c) 2014     , Dmitry Sarkisov <ait.meijin@gmail.com>
+Copyright (c) 2016-2017, Andre Schild <a.schild@aarboard.ch>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
