@@ -1,0 +1,756 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  host_groups:
+    - uuid: 0b4d87047ee14edb98a87b309ee5a803
+      name: 'HyperV VM'
+  templates:
+    - uuid: 46656c3389674e99a51708e260d87688
+      template: 'Template Windows HyperV Host'
+      name: 'Template Windows HyperV Host'
+      description: |
+        See https://github.com/ameiji/Zabbix-HyperV-Templates
+        and https://github.com/a-schild/Zabbix-HyperV-Templates
+      groups:
+        - name: Templates
+      items:
+        - uuid: 62e4029b4e374f66be93c0a2e0a44441
+          name: 'HyperV Total Pages'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V-Hypervisor\Gesamtanzahl von Seiten]'
+          delay: 5m
+          history: 2w
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 5775349ddc254004b391cd3b6ece979a
+          name: 'HyperV Number of Logical CPUs'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V-Hypervisor\Logische Prozessoren]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 8e2dfc2a2eaf4bfa82e7e36e50aee316
+          name: 'HyperV Number of Partitions (VMs)'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V-Hypervisor\Partitionen]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: f89fc1ce21c842c4a6b321a684dfd30c
+          name: 'HyperV Total Pages'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V-Hypervisor\Seiten gesamt]'
+          delay: 5m
+          history: 2w
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 3a7c1cf73438492596ef29c28bda2377
+          name: 'HyperV Number of Virtual CPUs'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V-Hypervisor\Virtuelle Prozessoren]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 91fbe0f461da4ca2adb6920fedbaaddf
+          name: 'HyperV Monitored Notifications'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V-Hypervisor\Überwachte Benachrichtigungen]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 686f5da0f336438d859180e5e9e75fc7
+          name: 'HyperV VMs Critical'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität kritisch]'
+          history: 30d
+          trends: 90d
+          description: 'The number of critical VMs on a host.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 48f8cb9b172643c99a92f41859914f89
+              expression: 'last(/Template Windows HyperV Host/perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität kritisch])>0'
+              name: 'Hyper-V host has critical VMs'
+              priority: HIGH
+              description: 'The number of VMs running in a critical state.'
+        - uuid: 69eff8cfd5ae403e9fcfa1668abc4f05
+          name: 'HyperV VMs OK'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität OK]'
+          history: 30d
+          trends: 90d
+          description: 'The number of OK VM''s on a host.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 2374cffc06fc4696adc44d625a245ce2
+              expression: 'last(/Template Windows HyperV Host/perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität OK])=0'
+              name: 'Hyper-V host has 0 VMs in OK state'
+              priority: WARNING
+              description: 'Number of VMs in an OK state.'
+        - uuid: fb5e0f803903491ebd43f70ef8903fa9
+          name: 'HyperV Virtual CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Gastausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: a570fed49ab340d090e1023ff625bdb6
+          name: 'HyperV Virtual CPU Total Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Gesamtausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: e544846564fb4854bfec6b296b94d6e9
+          name: 'HyperV Virtual CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Hypervisorausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: deb3f0debe264340b7b0bbbfbda4b744
+          name: 'HyperV Virtual CPU Remote Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V - virtueller Prozessor des Hypervisors(_Total)\% Remoteausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor running on a remote node.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 2331c710b65d4f159b79e1effa8a4e1a
+          name: 'HyperV Logical CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 5baad609f2484613b4c9ce2c8519f484
+          name: 'HyperV Logical CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 3d9d3de29538439fb78186f47b25eb76
+          name: 'HyperV Logical CPU Idle Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in an idle state.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 7b661715e19d40ebbaf208408d80d8a9
+              expression: 'avg(/Template Windows HyperV Host/perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<10'
+              name: 'HyperV Host Idle CPU < 10%'
+              priority: WARNING
+        - uuid: 24fe013b75864eabb0a98c8791d5a7a9
+          name: 'HyperV Root Virtual CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 7a0007b4150e4e48b932d6d71c7c43fd
+          name: 'HyperV Root Virtual CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 2e8571b4368344d292b668e2144f2f4f
+          name: 'HyperV Root Virtual CPU Remote Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor running on a remote node.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: b901020311934c5bbe2f391492cd4c80
+          name: 'HyperV Root Virtual CPU Total Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 84c39e9c412b4dc2b5176560f28c57db
+          name: 'HyperV Virtual CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: c2dae19120c64cacbc81f2a541e70a92
+          name: 'HyperV Virtual CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 4b622cb423da4fbe9d6786211a6793ff
+          name: 'HyperV Virtual CPU Remote Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor running on a remote node.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 0d5e2e0194a84437b6e304cf7e7f8c93
+          name: 'HyperV Virtual CPU Total Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: f60c5d629a774f5987d74c657811c693
+          name: 'HyperV Number of Logical CPUs'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor\Logical Processors]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: bcc93232e18d418ab98c0195b7ac281a
+          name: 'HyperV Monitored Notifications'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor\Monitored Notifications]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: f4bd65316b8c49728adc217de83f44b6
+          name: 'HyperV Number of Partitions (VMs)'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor\Partitions]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: b14a9cf370e4426191e41998ef489508
+          name: 'HyperV Total Pages'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor\Total Pages]'
+          delay: 5m
+          history: 2w
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: c776f300182a41799b760847afd3886a
+          name: 'HyperV Number of Virtual CPUs'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Hypervisor\Virtual Processors]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 5928c6bc0a2841ae994f4764175b8114
+          name: 'HyperV VMs Critical'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical]'
+          history: 30d
+          trends: 90d
+          description: 'The number of critical VMs on a host.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 1ea6084474944b6a9e591c9f452c72d3
+              expression: 'last(/Template Windows HyperV Host/perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical])>0'
+              name: 'Hyper-V host has critical VMs'
+              priority: HIGH
+              description: 'The number of VMs running in a critical state.'
+        - uuid: 5446a5a6fb5142b5bb98ea6b23dfbf9f
+          name: 'HyperV VMs OK'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok]'
+          history: 30d
+          trends: 90d
+          description: 'The number of OK VM''s on a host.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 535706cfbefc4e3a8a64521b6d4fdb3d
+              expression: 'last(/Template Windows HyperV Host/perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok])=0'
+              name: 'Hyper-V host has 0 VMs in OK state'
+              priority: WARNING
+              description: 'Number of VMs in an OK state.'
+        - uuid: 02e91ac1617a41d49d1df4f905e6d1e4
+          name: 'HyperV Virtual Switch B/s Received'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Virtual Switch(*)\Bytes Received/sec]'
+          history: 30d
+          value_type: FLOAT
+          units: Bits/sec
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '8'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 1d919833ab184244882886b2a5e70631
+          name: 'HyperV Virtual Switch B/s Sent'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]'
+          history: 30d
+          value_type: FLOAT
+          units: Bits/sec
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '8'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 7628c9fe62614f89be501f0a114f00a3
+          name: 'HyperV Logical CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Gastausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 015d0ead5f834a4bad85552b31358bdf
+          name: 'HyperV Logical CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Hypervisorausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: f5431c013afb406e97105229cb7ab094
+          name: 'HyperV Logical CPU Idle Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Leerlaufzeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in an idle state.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 942f3fe4afb64c26a51e25edc651403c
+              expression: 'avg(/Template Windows HyperV Host/perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Leerlaufzeit],#3)<10'
+              name: 'HyperV Host Idle CPU < 10%'
+              priority: WARNING
+        - uuid: 18633d10fd704c329e619a56698333f7
+          name: 'HyperV Virtual Switch B/s Received'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Virtueller Hyper-V-Switch(*)\Empfangene Bytes/s]'
+          history: 30d
+          value_type: FLOAT
+          units: Bits/sec
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '8'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 5e0fca9cd5184d37828e1a2fed9bcbdb
+          name: 'HyperV Virtual Switch B/s Sent'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Virtueller Hyper-V-Switch(*)\Gesendete Bytes/s]'
+          history: 30d
+          value_type: FLOAT
+          units: Bits/sec
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '8'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: f95701c8990047319f0ee3d7e33e1a8d
+          name: 'HyperV Root Virtual CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Gastausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: fea5bce287f3438cb4526596b9459892
+          name: 'HyperV Root Virtual CPU Total Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Gesamtausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 9a9e6fd33e8f4141b86510574baf8a88
+          name: 'HyperV Root Virtual CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Hypervisorausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 97f229c852244e9b886859405be6be42
+          name: 'HyperV Root Virtual CPU Remote Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter[\Virtueller Prozessor des Hyper-V-Hypervisorstamms(_Total)\% Remoteausführungszeit]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor running on a remote node.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: b63f7bdbafd045cb833beed222584d22
+          name: 'HyperV Service State'
+          type: ZABBIX_ACTIVE
+          key: 'service_state[vmms]'
+          delay: 5m
+          history: 30d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: a72b83bca14f4f55b4e41906419ba353
+              expression: 'last(/Template Windows HyperV Host/service_state[vmms])<>0'
+              name: 'HyperV service state'
+              priority: HIGH
+      discovery_rules:
+        - uuid: ace26cccec1c4f63ae4e2587e739204e
+          name: 'Hyper-V VM Discovery'
+          key: hyperv.discovery
+          delay: 1h
+          lifetime: 15d
+          enabled_lifetime_type: DISABLE_NEVER
+          description: |
+            HyperV Guest VM Discovery
+            Requires PowerShell script installed on HyperV Host.
+          item_prototypes:
+            - uuid: d366f7317b6c4fc6a7614dbab691b0a2
+              name: 'Replication {#VMNAME}'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[GetVMReplication,{#VMNAME}]'
+              delay: 10m
+              history: 90d
+              value_type: TEXT
+              trends: '0'
+              tags:
+                - tag: Application
+                  value: 'HyperV Host'
+              trigger_prototypes:
+                - uuid: 0785d2e285bf4ed5a4670f46afc8475d
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME}],,"regexp","Critical")=1'
+                  name: 'Replication state {#VMNAME} critical'
+                  priority: HIGH
+                - uuid: 21d06d873e0c41c28a1d8bf628e8df8d
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME}],,"regexp","Warning")=1'
+                  name: 'Replication state {#VMNAME} warning'
+                  priority: WARNING
+            - uuid: 64af9035a2a349d2a81d9509210d82f2
+              name: 'VM status {#VMNAME}'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[GetVMStatus,{#VMNAME}]'
+              delay: 5m
+              history: 90d
+              value_type: TEXT
+              trends: '0'
+              tags:
+                - tag: Application
+                  value: 'HyperV Host'
+              trigger_prototypes:
+                - uuid: 3b1e3570ed934918bcbc4b60602f563d
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME}],1s,"like","Saved")=1'
+                  name: '{#VMNAME} in saved state'
+                  priority: HIGH
+                - uuid: 89182d0d0f42489ca449896f7dbc7dbd
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME}],1s,"like","Off")=1'
+                  name: '{#VMNAME} is Off'
+                  priority: INFO
+          host_prototypes:
+            - uuid: b3daed7e19fd492e969f1e2cf7207f42
+              host: '{#VMNAME}_{#VMHOST}'
+              name: '{#VMNAME}_{#VMHOST}'
+              group_links:
+                - group:
+                    name: 'HyperV VM'
+              templates:
+                - name: 'Template Windows HyperV VM Guest'
+      dashboards:
+        - uuid: 411810b978424df09f36646b0421a11c
+          name: '{HOSTNAME} Status'
+          pages:
+            - {  }
+  triggers:
+    - uuid: 11e8a370b5ff4171b9de038fc4479290
+      expression: 'last(/Template Windows HyperV Host/perf_counter[\Hyper-V-Hypervisor\Virtuelle Prozessoren])/last(/Template Windows HyperV Host/perf_counter[\Hyper-V-Hypervisor\Logische Prozessoren])>5'
+      name: 'Hyper-V Virtual to Logical CPU Ratio > 5:1'
+      priority: WARNING
+    - uuid: b2a2b06c978e4251a41e99db0a80a1ed
+      expression: 'last(/Template Windows HyperV Host/perf_counter[\Hyper-V Hypervisor\Virtual Processors])/last(/Template Windows HyperV Host/perf_counter[\Hyper-V Hypervisor\Logical Processors])>5'
+      name: 'Hyper-V Virtual to Logical CPU Ratio > 5:1'
+      priority: WARNING
+  graphs:
+    - uuid: d2f92df254374c0d973ef75b5c706680
+      name: 'HyperV CPUs, VMs & Notifications'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 0000EE
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor\Logical Processors]'
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: 33FFFF
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor\Virtual Processors]'
+        - sortorder: '2'
+          drawtype: BOLD_LINE
+          color: DD0000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor\Partitions]'
+        - sortorder: '3'
+          drawtype: BOLD_LINE
+          color: 00CC00
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor\Monitored Notifications]'
+    - uuid: c12215d95daa4991b6da39c330b32d61
+      name: 'HyperV CPUs, VMs & Notifications DE'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 0000EE
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V-Hypervisor\Logische Prozessoren]'
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: 33FFFF
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V-Hypervisor\Virtuelle Prozessoren]'
+        - sortorder: '2'
+          drawtype: BOLD_LINE
+          color: DD0000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor\Partitions]'
+        - sortorder: '3'
+          drawtype: BOLD_LINE
+          color: 00CC00
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V-Hypervisor\Überwachte Benachrichtigungen]'
+    - uuid: 50431474c5454e85bf941e3b18239815
+      name: 'HyperV CPU Total'
+      height: '400'
+      show_triggers: 'NO'
+      type: STACKED
+      ymax_type_1: FIXED
+      graph_items:
+        - color: 00CC00
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]'
+        - sortorder: '1'
+          color: DD0000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]'
+    - uuid: fdb9136129fa4e298ce822db717fefa0
+      name: 'HyperV CPU Total DE'
+      height: '400'
+      show_triggers: 'NO'
+      type: STACKED
+      ymax_type_1: FIXED
+      graph_items:
+        - color: 00CC00
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Gastausführungszeit]'
+        - sortorder: '1'
+          color: DD0000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Logischer Prozessor für Hyper-V-Hypervisor(_Total)\% Hypervisorausführungszeit]'
+    - uuid: 75779dc6d6764bcda9147acab23e6631
+      name: 'HyperV Network'
+      height: '300'
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: 3333FF
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Virtual Switch(*)\Bytes Received/sec]'
+        - sortorder: '1'
+          drawtype: GRADIENT_LINE
+          color: 00DD00
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]'
+    - uuid: 256a86a0c7084d2e856fbaaad95a852d
+      name: 'HyperV Network DE'
+      height: '300'
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: 3333FF
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Virtueller Hyper-V-Switch(*)\Empfangene Bytes/s]'
+        - sortorder: '1'
+          drawtype: GRADIENT_LINE
+          color: 00DD00
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Virtueller Hyper-V-Switch(*)\Gesendete Bytes/s]'
+    - uuid: 0bb2bde2bd524c34a7b0f8a878ddac3e
+      name: 'HyperV Total Pages'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: C80000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Hypervisor\Total Pages]'
+    - uuid: 6bef9958a02b44baa96e7913e33d5b3d
+      name: 'HyperV Total Pages DE'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: C80000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V-Hypervisor\Gesamtanzahl von Seiten]'
+    - uuid: 2556e5defaaf4c3192459d3f8bea58ff
+      name: 'HyperV VM Status'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: C80000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Virtual Machine Health Summary\Health Critical]'
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: 00C800
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V Virtual Machine Health Summary\Health Ok]'
+    - uuid: 5129b1a876184c99bf8eee37874d1815
+      name: 'HyperV VM Status DE'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: C80000
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität kritisch]'
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: 00C800
+          item:
+            host: 'Template Windows HyperV Host'
+            key: 'perf_counter[\Hyper-V - Integritätszusammenfassung für virtuelle Computer\Integrität OK]'

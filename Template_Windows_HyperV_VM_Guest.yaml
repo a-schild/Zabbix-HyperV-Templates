@@ -1,0 +1,137 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 0b4d87047ee14edb98a87b309ee5a803
+      name: 'HyperV VM'
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+    - uuid: aea23489ce3a49b6806ebb28e0cda430
+      name: Windows
+  templates:
+    - uuid: 46d3bf56e8ce466cac49c6e116e0e49f
+      template: 'Template Windows HyperV VM Guest'
+      name: 'Template Windows HyperV VM Guest'
+      groups:
+        - name: 'HyperV VM'
+        - name: Templates
+        - name: Windows
+      discovery_rules:
+        - uuid: fb33ea011419436c83e075c38029ce90
+          name: 'Hyper-V VM CPU Discovery'
+          key: 'hyperv.discoveryitem[GetVMCPUs,{HOST.NAME}]'
+          delay: 10m
+          lifetime: 30d
+          enabled_lifetime_type: DISABLE_NEVER
+          description: 'Hyper-V VM Virtual CPU Discovery'
+          item_prototypes:
+            - uuid: e92cfe21ae6943f9b2c6a4884839eee6
+              name: 'Hyper-V VM Virtual CPU {#VMCPU} Total'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMCPUTotal,{HOST.NAME},"{#VMCPU}"]'
+              history: 30d
+              units: '%'
+          graph_prototypes:
+            - uuid: 71e8643d71184108a59ea63b42cee17c
+              name: 'Hyper-V VM Virtual CPU {#VMCPU} Total'
+              graph_items:
+                - drawtype: GRADIENT_LINE
+                  color: 00BB00
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMCPUTotal,{HOST.NAME},"{#VMCPU}"]'
+        - uuid: c2090767dc39498ca820788c7dc14d46
+          name: 'Hyper-V VM Virtual Disk Discovery'
+          key: 'hyperv.discoveryitem[GetVMDisks,{HOST.NAME}]'
+          delay: 10m
+          lifetime: 30d
+          enabled_lifetime_type: DISABLE_NEVER
+          description: 'Hyper-V VM Virtual Disk Diskcovery'
+          item_prototypes:
+            - uuid: e75dcff870f7425aad1e206b1f385a46
+              name: 'Hyper-V VM Virtual Disk {#VMDISK} Bytes Read'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMDISKBytesRead,{HOST.NAME},"{#VMDISK}"]'
+              history: 30d
+              units: Bytes
+            - uuid: 5572cb6a16844957aa6baed1394f2b08
+              name: 'Hyper-V VM Virtual Disk {#VMDISK} Bytes Write'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMDISKBytesWrite,{HOST.NAME},"{#VMDISK}"]'
+              history: 30d
+              units: Bytes
+            - uuid: 2165cf4ce73f41148e7fa958bbe36519
+              name: 'Hyper-V VM Virtual Disk {#VMDISK} IOPS Read'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMDISKOpsRead,{HOST.NAME},"{#VMDISK}"]'
+              history: 30d
+              units: ops
+            - uuid: 73f3413cfb7c4c87b162f4e77fc9f034
+              name: 'Hyper-V VM Virtual Disk {#VMDISK} IOPS Write'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMDISKOpsWrite,{HOST.NAME},"{#VMDISK}"]'
+              history: 30d
+              units: ops
+          graph_prototypes:
+            - uuid: b096774c046f45828694e90973fa28b5
+              name: 'Hyper-V VM Virtual Disk {#VMDISK} Performance'
+              graph_items:
+                - drawtype: GRADIENT_LINE
+                  color: 00CC00
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMDISKBytesRead,{HOST.NAME},"{#VMDISK}"]'
+                - sortorder: '1'
+                  drawtype: GRADIENT_LINE
+                  color: 0000CC
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMDISKBytesWrite,{HOST.NAME},"{#VMDISK}"]'
+                - sortorder: '2'
+                  drawtype: BOLD_LINE
+                  color: 00BBBB
+                  yaxisside: RIGHT
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMDISKOpsRead,{HOST.NAME},"{#VMDISK}"]'
+                - sortorder: '3'
+                  drawtype: BOLD_LINE
+                  color: DD00DD
+                  yaxisside: RIGHT
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMDISKOpsWrite,{HOST.NAME},"{#VMDISK}"]'
+        - uuid: 55e100d1a1b54a719ea4f2b3f4a02e55
+          name: 'Hyper-V VM Virtual NIC Discovery'
+          key: 'hyperv.discoveryitem[GetVMNICs,{HOST.NAME}]'
+          delay: 10m
+          lifetime: 30d
+          enabled_lifetime_type: DISABLE_NEVER
+          description: 'Hyper-V VM Virtual Net Adapter Diskcovery'
+          item_prototypes:
+            - uuid: 5791ac64b17a43a787b363be66a94b75
+              name: 'Hyper-V VM VNIC {#VMNIC} Bytes Recvd'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMNICRecv,{HOST.NAME},"{#VMNIC}"]'
+              history: 30d
+              units: Bytes
+            - uuid: 3c8356f4cf9f427a885ca37e6861f666
+              name: 'Hyper-V VM VNIC {#VMNIC} Bytes Sent'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.check[VMNICSent,{HOST.NAME},"{#VMNIC}"]'
+              history: 30d
+              units: Bytes
+          graph_prototypes:
+            - uuid: 4789d0bdf78c4a01b2476fdb36ebfa27
+              name: 'Hyper-V VM {#VMNIC} Network usage'
+              graph_items:
+                - drawtype: GRADIENT_LINE
+                  color: 0000DD
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMNICRecv,{HOST.NAME},"{#VMNIC}"]'
+                - sortorder: '1'
+                  drawtype: GRADIENT_LINE
+                  color: 00C800
+                  item:
+                    host: 'Template Windows HyperV VM Guest'
+                    key: 'hyperv.check[VMNICSent,{HOST.NAME},"{#VMNIC}"]'
