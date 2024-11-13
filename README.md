@@ -33,18 +33,13 @@ The following _host_ parameters are monitored:
 	* Hyper-V Virtual Switch(*)\Bytes
 	* Hyper-V Virtual Machine Health Summary\Health Critical
 	
-* Currently the script+template only work for servers installed with the EN or DE image
-  This is due to the way windows handels performance counters, they always
-  use names corresponding to the initial windows image language
-
 ## Usage
 * Import provided templates in this order
   1. Template_Windows_HyperV_VM_Guest.xml (or the yaml version)
   2. Template_Windows_HyperV_Host.xml (or the yaml version)
 
 *  Copy provided PowerShell script to the desired location on your HyperV host machine.
-   If your server(s) are not running a english version of windows, you will have to modify
-   the performance counters to match the names in the server OS language.
+   `C:\Program Files\Zabbix Agent 2\` is the default used in the config file.
 
 *  Assuming your host is called my-hyperv-hostname, you can create a self siged certificate and sign it as follow:
 ```$cert = New-SelfSignedCertificate -DnsName "my-hyperv-hostname" -type codesigning
@@ -126,21 +121,15 @@ zabbix_get -s 127.0.0.1 -k hyperv.discovery --tls-connect psk \
     --tls-psk-identity SERVER-IDENTITY --tls-psk-file "C:\Program Files\Zabbix Agent 2\psk.key"
 ```
 
-- Zabbix log file
-  It is normal to see some errors in the zabbix agent log file.
-  Since the script works for EN and DE installed servers, we have to query both
-  performance counters. And the counters in the other language don't exist
-  so they show up as errors in the log file, but can be ignored.
-
-```log
-2024/11/13 10:07:31.031561 check 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]' is not supported: Failed to get counter for path "\\Hyper-V Hypervisor Root Virtual Processor(_Total)\\% Remote Run Time" and lang 0: Cannot add counter: Das angegebene Objekt wurde nicht auf dem Computer gefunden.
-.
-2024/11/13 10:07:32.030406 check 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]' is not supported: Failed to get counter for path "\\Hyper-V Hypervisor Root Virtual Processor(_Total)\\% Total Run Time" and lang 0: Cannot add counter: Das angegebene Objekt wurde nicht auf dem Computer gefunden.
-. ```  
 
 ## Bugs
 * There are no Triggers for VM Guest.
 
+## Changelog
+- 2024-11-13
+  - Switched performance counters to work with all OS languages.
+    Thanks to the new perf_counter_en zabbix item.
+	Updated documentation
 
 ## License:
 
