@@ -1,9 +1,12 @@
-# Zabbix Agent Templates for Hyper-V monitoring 
+# Zabbix Agent 2 Templates for Hyper-V monitoring 
 
 ## Description
 Simple Hyper-V Guest and Host templates.
 
 Compatible with Zabbix Server 7.0+
+
+The scripts are setup for the Agent2, but they also work with the 
+normal agent if you adapt some paths in the conf file.
 
 * Template Windows Hyper-V Guest  
 Discovers VM guest performance counters and creates Zabbix items for each of them.
@@ -30,12 +33,14 @@ The following _host_ parameters are monitored:
 	* Hyper-V Virtual Switch(*)\Bytes
 	* Hyper-V Virtual Machine Health Summary\Health Critical
 	
-
+* Currently the script+template only work for servers installed with the EN or DE image
+  This is due to the way windows handels performance counters, they always
+  use names corresponding to the initial windows image language
 
 ## Usage
-* Import provided templates.  
-Allow Zabbix to create necessary groups. 
-(Just to check that everything works as expected. You can modify all the details to suit your needs later.)
+* Import provided templates in this order
+  1. Template_Windows_HyperV_VM_Guest.xml (or the yaml version)
+  2. Template_Windows_HyperV_Host.xml (or the yaml version)
 
 *  Copy provided PowerShell script to the desired location on your HyperV host machine.
    If your server(s) are not running a english version of windows, you will have to modify
@@ -74,7 +79,7 @@ Remove-Item -Path $exportPath
 	* If you get an error check
 		* If your certificate is signed/you changed the policy to unrestricted.
 		* If your path in the config file is correct.
-```The argument 'C:\Program Files\Zabbix\zabbix-vm-perf.ps1' to the -File parameter does not exist. 
+```The argument 'C:\Program Files\Zabbix Agent 2\zabbix-vm-perf.ps1' to the -File parameter does not exist. 
 Provide the path to an existing '.ps1' file as an argument to the -File parameter.
 Windows PowerShell 
 Copyright (C) 2016 Microsoft Corporation. All rights reserved.
@@ -83,9 +88,55 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 
 ## F.A.Q.
 
-Depending on the load of your Hyper-V server, you will have to increase the default
-Zabbix Temout from 3 to 10-30 seconds
+- Depending on the load of your Hyper-V server, you will have to increase the default
+  Zabbix Temout from 3 to 10-30 seconds
+  
+- Make sure the agent is allowed to execute the zabbix-vm-perf.ps1 file.
+  For this open a cmd console in the `C:\Program Files\Zabbix Agent 2` location
+  Then type `powershell zabbix-vm-perf.ps1` + enter
+  This should return a json structure with all the VM's on this host,
+  including the vm state, and the replication status
 
+```cmd
+c:\Program Files\Zabbix Agent 2\zabbix_agent2.d>powershell .\zabbix-vm-perf.ps1
+```
+Example output
+```json
+{
+ "data":[
+
+ { "{#VMNAME}":"apps-company" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Suspended" },
+ { "{#VMNAME}":"ipva-company" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Suspended" },
+ { "{#VMNAME}":"rp-company" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Error" },
+ { "{#VMNAME}":"SV02" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Error" },
+ { "{#VMNAME}":"sv03" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Disabled" },
+ { "{#VMNAME}":"sv05" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Error" },
+ { "{#VMNAME}":"sv101" ,"{#VMSTATE}":"Running", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"Error" },
+ { "{#VMNAME}":"XCase" ,"{#VMSTATE}":"Off", "{#VMHOST}":"SV02-HV" ,"{#REPLICATION}":"WaitingForStartResynchronize" }
+ ]
+}
+```
+
+If the discovery still does not work, try to get the vm list via zabbix_get and the agent.
+You might have to allow 127.0.0.1 in the agent config.
+This should return the same json data as invoking the script directly
+
+```cmd
+zabbix_get -s 127.0.0.1 -k hyperv.discovery --tls-connect psk \
+    --tls-psk-identity SERVER-IDENTITY --tls-psk-file "C:\Program Files\Zabbix Agent 2\psk.key"
+```
+
+- Zabbix log file
+  It is normal to see some errors in the zabbix agent log file.
+  Since the script works for EN and DE installed servers, we have to query both
+  performance counters. And the counters in the other language don't exist
+  so they show up as errors in the log file, but can be ignored.
+
+```log
+2024/11/13 10:07:31.031561 check 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]' is not supported: Failed to get counter for path "\\Hyper-V Hypervisor Root Virtual Processor(_Total)\\% Remote Run Time" and lang 0: Cannot add counter: Das angegebene Objekt wurde nicht auf dem Computer gefunden.
+.
+2024/11/13 10:07:32.030406 check 'perf_counter[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]' is not supported: Failed to get counter for path "\\Hyper-V Hypervisor Root Virtual Processor(_Total)\\% Total Run Time" and lang 0: Cannot add counter: Das angegebene Objekt wurde nicht auf dem Computer gefunden.
+. ```  
 
 ## Bugs
 * There are no Triggers for VM Guest.
