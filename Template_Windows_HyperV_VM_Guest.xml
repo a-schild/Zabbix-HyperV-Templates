@@ -44,7 +44,6 @@
                         <item_prototype>
                             <uuid>e92cfe21ae6943f9b2c6a4884839eee6</uuid>
                             <name>Hyper-V VM Virtual CPU {#VMCPU} Total</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMCPUTotal,{HOST.NAME},&quot;{#VMCPU}&quot;]</key>
                             <history>30d</history>
                             <units>%</units>
@@ -79,7 +78,6 @@
                         <item_prototype>
                             <uuid>e75dcff870f7425aad1e206b1f385a46</uuid>
                             <name>Hyper-V VM Virtual Disk {#VMDISK} Bytes Read</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMDISKBytesRead,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>Bytes</units>
@@ -87,7 +85,6 @@
                         <item_prototype>
                             <uuid>5572cb6a16844957aa6baed1394f2b08</uuid>
                             <name>Hyper-V VM Virtual Disk {#VMDISK} Bytes Write</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMDISKBytesWrite,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>Bytes</units>
@@ -95,7 +92,6 @@
                         <item_prototype>
                             <uuid>2165cf4ce73f41148e7fa958bbe36519</uuid>
                             <name>Hyper-V VM Virtual Disk {#VMDISK} IOPS Read</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMDISKOpsRead,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>ops</units>
@@ -103,7 +99,6 @@
                         <item_prototype>
                             <uuid>73f3413cfb7c4c87b162f4e77fc9f034</uuid>
                             <name>Hyper-V VM Virtual Disk {#VMDISK} IOPS Write</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMDISKOpsWrite,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>ops</units>
@@ -167,7 +162,6 @@
                         <item_prototype>
                             <uuid>5791ac64b17a43a787b363be66a94b75</uuid>
                             <name>Hyper-V VM VNIC {#VMNIC} Bytes Recvd</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMNICRecv,{HOST.NAME},&quot;{#VMNIC}&quot;]</key>
                             <history>30d</history>
                             <units>Bytes</units>
@@ -175,7 +169,6 @@
                         <item_prototype>
                             <uuid>3c8356f4cf9f427a885ca37e6861f666</uuid>
                             <name>Hyper-V VM VNIC {#VMNIC} Bytes Sent</name>
-                            <type>ZABBIX_ACTIVE</type>
                             <key>hyperv.check[VMNICSent,{HOST.NAME},&quot;{#VMNIC}&quot;]</key>
                             <history>30d</history>
                             <units>Bytes</units>

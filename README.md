@@ -126,6 +126,8 @@ zabbix_get -s 127.0.0.1 -k hyperv.discovery --tls-connect psk \
 * There are no Triggers for VM Guest.
 
 ## Changelog
+- 2024-11-20
+  - Switch item prototypes in VM Guest template to Zabbix passive agent
 - 2024-11-13
   - Switched performance counters to work with all OS languages.
     Thanks to the new perf_counter_en zabbix item.

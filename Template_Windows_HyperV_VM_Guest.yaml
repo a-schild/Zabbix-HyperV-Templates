@@ -26,7 +26,6 @@ zabbix_export:
           item_prototypes:
             - uuid: e92cfe21ae6943f9b2c6a4884839eee6
               name: 'Hyper-V VM Virtual CPU {#VMCPU} Total'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMCPUTotal,{HOST.NAME},"{#VMCPU}"]'
               history: 30d
               units: '%'
@@ -49,25 +48,21 @@ zabbix_export:
           item_prototypes:
             - uuid: e75dcff870f7425aad1e206b1f385a46
               name: 'Hyper-V VM Virtual Disk {#VMDISK} Bytes Read'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMDISKBytesRead,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: Bytes
             - uuid: 5572cb6a16844957aa6baed1394f2b08
               name: 'Hyper-V VM Virtual Disk {#VMDISK} Bytes Write'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMDISKBytesWrite,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: Bytes
             - uuid: 2165cf4ce73f41148e7fa958bbe36519
               name: 'Hyper-V VM Virtual Disk {#VMDISK} IOPS Read'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMDISKOpsRead,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: ops
             - uuid: 73f3413cfb7c4c87b162f4e77fc9f034
               name: 'Hyper-V VM Virtual Disk {#VMDISK} IOPS Write'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMDISKOpsWrite,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: ops
@@ -110,13 +105,11 @@ zabbix_export:
           item_prototypes:
             - uuid: 5791ac64b17a43a787b363be66a94b75
               name: 'Hyper-V VM VNIC {#VMNIC} Bytes Recvd'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMNICRecv,{HOST.NAME},"{#VMNIC}"]'
               history: 30d
               units: Bytes
             - uuid: 3c8356f4cf9f427a885ca37e6861f666
               name: 'Hyper-V VM VNIC {#VMNIC} Bytes Sent'
-              type: ZABBIX_ACTIVE
               key: 'hyperv.check[VMNICSent,{HOST.NAME},"{#VMNIC}"]'
               history: 30d
               units: Bytes
