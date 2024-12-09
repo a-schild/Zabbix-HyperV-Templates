@@ -29,6 +29,7 @@ zabbix_export:
               key: 'hyperv.check[VMCPUTotal,{HOST.NAME},"{#VMCPU}"]'
               history: 30d
               units: '%'
+              timeout: 30s
           graph_prototypes:
             - uuid: 71e8643d71184108a59ea63b42cee17c
               name: 'Hyper-V VM Virtual CPU {#VMCPU} Total'
@@ -51,21 +52,25 @@ zabbix_export:
               key: 'hyperv.check[VMDISKBytesRead,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: Bytes
+              timeout: 30s
             - uuid: 5572cb6a16844957aa6baed1394f2b08
               name: 'Hyper-V VM Virtual Disk {#VMDISK} Bytes Write'
               key: 'hyperv.check[VMDISKBytesWrite,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: Bytes
+              timeout: 30s
             - uuid: 2165cf4ce73f41148e7fa958bbe36519
               name: 'Hyper-V VM Virtual Disk {#VMDISK} IOPS Read'
               key: 'hyperv.check[VMDISKOpsRead,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: ops
+              timeout: 30s
             - uuid: 73f3413cfb7c4c87b162f4e77fc9f034
               name: 'Hyper-V VM Virtual Disk {#VMDISK} IOPS Write'
               key: 'hyperv.check[VMDISKOpsWrite,{HOST.NAME},"{#VMDISK}"]'
               history: 30d
               units: ops
+              timeout: 30s
           graph_prototypes:
             - uuid: b096774c046f45828694e90973fa28b5
               name: 'Hyper-V VM Virtual Disk {#VMDISK} Performance'
@@ -128,3 +133,10 @@ zabbix_export:
                   item:
                     host: 'Template Windows HyperV VM Guest'
                     key: 'hyperv.check[VMNICSent,{HOST.NAME},"{#VMNIC}"]'
+      tags:
+        - tag: class
+          value: software
+        - tag: target
+          value: hyperv
+        - tag: target
+          value: hyperv-client

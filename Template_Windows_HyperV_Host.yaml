@@ -254,7 +254,7 @@ zabbix_export:
         - uuid: b63f7bdbafd045cb833beed222584d22
           name: 'HyperV Service State'
           type: ZABBIX_ACTIVE
-          key: 'service_state[vmms]'
+          key: 'service.info[vmms]'
           delay: 5m
           history: 30d
           tags:
@@ -262,7 +262,7 @@ zabbix_export:
               value: 'HyperV Host'
           triggers:
             - uuid: a72b83bca14f4f55b4e41906419ba353
-              expression: 'last(/Template Windows HyperV Host/service_state[vmms])<>0'
+              expression: 'last(/Template Windows HyperV Host/service.info[vmms])<>0'
               name: 'HyperV service state'
               priority: HIGH
       discovery_rules:
@@ -284,6 +284,7 @@ zabbix_export:
               history: 90d
               value_type: TEXT
               trends: '0'
+              timeout: 30s
               tags:
                 - tag: Application
                   value: 'HyperV Host'
@@ -304,6 +305,7 @@ zabbix_export:
               history: 90d
               value_type: TEXT
               trends: '0'
+              timeout: 30s
               tags:
                 - tag: Application
                   value: 'HyperV Host'
@@ -325,6 +327,12 @@ zabbix_export:
                     name: 'HyperV VM'
               templates:
                 - name: 'Template Windows HyperV VM Guest'
+          timeout: 30s
+      tags:
+        - tag: target
+          value: hyperv
+        - tag: target
+          value: hyperv-host
       dashboards:
         - uuid: 411810b978424df09f36646b0421a11c
           name: 'Hyper-V Host'

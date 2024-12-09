@@ -382,7 +382,7 @@ and https://github.com/a-schild/Zabbix-HyperV-Templates</description>
                     <uuid>b63f7bdbafd045cb833beed222584d22</uuid>
                     <name>HyperV Service State</name>
                     <type>ZABBIX_ACTIVE</type>
-                    <key>service_state[vmms]</key>
+                    <key>service.info[vmms]</key>
                     <delay>5m</delay>
                     <history>30d</history>
                     <tags>
@@ -394,7 +394,7 @@ and https://github.com/a-schild/Zabbix-HyperV-Templates</description>
                     <triggers>
                         <trigger>
                             <uuid>a72b83bca14f4f55b4e41906419ba353</uuid>
-                            <expression>last(/Template Windows HyperV Host/service_state[vmms])&lt;&gt;0</expression>
+                            <expression>last(/Template Windows HyperV Host/service.info[vmms])&lt;&gt;0</expression>
                             <name>HyperV service state</name>
                             <priority>HIGH</priority>
                         </trigger>
@@ -421,6 +421,7 @@ Requires PowerShell script installed on HyperV Host.</description>
                             <history>90d</history>
                             <value_type>TEXT</value_type>
                             <trends>0</trends>
+                            <timeout>30s</timeout>
                             <tags>
                                 <tag>
                                     <tag>Application</tag>
@@ -451,6 +452,7 @@ Requires PowerShell script installed on HyperV Host.</description>
                             <history>90d</history>
                             <value_type>TEXT</value_type>
                             <trends>0</trends>
+                            <timeout>30s</timeout>
                             <tags>
                                 <tag>
                                     <tag>Application</tag>
@@ -492,8 +494,19 @@ Requires PowerShell script installed on HyperV Host.</description>
                             </templates>
                         </host_prototype>
                     </host_prototypes>
+                    <timeout>30s</timeout>
                 </discovery_rule>
             </discovery_rules>
+            <tags>
+                <tag>
+                    <tag>target</tag>
+                    <value>hyperv</value>
+                </tag>
+                <tag>
+                    <tag>target</tag>
+                    <value>hyperv-host</value>
+                </tag>
+            </tags>
             <dashboards>
                 <dashboard>
                     <uuid>411810b978424df09f36646b0421a11c</uuid>

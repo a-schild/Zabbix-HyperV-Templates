@@ -47,6 +47,7 @@
                             <key>hyperv.check[VMCPUTotal,{HOST.NAME},&quot;{#VMCPU}&quot;]</key>
                             <history>30d</history>
                             <units>%</units>
+                            <timeout>30s</timeout>
                         </item_prototype>
                     </item_prototypes>
                     <graph_prototypes>
@@ -81,6 +82,7 @@
                             <key>hyperv.check[VMDISKBytesRead,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>Bytes</units>
+                            <timeout>30s</timeout>
                         </item_prototype>
                         <item_prototype>
                             <uuid>5572cb6a16844957aa6baed1394f2b08</uuid>
@@ -88,6 +90,7 @@
                             <key>hyperv.check[VMDISKBytesWrite,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>Bytes</units>
+                            <timeout>30s</timeout>
                         </item_prototype>
                         <item_prototype>
                             <uuid>2165cf4ce73f41148e7fa958bbe36519</uuid>
@@ -95,6 +98,7 @@
                             <key>hyperv.check[VMDISKOpsRead,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>ops</units>
+                            <timeout>30s</timeout>
                         </item_prototype>
                         <item_prototype>
                             <uuid>73f3413cfb7c4c87b162f4e77fc9f034</uuid>
@@ -102,6 +106,7 @@
                             <key>hyperv.check[VMDISKOpsWrite,{HOST.NAME},&quot;{#VMDISK}&quot;]</key>
                             <history>30d</history>
                             <units>ops</units>
+                            <timeout>30s</timeout>
                         </item_prototype>
                     </item_prototypes>
                     <graph_prototypes>
@@ -201,6 +206,20 @@
                     </graph_prototypes>
                 </discovery_rule>
             </discovery_rules>
+            <tags>
+                <tag>
+                    <tag>class</tag>
+                    <value>software</value>
+                </tag>
+                <tag>
+                    <tag>target</tag>
+                    <value>hyperv</value>
+                </tag>
+                <tag>
+                    <tag>target</tag>
+                    <value>hyperv-client</value>
+                </tag>
+            </tags>
         </template>
     </templates>
 </zabbix_export>
