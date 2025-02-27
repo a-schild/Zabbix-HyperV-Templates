@@ -93,7 +93,7 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
   including the vm state, and the replication status
 
 ```cmd
-c:\Program Files\Zabbix Agent 2\zabbix_agent2.d>powershell .\zabbix-vm-perf.ps1
+c:\Program Files\Zabbix Agent 2\>powershell .\zabbix-vm-perf.ps1
 ```
 Example output
 ```json
