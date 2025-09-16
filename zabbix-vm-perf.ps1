@@ -38,21 +38,50 @@ Function Get-PerformanceCounterLocalName
     $ComputerName = $env:COMPUTERNAME
   )
  
-  $code = '[DllImport("pdh.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern UInt32 PdhLookupPerfNameByIndex(string szMachineName, uint dwNameIndex, System.Text.StringBuilder szNameBuffer, ref uint pcchNameBufferSize);'
- 
-  $Buffer = New-Object System.Text.StringBuilder(1024)
-  [UInt32]$BufferSize = $Buffer.Capacity
- 
-  $t = Add-Type -MemberDefinition $code -PassThru -Name PerfCounter -Namespace Utility
-  $rv = $t::PdhLookupPerfNameByIndex($ComputerName, $id, $Buffer, [Ref]$BufferSize)
- 
-  if ($rv -eq 0)
-  {
-    $Buffer.ToString().Substring(0, $BufferSize-1)
+  try {
+    $code = '[DllImport("pdh.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern UInt32 PdhLookupPerfNameByIndex(string szMachineName, uint dwNameIndex, System.Text.StringBuilder szNameBuffer, ref uint pcchNameBufferSize);'
+   
+    # Try with different buffer sizes if the first attempt fails
+    $bufferSizes = @(1024, 2048, 4096)
+    
+    foreach ($initialSize in $bufferSizes) {
+      $Buffer = New-Object System.Text.StringBuilder($initialSize)
+      [UInt32]$BufferSize = $Buffer.Capacity
+   
+      $t = Add-Type -MemberDefinition $code -PassThru -Name PerfCounter -Namespace Utility
+      $rv = $t::PdhLookupPerfNameByIndex($ComputerName, $id, $Buffer, [Ref]$BufferSize)
+   
+      if ($rv -eq 0)
+      {
+        $bufferString = $Buffer.ToString()
+        $actualLength = $bufferString.Length
+        
+        # Handle the case where BufferSize might be larger than actual string
+        if ($BufferSize -gt 0 -and $actualLength -gt 0) {
+          $targetLength = [Math]::Min($BufferSize-1, $actualLength)
+          if ($targetLength -gt 0) {
+            return $bufferString.Substring(0, $targetLength)
+          }
+        }
+        
+        # Fallback: just trim null characters
+        $result = $bufferString.TrimEnd([char]0)
+        if ($result.Length -gt 0) {
+          return $result
+        }
+      }
+      elseif ($rv -eq 0x800007D2) {
+        # PDH_MORE_DATA - buffer too small, try next size
+        continue
+      }
+    }
+    
+    # If all attempts failed, throw the error
+    Throw "Get-PerformanceCounterLocalName : Unable to retrieve localized name for ID $ID. Check computer name and performance counter ID."
   }
-  else
-  {
-    Throw 'Get-PerformanceCounterLocalName : Unable to retrieve localized name. Check computer name and performance counter ID.'
+  catch {
+    Write-Warning "Error in Get-PerformanceCounterLocalName for ID $ID : $($_.Exception.Message)"
+    return $null
   }
 }
 
@@ -130,6 +159,32 @@ function Test-PerformanceCounter
     }
     catch {
         return $false
+    }
+}
+
+function Build-SafeCounterPath
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        $CategoryId,
+        [Parameter(Mandatory=$true)]
+        $CounterId,
+        [Parameter(Mandatory=$false)]
+        $Instance = "*"
+    )
+    
+    # Get localized names, with fallback to IDs if names can't be resolved
+    $categoryName = Get-PerformanceCounterLocalName $CategoryId
+    $counterName = Get-PerformanceCounterLocalName $CounterId
+    
+    if ($categoryName -and $counterName) {
+        return "\$categoryName($Instance)\$counterName"
+    }
+    else {
+        # Fallback to numeric IDs if name resolution fails
+        Write-Warning "Using numeric counter path as fallback: \$CategoryId($Instance)\$CounterId"
+        return "\$CategoryId($Instance)\$CounterId"
     }
 }
 
@@ -237,20 +292,13 @@ if ($psboundparameters.Count -eq 2) {
 			
 			('GetVMDisks'){
 				$ItemType = "VMDISK"
-				$counterPart1 = Get-PerformanceCounterLocalName(9470)
-				$counterPart2 = Get-PerformanceCounterLocalName(9482)
-				$counterName= "\$counterPart1(*)\$counterPart2"
-				<# $Results =  (Get-Counter -Counter '\Hyper-V Virtual Storage Device(*)\Read Bytes/sec' -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {$_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName #>
+				$counterName = Build-SafeCounterPath -CategoryId 9470 -CounterId 9482 -Instance "*"
 				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {$_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
 			}
 
 			('GetVMNICs'){
 				$ItemType = "VMNIC"
-				$counterPart1 = Get-PerformanceCounterLocalName(11386)
-				$counterPart2 = Get-PerformanceCounterLocalName(11248)
-				$counterName= "\$counterPart1(*)\$counterPart2"
-				<# $Results = (Get-Counter -Counter '\Virtueller Hyper-V-Netzwerkadapter(*)\Gesendete Pakete/s' -ErrorAction SilentlyContinue).CounterSamples | Where-Object  {$_.InstanceName -like $VMName+'_*'} | select InstanceName #>
-				<# $Results = (Get-Counter -Counter '\Hyper-V Virtual Network Adapter(*)\Packets Sent/sec' -ErrorAction SilentlyContinue).CounterSamples | Where-Object  {$_.InstanceName -like $VMName+'_*'} | select InstanceName #>
+				$counterName = Build-SafeCounterPath -CategoryId 11386 -CounterId 11248 -Instance "*"
 				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {$_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
 			}
 
@@ -261,11 +309,9 @@ if ($psboundparameters.Count -eq 2) {
 				$counterFound = $false
 				$Results = @()
 				
-				# Method 1: Use local name lookup
+				# Method 1: Use safe counter path building
 				try {
-					$counterPart1 = Get-PerformanceCounterLocalName(10500)
-					$counterPart2 = Get-PerformanceCounterLocalName(10788)
-					$counterName= "\$counterPart1(*)\$counterPart2"
+					$counterName = Build-SafeCounterPath -CategoryId 10500 -CounterId 10788 -Instance "*"
 					
 					if (Test-PerformanceCounter $counterName) {
 						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*' -or $_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
