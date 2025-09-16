@@ -68,19 +68,119 @@ function Get-PerformanceCounterID
     {
         Write-Progress -Activity 'Retrieving PerfIDs' -Status 'Working'
  
-        $key = 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\CurrentLanguage'
-        $counters = (Get-ItemProperty -Path $key -Name Counter).Counter
+        # Try current language first, then fallback to English (009)
+        $languages = @('CurrentLanguage', '009')
         $script:perfHash = @{}
-        $all = $counters.Count
- 
-        for($i = 0; $i -lt $all; $i+=2)
-        {
-           Write-Progress -Activity 'Retrieving PerfIDs' -Status 'Working' -PercentComplete ($i*100/$all)
-           $script:perfHash.$($counters[$i+1]) = $counters[$i]
+        
+        foreach ($lang in $languages) {
+            try {
+                $key = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\$lang"
+                $counters = (Get-ItemProperty -Path $key -Name Counter -ErrorAction Stop).Counter
+                $all = $counters.Count
+        
+                for($i = 0; $i -lt $all; $i+=2)
+                {
+                   Write-Progress -Activity 'Retrieving PerfIDs' -Status 'Working' -PercentComplete ($i*100/$all)
+                   if (-not $script:perfHash.ContainsKey($counters[$i+1])) {
+                       $script:perfHash.$($counters[$i+1]) = $counters[$i]
+                   }
+                }
+                break
+            }
+            catch {
+                Write-Warning "Failed to load counters from $lang"
+                continue
+            }
         }
     }
  
-    $script:perfHash.$Name
+    $result = $script:perfHash.$Name
+    if (-not $result) {
+        # Try English counter names as fallback
+        $englishNames = @{
+            'Hyper-V Virtual Storage Device' = '9470'
+            'Read Bytes/sec' = '9480'
+            'Write Bytes/sec' = '9482'
+            'Read Operations/sec' = '9484'
+            'Write Operations/sec' = '9486'
+            'Hyper-V Virtual Network Adapter' = '11386'
+            'Bytes Received/sec' = '11232'
+            'Bytes Sent/sec' = '11236'
+            'Packets Sent/sec' = '11248'
+            'Hyper-V Hypervisor Virtual Processor' = '10500'
+            '% Total Run Time' = '10788'
+        }
+        $result = $englishNames.$Name
+    }
+    
+    return $result
+}
+
+function Test-PerformanceCounter
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        $CounterPath
+    )
+    
+    try {
+        $testResult = Get-Counter -Counter $CounterPath -MaxSamples 1 -ErrorAction Stop
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-HyperVCounterPath
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        $CounterType,
+        [Parameter(Mandatory=$false)]
+        $Instance = "*"
+    )
+    
+    $counterMappings = @{
+        'VirtualStorageDevice' = @{
+            'Category' = 'Hyper-V Virtual Storage Device'
+            'Counters' = @{
+                'ReadBytes' = 'Read Bytes/sec'
+                'WriteBytes' = 'Write Bytes/sec'
+                'ReadOps' = 'Read Operations/sec'
+                'WriteOps' = 'Write Operations/sec'
+            }
+        }
+        'VirtualNetworkAdapter' = @{
+            'Category' = 'Hyper-V Virtual Network Adapter'
+            'Counters' = @{
+                'BytesReceived' = 'Bytes Received/sec'
+                'BytesSent' = 'Bytes Sent/sec'
+                'PacketsSent' = 'Packets Sent/sec'
+            }
+        }
+        'HypervisorVirtualProcessor' = @{
+            'Category' = 'Hyper-V Hypervisor Virtual Processor'
+            'Counters' = @{
+                'TotalRunTime' = '% Total Run Time'
+            }
+        }
+    }
+    
+    $mapping = $counterMappings[$CounterType]
+    if (-not $mapping) {
+        throw "Unknown counter type: $CounterType"
+    }
+    
+    # Try to get counter IDs dynamically
+    $categoryId = Get-PerformanceCounterID $mapping.Category
+    if (-not $categoryId) {
+        throw "Could not resolve category ID for: $($mapping.Category)"
+    }
+    
+    return $categoryId
 }
 
 $hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty name
@@ -156,12 +256,52 @@ if ($psboundparameters.Count -eq 2) {
 
 			('GetVMCPUs'){
 				 $ItemType  ="VMCPU"
-				$counterPart1 = Get-PerformanceCounterLocalName(10500)
-				$counterPart2 = Get-PerformanceCounterLocalName(10788)
-				$counterName= "\$counterPart1(*)\$counterPart2"
-				 <# $Results = (Get-Counter -Counter '\Hyper-V - virtueller Prozessor des Hypervisors(*)\% Gesamtausführungszeit' -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*'} | select InstanceName #>
-				 <# $Results = (Get-Counter -Counter '\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time' -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*'} | select InstanceName #>
-				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {$_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+				
+				# Try multiple approaches to get the counter
+				$counterFound = $false
+				$Results = @()
+				
+				# Method 1: Use local name lookup
+				try {
+					$counterPart1 = Get-PerformanceCounterLocalName(10500)
+					$counterPart2 = Get-PerformanceCounterLocalName(10788)
+					$counterName= "\$counterPart1(*)\$counterPart2"
+					
+					if (Test-PerformanceCounter $counterName) {
+						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*' -or $_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+						$counterFound = $true
+					}
+				}
+				catch {
+					Write-Warning "Method 1 failed for GetVMCPUs: $($_.Exception.Message)"
+				}
+				
+				# Method 2: Try with English counter names if method 1 failed
+				if (-not $counterFound) {
+					try {
+						$englishCounterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
+						if (Test-PerformanceCounter $englishCounterName) {
+							$Results = (Get-Counter -Counter $englishCounterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*' -or $_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+							$counterFound = $true
+						}
+					}
+					catch {
+						Write-Warning "Method 2 failed for GetVMCPUs: $($_.Exception.Message)"
+					}
+				}
+				
+				# Method 3: Try alternative pattern matching
+				if (-not $counterFound) {
+					try {
+						$counterPart1 = Get-PerformanceCounterLocalName(10500)
+						$counterPart2 = Get-PerformanceCounterLocalName(10788)
+						$counterName= "\$counterPart1(*)\$counterPart2"
+						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -match $VMName} | select InstanceName
+					}
+					catch {
+						Write-Warning "Method 3 failed for GetVMCPUs: $($_.Exception.Message)"
+					}
+				}
 			}
 				
 			default {$Results = "Bad Request"; write-host $Results; exit}
