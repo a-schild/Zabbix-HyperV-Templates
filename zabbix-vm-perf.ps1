@@ -188,6 +188,104 @@ function Build-SafeCounterPath
     }
 }
 
+function Get-SafePerformanceCounter
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        $CategoryId,
+        [Parameter(Mandatory=$true)]
+        $CounterId,
+        [Parameter(Mandatory=$true)]
+        $InstanceName
+    )
+    
+    # Try with original instance name first
+    try {
+        $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $InstanceName
+        $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+        if ($result) {
+            return $result
+        }
+    }
+    catch {
+        Write-Warning "Failed with original instance name '$InstanceName': $($_.Exception.Message)"
+    }
+    
+    # Try with sanitized instance name if original failed
+    $safeInstanceName = Sanitize-VMName $InstanceName
+    if ($safeInstanceName -ne $InstanceName) {
+        try {
+            $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $safeInstanceName
+            $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+            if ($result) {
+                return $result
+            }
+        }
+        catch {
+            Write-Warning "Failed with sanitized instance name '$safeInstanceName': $($_.Exception.Message)"
+        }
+    }
+    
+    return $null
+}
+
+function Sanitize-VMName
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$VMName
+    )
+    
+    # Remove or replace characters that are invalid in Zabbix item keys and performance counter paths
+    # Zabbix doesn't allow: ( ) [ ] { } | \ / ? * " ' : ; , = + & % @ ! # $ ^
+    # Performance counters are especially sensitive to ( ) [ ] { }
+    
+    $sanitized = $VMName
+    
+    # Replace problematic characters with safe alternatives
+    $sanitized = $sanitized -replace '\(', '_'    # Replace ( with _
+    $sanitized = $sanitized -replace '\)', '_'    # Replace ) with _
+    $sanitized = $sanitized -replace '\[', '_'    # Replace [ with _
+    $sanitized = $sanitized -replace '\]', '_'    # Replace ] with _
+    $sanitized = $sanitized -replace '\{', '_'    # Replace { with _
+    $sanitized = $sanitized -replace '\}', '_'    # Replace } with _
+    $sanitized = $sanitized -replace '\\', '_'    # Replace \ with _
+    $sanitized = $sanitized -replace '/', '_'     # Replace / with _
+    $sanitized = $sanitized -replace '\|', '_'    # Replace | with _
+    $sanitized = $sanitized -replace '\?', '_'    # Replace ? with _
+    $sanitized = $sanitized -replace '\*', '_'    # Replace * with _
+    $sanitized = $sanitized -replace '"', '_'     # Replace " with _
+    $sanitized = $sanitized -replace "'", '_'     # Replace ' with _
+    $sanitized = $sanitized -replace ':', '_'     # Replace : with _
+    $sanitized = $sanitized -replace ';', '_'     # Replace ; with _
+    $sanitized = $sanitized -replace ',', '_'     # Replace , with _
+    $sanitized = $sanitized -replace '=', '_'     # Replace = with _
+    $sanitized = $sanitized -replace '\+', '_'    # Replace + with _
+    $sanitized = $sanitized -replace '&', '_'     # Replace & with _
+    $sanitized = $sanitized -replace '%', '_'     # Replace % with _
+    $sanitized = $sanitized -replace '@', '_'     # Replace @ with _
+    $sanitized = $sanitized -replace '!', '_'     # Replace ! with _
+    $sanitized = $sanitized -replace '#', '_'     # Replace # with _
+    $sanitized = $sanitized -replace '\$', '_'    # Replace $ with _
+    $sanitized = $sanitized -replace '\^', '_'    # Replace ^ with _
+    $sanitized = $sanitized -replace '`', '_'     # Replace ` with _
+    $sanitized = $sanitized -replace '~', '_'     # Replace ~ with _
+    
+    # Remove any leading/trailing underscores and collapse multiple underscores
+    $sanitized = $sanitized -replace '^_+', ''    # Remove leading underscores
+    $sanitized = $sanitized -replace '_+$', ''    # Remove trailing underscores
+    $sanitized = $sanitized -replace '_+', '_'    # Collapse multiple underscores
+    
+    # Ensure we don't return an empty string
+    if ([string]::IsNullOrWhiteSpace($sanitized)) {
+        $sanitized = "VM_" + $VMName.GetHashCode().ToString().Replace('-', '')
+    }
+    
+    return $sanitized
+}
+
 function Get-HyperVCounterPath
 {
     param
@@ -242,6 +340,16 @@ $hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty n
 
 $VMName = $VMName.Replace("_" + $hostname, '')
 
+# Store both original and sanitized VM name for different uses
+$originalVMName = $VMName
+$safeVMName = Sanitize-VMName $VMName
+
+# Also sanitize VMObject if provided (contains instance names)
+if ($VMObject) {
+    $originalVMObject = $VMObject
+    $safeVMObject = Sanitize-VMName $VMObject
+}
+
 <# Zabbix Hyper-V Virtual Machine Discovery #>
 if ($QueryName -eq '') {
     
@@ -255,7 +363,10 @@ if ($QueryName -eq '') {
     $n = $colItems.Count
 
     foreach ($objItem in $colItems) {
-        $line =  ' { "{#VMNAME}":"' + $objItem.Name + '" ,"{#VMSTATE}":"' + $objItem.State  +
+        $originalName = $objItem.Name
+        $sanitizedName = Sanitize-VMName $originalName
+        
+        $line =  ' { "{#VMNAME}":"' + $originalName + '" ,"{#VMNAME_SAFE}":"' + $sanitizedName + '" ,"{#VMSTATE}":"' + $objItem.State  +
                      '", "{#VMHOST}":"' + $hostname + '" ,"{#REPLICATION}":"' + $objItem.ReplicationState +'" }'
         if ($n -gt 1){
             $line += ","
@@ -293,13 +404,25 @@ if ($psboundparameters.Count -eq 2) {
 			('GetVMDisks'){
 				$ItemType = "VMDISK"
 				$counterName = Build-SafeCounterPath -CategoryId 9470 -CounterId 9482 -Instance "*"
-				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {$_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+				# Try matching with both original and safe VM names
+				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {
+					$_.InstanceName -like '*-'+$originalVMName+'*' -or 
+					$_.InstanceName -like '*-'+$safeVMName+'*' -or
+					$_.InstanceName -like '*'+$originalVMName+'*' -or
+					$_.InstanceName -like '*'+$safeVMName+'*'
+				} | select InstanceName
 			}
 
 			('GetVMNICs'){
 				$ItemType = "VMNIC"
 				$counterName = Build-SafeCounterPath -CategoryId 11386 -CounterId 11248 -Instance "*"
-				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {$_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+				# Try matching with both original and safe VM names
+				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {
+					$_.InstanceName -like '*-'+$originalVMName+'*' -or 
+					$_.InstanceName -like '*-'+$safeVMName+'*' -or
+					$_.InstanceName -like '*'+$originalVMName+'*' -or
+					$_.InstanceName -like '*'+$safeVMName+'*'
+				} | select InstanceName
 			}
 
 			('GetVMCPUs'){
@@ -314,7 +437,14 @@ if ($psboundparameters.Count -eq 2) {
 					$counterName = Build-SafeCounterPath -CategoryId 10500 -CounterId 10788 -Instance "*"
 					
 					if (Test-PerformanceCounter $counterName) {
-						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*' -or $_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
+							$_.InstanceName -like $originalVMName+':*' -or 
+							$_.InstanceName -like $safeVMName+':*' -or
+							$_.InstanceName -like '*-'+$originalVMName+'*' -or 
+							$_.InstanceName -like '*-'+$safeVMName+'*' -or
+							$_.InstanceName -like '*'+$originalVMName+'*' -or 
+							$_.InstanceName -like '*'+$safeVMName+'*'
+						} | select InstanceName
 						$counterFound = $true
 					}
 				}
@@ -327,7 +457,14 @@ if ($psboundparameters.Count -eq 2) {
 					try {
 						$englishCounterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
 						if (Test-PerformanceCounter $englishCounterName) {
-							$Results = (Get-Counter -Counter $englishCounterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -like $VMName+':*' -or $_.InstanceName -like '*-'+$VMName+'*'} | select InstanceName
+							$Results = (Get-Counter -Counter $englishCounterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
+								$_.InstanceName -like $originalVMName+':*' -or 
+								$_.InstanceName -like $safeVMName+':*' -or
+								$_.InstanceName -like '*-'+$originalVMName+'*' -or 
+								$_.InstanceName -like '*-'+$safeVMName+'*' -or
+								$_.InstanceName -like '*'+$originalVMName+'*' -or 
+								$_.InstanceName -like '*'+$safeVMName+'*'
+							} | select InstanceName
 							$counterFound = $true
 						}
 					}
@@ -342,7 +479,9 @@ if ($psboundparameters.Count -eq 2) {
 						$counterPart1 = Get-PerformanceCounterLocalName(10500)
 						$counterPart2 = Get-PerformanceCounterLocalName(10788)
 						$counterName= "\$counterPart1(*)\$counterPart2"
-						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {$_.InstanceName -match $VMName} | select InstanceName
+						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
+							$_.InstanceName -match $originalVMName -or $_.InstanceName -match $safeVMName
+						} | select InstanceName
 					}
 					catch {
 						Write-Warning "Method 3 failed for GetVMCPUs: $($_.Exception.Message)"
@@ -404,64 +543,36 @@ if ($psboundparameters.Count -eq 3)
                 <# Disk Counters #>
                 ('VMDISKBytesRead'){
 					$ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(9470)
-					$counterPart2 = Get-PerformanceCounterLocalName(9480)
-					$counterName= "\$counterPart1($VMObject)\$counterPart2"
-					<# $Results =  (Get-Counter -Counter "\Hyper-V Virtual Storage Device($VMObject)\Read Bytes/sec").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9480 -InstanceName $VMObject
                 }
                 ('VMDISKBytesWrite'){
 					$ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(9470)
-					$counterPart2 = Get-PerformanceCounterLocalName(9482)
-					$counterName= "\$counterPart1($VMObject)\$counterPart2"
-					<# $Results =  (Get-Counter -Counter "\Hyper-V Virtual Storage Device($VMObject)\Write Bytes/sec").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9482 -InstanceName $VMObject
                 }
                 ('VMDISKOpsRead'){
 					$ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(9470)
-					$counterPart2 = Get-PerformanceCounterLocalName(9484)
-					$counterName= "\$counterPart1($VMObject)\$counterPart2"
-					<# $Results =  (Get-Counter -Counter "\Hyper-V Virtual Storage Device($VMObject)\Read Operations/sec").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9484 -InstanceName $VMObject
                 }
                 ('VMDISKOpsWrite'){
 					$ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(9470)
-					$counterPart2 = Get-PerformanceCounterLocalName(9486)
-					$counterName= "\$counterPart1($VMObject)\$counterPart2"
-					<# $Results =  (Get-Counter -Counter "\Hyper-V Virtual Storage Device($VMObject)\Write Operations/sec").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9486 -InstanceName $VMObject
                 }
 
                 <# Network Counters #>
                 ('VMNICSent'){
 					$ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(11386)
-					$counterPart2 = Get-PerformanceCounterLocalName(11236)
-					$counterName= "\$counterPart1($VMObject)\$counterPart2"
-					<# $Results = (Get-Counter -Counter "\Hyper-V Virtual Network Adapter($VMObject)\Bytes Sent/sec").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 11386 -CounterId 11236 -InstanceName $VMObject
                 }
                 ('VMNICRecv'){
 					$ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(11386)
-					$counterPart2 = Get-PerformanceCounterLocalName(11232)
-					$counterName= "\$counterPart1($VMObject)\$counterPart2"
-					<# $Results = (Get-Counter -Counter "\Hyper-V Virtual Network Adapter($VMObject)\Bytes Received/sec").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 11386 -CounterId 11232 -InstanceName $VMObject
                 }
 
 
                 <# Virtual CPU Counters #>
                 ('VMCPUTotal'){
                     $ItemType = $QueryName
-					$counterPart1 = Get-PerformanceCounterLocalName(10500)
-					$counterPart2 = Get-PerformanceCounterLocalName(10788)
-					$counterName= "\$counterPart1(*)\$counterPart2"
-                    <# $Results = (Get-Counter -Counter "\Hyper-V Hypervisor Virtual Processor($VMObject)\% Total Run Time").CounterSamples #>
-					$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+					$Results = Get-SafePerformanceCounter -CategoryId 10500 -CounterId 10788 -InstanceName $VMObject
                 }
 
                 default {$Results = "Bad Request"; exit}

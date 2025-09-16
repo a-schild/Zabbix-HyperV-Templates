@@ -416,7 +416,7 @@ Requires PowerShell script installed on HyperV Host.</description>
                             <uuid>d366f7317b6c4fc6a7614dbab691b0a2</uuid>
                             <name>Replication {#VMNAME}</name>
                             <type>ZABBIX_ACTIVE</type>
-                            <key>hyperv.check[GetVMReplication,{#VMNAME}]</key>
+                            <key>hyperv.check[GetVMReplication,{#VMNAME_SAFE}]</key>
                             <delay>10m</delay>
                             <history>90d</history>
                             <value_type>TEXT</value_type>
@@ -431,13 +431,13 @@ Requires PowerShell script installed on HyperV Host.</description>
                             <trigger_prototypes>
                                 <trigger_prototype>
                                     <uuid>0785d2e285bf4ed5a4670f46afc8475d</uuid>
-                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME}],,&quot;regexp&quot;,&quot;Critical&quot;)=1</expression>
+                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME_SAFE}],,&quot;regexp&quot;,&quot;Critical&quot;)=1</expression>
                                     <name>Replication state {#VMNAME} critical</name>
                                     <priority>HIGH</priority>
                                 </trigger_prototype>
                                 <trigger_prototype>
                                     <uuid>21d06d873e0c41c28a1d8bf628e8df8d</uuid>
-                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME}],,&quot;regexp&quot;,&quot;Warning&quot;)=1</expression>
+                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME_SAFE}],,&quot;regexp&quot;,&quot;Warning&quot;)=1</expression>
                                     <name>Replication state {#VMNAME} warning</name>
                                     <priority>WARNING</priority>
                                 </trigger_prototype>
@@ -447,7 +447,7 @@ Requires PowerShell script installed on HyperV Host.</description>
                             <uuid>64af9035a2a349d2a81d9509210d82f2</uuid>
                             <name>VM status {#VMNAME}</name>
                             <type>ZABBIX_ACTIVE</type>
-                            <key>hyperv.check[GetVMStatus,{#VMNAME}]</key>
+                            <key>hyperv.check[GetVMStatus,{#VMNAME_SAFE}]</key>
                             <delay>5m</delay>
                             <history>90d</history>
                             <value_type>TEXT</value_type>
@@ -462,13 +462,13 @@ Requires PowerShell script installed on HyperV Host.</description>
                             <trigger_prototypes>
                                 <trigger_prototype>
                                     <uuid>3b1e3570ed934918bcbc4b60602f563d</uuid>
-                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME}],1s,&quot;like&quot;,&quot;Saved&quot;)=1</expression>
+                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME_SAFE}],1s,&quot;like&quot;,&quot;Saved&quot;)=1</expression>
                                     <name>{#VMNAME} in saved state</name>
                                     <priority>HIGH</priority>
                                 </trigger_prototype>
                                 <trigger_prototype>
                                     <uuid>89182d0d0f42489ca449896f7dbc7dbd</uuid>
-                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME}],1s,&quot;like&quot;,&quot;Off&quot;)=1</expression>
+                                    <expression>find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME_SAFE}],1s,&quot;like&quot;,&quot;Off&quot;)=1</expression>
                                     <name>{#VMNAME} is Off</name>
                                     <priority>INFO</priority>
                                 </trigger_prototype>
@@ -478,7 +478,7 @@ Requires PowerShell script installed on HyperV Host.</description>
                     <host_prototypes>
                         <host_prototype>
                             <uuid>b3daed7e19fd492e969f1e2cf7207f42</uuid>
-                            <host>{#VMNAME}_{#VMHOST}</host>
+                            <host>{#VMNAME_SAFE}_{#VMHOST}</host>
                             <name>{#VMNAME}_{#VMHOST}</name>
                             <group_links>
                                 <group_link>
