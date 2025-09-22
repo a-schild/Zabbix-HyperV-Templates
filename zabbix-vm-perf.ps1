@@ -338,18 +338,6 @@ function Get-HyperVCounterPath
 
 $hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty name
 
-$VMName = $VMName.Replace("_" + $hostname, '')
-
-# Store both original and sanitized VM name for different uses
-$originalVMName = $VMName
-$safeVMName = Sanitize-VMName $VMName
-
-# Also sanitize VMObject if provided (contains instance names)
-if ($VMObject) {
-    $originalVMObject = $VMObject
-    $safeVMObject = Sanitize-VMName $VMObject
-}
-
 <# Zabbix Hyper-V Virtual Machine Discovery #>
 if ($QueryName -eq '') {
     
@@ -383,6 +371,27 @@ if ($QueryName -eq '') {
 
 <# Zabbix Hyper-V VM Perf Counter Discovery #>
 if ($psboundparameters.Count -eq 2) {
+    # Only remove hostname suffix if it actually exists at the end of the VM name
+    $hostnameSuffix = "_" + $hostname
+    if ($VMName.EndsWith($hostnameSuffix)) {
+        $VMName = $VMName.Substring(0, $VMName.Length - $hostnameSuffix.Length)
+
+        # Ensure VMName is not empty after hostname removal
+        if ([string]::IsNullOrWhiteSpace($VMName)) {
+            Write-Error "VMName became empty after hostname removal. Original VMName may have been only the hostname suffix."
+            exit 1
+        }
+    }
+
+    # Store both original and sanitized VM name for different uses
+    $originalVMName = $VMName
+    $safeVMName = Sanitize-VMName $VMName
+
+    # Also sanitize VMObject if provided (contains instance names)
+    if ($VMObject) {
+        $originalVMObject = $VMObject
+        $safeVMObject = Sanitize-VMName $VMObject
+    }
 	if ($QueryName -eq "GetPerformanceCounterID")
 	{
 		$pcID= Get-PerformanceCounterID($VMName)
