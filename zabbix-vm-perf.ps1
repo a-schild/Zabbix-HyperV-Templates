@@ -615,7 +615,8 @@ function Get-VMDiskInstances
             }
         }
 
-        return $matchedInstances
+        # Ensure we return an array (even if empty)
+        return @($matchedInstances)
     }
     catch {
         return @()
@@ -719,7 +720,7 @@ if ($psboundparameters.Count -eq 2) {
 			# Test the disk discovery method
 			$diskInstances = Get-VMDiskInstances -VMName $originalVMName
 
-			Write-Host "`nFound $($diskInstances.Count) performance counter instances:"
+			Write-Host "`nFound $(($diskInstances | Measure-Object).Count) performance counter instances:"
 			foreach ($disk in $diskInstances) {
 				Write-Host "  Instance: $($disk.InstanceName)"
 				Write-Host "  Path: $($disk.DiskPath)"
@@ -825,7 +826,7 @@ if ($psboundparameters.Count -eq 2) {
 				# Use Hyper-V cmdlets to get accurate VM disk instances
 				$diskInstances = Get-VMDiskInstances -VMName $originalVMName
 
-				if ($diskInstances.Count -gt 0) {
+				if ($diskInstances -and (($diskInstances | Measure-Object).Count -gt 0)) {
 					$Results = $diskInstances | Select-Object @{Name="InstanceName"; Expression={$_.InstanceName}}
 				} else {
 					# Fallback: try name-based matching with storage counter instances
