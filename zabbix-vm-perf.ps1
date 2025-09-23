@@ -1,5 +1,5 @@
-<# 
-Zabbix Agent PowerShell script for Hyper-V monitoring 
+<#
+Zabbix Agent PowerShell script for Hyper-V monitoring
 
 
 Copyright (c) 2015, Dmitry Sarkisov <ait.meijin@gmail.com>
@@ -28,34 +28,37 @@ param(
 	[string]$VMObject
 )
 
+# Get script directory for cache files
+$script:ScriptDirectory = Split-Path $MyInvocation.MyCommand.Path -Parent
+
 Function Get-PerformanceCounterLocalName
 {
   param
   (
     [UInt32]
     $ID,
- 
+
     $ComputerName = $env:COMPUTERNAME
   )
- 
+
   try {
     $code = '[DllImport("pdh.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern UInt32 PdhLookupPerfNameByIndex(string szMachineName, uint dwNameIndex, System.Text.StringBuilder szNameBuffer, ref uint pcchNameBufferSize);'
-   
+
     # Try with different buffer sizes if the first attempt fails
     $bufferSizes = @(1024, 2048, 4096)
-    
+
     foreach ($initialSize in $bufferSizes) {
       $Buffer = New-Object System.Text.StringBuilder($initialSize)
       [UInt32]$BufferSize = $Buffer.Capacity
-   
+
       $t = Add-Type -MemberDefinition $code -PassThru -Name PerfCounter -Namespace Utility
       $rv = $t::PdhLookupPerfNameByIndex($ComputerName, $id, $Buffer, [Ref]$BufferSize)
-   
+
       if ($rv -eq 0)
       {
         $bufferString = $Buffer.ToString()
         $actualLength = $bufferString.Length
-        
+
         # Handle the case where BufferSize might be larger than actual string
         if ($BufferSize -gt 0 -and $actualLength -gt 0) {
           $targetLength = [Math]::Min($BufferSize-1, $actualLength)
@@ -63,7 +66,7 @@ Function Get-PerformanceCounterLocalName
             return $bufferString.Substring(0, $targetLength)
           }
         }
-        
+
         # Fallback: just trim null characters
         $result = $bufferString.TrimEnd([char]0)
         if ($result.Length -gt 0) {
@@ -75,7 +78,7 @@ Function Get-PerformanceCounterLocalName
         continue
       }
     }
-    
+
     # If all attempts failed, throw the error
     Throw "Get-PerformanceCounterLocalName : Unable to retrieve localized name for ID $ID. Check computer name and performance counter ID."
   }
@@ -85,64 +88,251 @@ Function Get-PerformanceCounterLocalName
   }
 }
 
-function Get-PerformanceCounterID
+function Get-CacheFilePath
 {
     param
     (
         [Parameter(Mandatory=$true)]
-        $Name
+        [string]$CacheType
     )
- 
-    if ($script:perfHash -eq $null)
-    {
-        Write-Progress -Activity 'Retrieving PerfIDs' -Status 'Working'
- 
-        # Try current language first, then fallback to English (009)
-        $languages = @('CurrentLanguage', '009')
-        $script:perfHash = @{}
-        
-        foreach ($lang in $languages) {
+
+    # Use the script directory that was set at the beginning
+    if ($script:ScriptDirectory) {
+        $scriptDir = $script:ScriptDirectory
+    } else {
+        # Fallback to current directory
+        $scriptDir = Get-Location
+    }
+
+    return Join-Path $scriptDir "zabbix-hyperv-$CacheType-cache.json"
+}
+
+function Test-CacheValid
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$CacheFilePath
+    )
+
+    if (-not (Test-Path $CacheFilePath)) {
+        return $false
+    }
+
+    $fileAge = (Get-Date) - (Get-Item $CacheFilePath).LastWriteTime
+    return $fileAge.Days -lt 1
+}
+
+function Save-CounterCache
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [hashtable]$CounterHash,
+        [Parameter(Mandatory=$true)]
+        [string]$CacheFilePath
+    )
+
+    try {
+        $CounterHash | ConvertTo-Json | Out-File -FilePath $CacheFilePath -Encoding UTF8
+    }
+    catch {
+        Write-Warning "Failed to save cache to $CacheFilePath`: $($_.Exception.Message)"
+    }
+}
+
+function Load-CounterCache
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$CacheFilePath
+    )
+
+    try {
+        $json = Get-Content -Path $CacheFilePath -Raw -Encoding UTF8
+        $obj = $json | ConvertFrom-Json
+
+        # Convert PSCustomObject to hashtable for PowerShell 5.1 compatibility
+        $hashtable = @{}
+        $obj.PSObject.Properties | ForEach-Object {
+            $hashtable[$_.Name] = $_.Value
+        }
+
+        return $hashtable
+    }
+    catch {
+        Write-Warning "Failed to load cache from $CacheFilePath`: $($_.Exception.Message)"
+        return @{}
+    }
+}
+
+function Clear-CounterCaches
+{
+    # Clear old cache files - useful for troubleshooting or forcing refresh
+    $cacheFiles = @(
+        (Get-CacheFilePath "english"),
+        (Get-CacheFilePath "localized")
+    )
+
+    foreach ($cacheFile in $cacheFiles) {
+        if (Test-Path $cacheFile) {
             try {
-                $key = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\$lang"
-                $counters = (Get-ItemProperty -Path $key -Name Counter -ErrorAction Stop).Counter
-                $all = $counters.Count
-        
-                for($i = 0; $i -lt $all; $i+=2)
-                {
-                   Write-Progress -Activity 'Retrieving PerfIDs' -Status 'Working' -PercentComplete ($i*100/$all)
-                   if (-not $script:perfHash.ContainsKey($counters[$i+1])) {
-                       $script:perfHash.$($counters[$i+1]) = $counters[$i]
-                   }
-                }
-                break
+                Remove-Item $cacheFile -Force
+                Write-Host "Cleared cache: $cacheFile"
             }
             catch {
-                Write-Warning "Failed to load counters from $lang"
-                continue
+                Write-Warning "Failed to clear cache $cacheFile`: $($_.Exception.Message)"
             }
         }
     }
- 
-    $result = $script:perfHash.$Name
-    if (-not $result) {
-        # Try English counter names as fallback
-        $englishNames = @{
-            'Hyper-V Virtual Storage Device' = '9470'
-            'Read Bytes/sec' = '9480'
-            'Write Bytes/sec' = '9482'
-            'Read Operations/sec' = '9484'
-            'Write Operations/sec' = '9486'
-            'Hyper-V Virtual Network Adapter' = '11386'
-            'Bytes Received/sec' = '11232'
-            'Bytes Sent/sec' = '11236'
-            'Packets Sent/sec' = '11248'
-            'Hyper-V Hypervisor Virtual Processor' = '10500'
-            '% Total Run Time' = '10788'
+}
+
+function Get-HyperVCounterNames
+{
+    # Return only the Hyper-V counters we actually use
+    return @(
+        'Hyper-V Hypervisor Virtual Processor',
+        '% Total Run Time',
+        'Hyper-V Virtual Storage Device',
+        'Read Bytes/sec',
+        'Write Bytes/sec',
+        'Read Operations/sec',
+        'Write Operations/sec',
+        'Hyper-V Virtual Network Adapter',
+        'Bytes Received/sec',
+        'Bytes Sent/sec',
+        'Packets Sent/sec'
+    )
+}
+
+function Initialize-EnglishCounterCache
+{
+    $cacheFile = Get-CacheFilePath "english"
+
+    # Try to load from cache first
+    if (Test-CacheValid $cacheFile) {
+        # Write-Progress -Activity 'Loading English Counter Cache' -Status 'Reading from cache'
+        $script:englishPerfHash = Load-CounterCache $cacheFile
+        if ($script:englishPerfHash.Count -gt 0) {
+            # Write-Progress -Activity 'Loading English Counter Cache' -Completed
+            return
         }
-        $result = $englishNames.$Name
     }
-    
-    return $result
+
+    # Cache miss or invalid - build optimized cache with only needed counters
+    Write-Progress -Activity 'Building Optimized Counter Cache' -Status 'Reading registry'
+    $script:englishPerfHash = @{}
+
+    try {
+        # Always use English registry (009)
+        $key = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\009"
+        $counters = (Get-ItemProperty -Path $key -Name Counter -ErrorAction Stop).Counter
+        $all = $counters.Count
+
+        # Get list of Hyper-V counters we need
+        $neededCounters = Get-HyperVCounterNames
+        $foundCount = 0
+
+        for($i = 0; $i -lt $all; $i+=2)
+        {
+            Write-Progress -Activity 'Building Optimized Counter Cache' -Status "Processing counters ($foundCount found)" -PercentComplete ($i*100/$all)
+
+            $counterName = $counters[$i+1]
+            $counterId = $counters[$i]
+
+            # Only cache Hyper-V related counters to speed things up
+            if ($neededCounters -contains $counterName -or $counterName -like "*Hyper-V*") {
+                $script:englishPerfHash.$counterName = $counterId
+                $foundCount++
+            }
+
+            # Early exit if we found all our needed counters
+            if ($foundCount -ge $neededCounters.Count) {
+                Write-Progress -Activity 'Building Optimized Counter Cache' -Status "Found all needed counters"
+            }
+        }
+
+        # Save to cache for next time
+        Save-CounterCache $script:englishPerfHash $cacheFile
+        Write-Progress -Activity 'Building Optimized Counter Cache' -Completed
+    }
+    catch {
+        Write-Warning "Failed to load English counters: $($_.Exception.Message)"
+    }
+}
+
+function Get-EnglishCounterID
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$EnglishName
+    )
+
+    if ($script:englishPerfHash -eq $null)
+    {
+        Initialize-EnglishCounterCache
+    }
+
+    return $script:englishPerfHash.$EnglishName
+}
+
+function Get-LocalizedCounterName
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$EnglishName
+    )
+
+    # Initialize localized cache if needed
+    if ($script:localizedCounterCache -eq $null) {
+        $script:localizedCounterCache = @{}
+
+        # Try to load from cache file
+        $cacheFile = Get-CacheFilePath "localized"
+        if (Test-CacheValid $cacheFile) {
+            $script:localizedCounterCache = Load-CounterCache $cacheFile
+        }
+    }
+
+    # Check if we already have this counter in cache
+    if ($script:localizedCounterCache.ContainsKey($EnglishName)) {
+        return $script:localizedCounterCache.$EnglishName
+    }
+
+    # Cache miss - resolve and store
+    $counterId = Get-EnglishCounterID $EnglishName
+    $localizedName = $EnglishName  # Default fallback
+
+    if ($counterId) {
+        # Try to get the localized name using the ID
+        $resolvedName = Get-PerformanceCounterLocalName $counterId
+        if ($resolvedName) {
+            $localizedName = $resolvedName
+        }
+        else {
+            Write-Warning "Could not localize counter '$EnglishName' (ID: $counterId), using English name"
+        }
+    }
+    else {
+        Write-Warning "Could not find counter ID for '$EnglishName', using English name"
+    }
+
+    # Store in cache for future use
+    $script:localizedCounterCache.$EnglishName = $localizedName
+
+    # Save updated cache to file (async to avoid blocking)
+    $cacheFile = Get-CacheFilePath "localized"
+    try {
+        Save-CounterCache $script:localizedCounterCache $cacheFile
+    }
+    catch {
+        # Don't fail if cache save fails
+    }
+
+    return $localizedName
 }
 
 function Test-PerformanceCounter
@@ -152,7 +342,7 @@ function Test-PerformanceCounter
         [Parameter(Mandatory=$true)]
         $CounterPath
     )
-    
+
     try {
         $testResult = Get-Counter -Counter $CounterPath -MaxSamples 1 -ErrorAction Stop
         return $true
@@ -167,24 +357,24 @@ function Build-SafeCounterPath
     param
     (
         [Parameter(Mandatory=$true)]
-        $CategoryId,
+        $EnglishCategoryName,
         [Parameter(Mandatory=$true)]
-        $CounterId,
+        $EnglishCounterName,
         [Parameter(Mandatory=$false)]
         $Instance = "*"
     )
-    
-    # Get localized names, with fallback to IDs if names can't be resolved
-    $categoryName = Get-PerformanceCounterLocalName $CategoryId
-    $counterName = Get-PerformanceCounterLocalName $CounterId
-    
-    if ($categoryName -and $counterName) {
-        return "\$categoryName($Instance)\$counterName"
+
+    # Get localized names from English names
+    $localCategoryName = Get-LocalizedCounterName $EnglishCategoryName
+    $localCounterName = Get-LocalizedCounterName $EnglishCounterName
+
+    if ($localCategoryName -and $localCounterName) {
+        return "\$localCategoryName($Instance)\$localCounterName"
     }
     else {
-        # Fallback to numeric IDs if name resolution fails
-        Write-Warning "Using numeric counter path as fallback: \$CategoryId($Instance)\$CounterId"
-        return "\$CategoryId($Instance)\$CounterId"
+        # Fallback to English names if localization fails
+        Write-Warning "Using English counter names as fallback: \$EnglishCategoryName($Instance)\$EnglishCounterName"
+        return "\$EnglishCategoryName($Instance)\$EnglishCounterName"
     }
 }
 
@@ -193,9 +383,9 @@ function Get-SafePerformanceCounter
     param
     (
         [Parameter(Mandatory=$true)]
-        $CategoryId,
+        $EnglishCategoryName,
         [Parameter(Mandatory=$true)]
-        $CounterId,
+        $EnglishCounterName,
         [Parameter(Mandatory=$true)]
         $InstanceName
     )
@@ -205,7 +395,7 @@ function Get-SafePerformanceCounter
 
     # Try with original instance name first (performance counters typically use original names)
     try {
-        $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $originalInstanceName
+        $counterPath = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $originalInstanceName
         $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
         if ($result) {
             return $result
@@ -218,7 +408,7 @@ function Get-SafePerformanceCounter
     # Try with the provided instance name if it's different from original
     if ($InstanceName -ne $originalInstanceName) {
         try {
-            $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $InstanceName
+            $counterPath = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $InstanceName
             $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
             if ($result) {
                 return $result
@@ -233,7 +423,7 @@ function Get-SafePerformanceCounter
     $safeInstanceName = Sanitize-VMName $originalInstanceName
     if ($safeInstanceName -ne $originalInstanceName -and $safeInstanceName -ne $InstanceName) {
         try {
-            $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $safeInstanceName
+            $counterPath = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $safeInstanceName
             $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
             if ($result) {
                 return $result
@@ -336,74 +526,120 @@ function Get-OriginalVMName
     }
 }
 
-function Get-HyperVCounterPath
+function Get-StorageCounterInstances
+{
+    # Get storage performance counter instances using proper localized counter names
+    try {
+        # Use our cached counter resolution to get the localized category and counter names
+        $localCategoryName = Get-LocalizedCounterName "Hyper-V Virtual Storage Device"
+
+        # Try to get any counter from this category to access instances
+        # We don't need a specific counter, any counter will give us the instance list
+        try {
+            $counterSet = Get-Counter -ListSet $localCategoryName -ErrorAction Stop
+            if ($counterSet.Counter.Count -gt 0) {
+                $anyCounter = $counterSet.Counter[0]
+                $instances = (Get-Counter -Counter $anyCounter -ErrorAction Stop).CounterSamples
+                return $instances
+            }
+        }
+        catch {
+            # Fallback: try English category name
+            try {
+                $counterSet = Get-Counter -ListSet "Hyper-V Virtual Storage Device" -ErrorAction Stop
+                if ($counterSet.Counter.Count -gt 0) {
+                    $anyCounter = $counterSet.Counter[0]
+                    $instances = (Get-Counter -Counter $anyCounter -ErrorAction Stop).CounterSamples
+                    return $instances
+                }
+            }
+            catch {
+                return @()
+            }
+        }
+
+        return @()
+    }
+    catch {
+        return @()
+    }
+}
+
+function Get-VMDiskInstances
 {
     param
     (
         [Parameter(Mandatory=$true)]
-        $CounterType,
-        [Parameter(Mandatory=$false)]
-        $Instance = "*"
+        [string]$VMName
     )
-    
-    $counterMappings = @{
-        'VirtualStorageDevice' = @{
-            'Category' = 'Hyper-V Virtual Storage Device'
-            'Counters' = @{
-                'ReadBytes' = 'Read Bytes/sec'
-                'WriteBytes' = 'Write Bytes/sec'
-                'ReadOps' = 'Read Operations/sec'
-                'WriteOps' = 'Write Operations/sec'
+
+    try {
+        # Get the VM and its hard drives
+        $vm = Get-VM -Name $VMName -ErrorAction Stop
+        $vmDisks = Get-VMHardDiskDrive -VM $vm -ErrorAction Stop
+
+        if ($vmDisks.Count -eq 0) {
+            return @()
+        }
+
+        # Get all storage performance counter instances
+        $allStorageInstances = Get-StorageCounterInstances
+
+        if ($allStorageInstances.Count -eq 0) {
+            return @()
+        }
+
+        $matchedInstances = @()
+
+        foreach ($disk in $vmDisks) {
+            $diskPath = $disk.Path
+
+            # Extract filename from path
+            $diskFileName = Split-Path $diskPath -Leaf
+            $diskFileNameNoExt = [System.IO.Path]::GetFileNameWithoutExtension($diskFileName)
+
+            # Try to find matching performance counter instances
+            $matchingInstances = $allStorageInstances | Where-Object {
+                $_.InstanceName -like "*$diskFileName*" -or
+                $_.InstanceName -like "*$diskFileNameNoExt*"
+            }
+
+            foreach ($instance in $matchingInstances) {
+                $matchedInstances += [PSCustomObject]@{
+                    InstanceName = $instance.InstanceName
+                    DiskPath = $diskPath
+                    ControllerType = $disk.ControllerType
+                    ControllerNumber = $disk.ControllerNumber
+                    ControllerLocation = $disk.ControllerLocation
+                }
             }
         }
-        'VirtualNetworkAdapter' = @{
-            'Category' = 'Hyper-V Virtual Network Adapter'
-            'Counters' = @{
-                'BytesReceived' = 'Bytes Received/sec'
-                'BytesSent' = 'Bytes Sent/sec'
-                'PacketsSent' = 'Packets Sent/sec'
-            }
-        }
-        'HypervisorVirtualProcessor' = @{
-            'Category' = 'Hyper-V Hypervisor Virtual Processor'
-            'Counters' = @{
-                'TotalRunTime' = '% Total Run Time'
-            }
-        }
+
+        return $matchedInstances
     }
-    
-    $mapping = $counterMappings[$CounterType]
-    if (-not $mapping) {
-        throw "Unknown counter type: $CounterType"
+    catch {
+        return @()
     }
-    
-    # Try to get counter IDs dynamically
-    $categoryId = Get-PerformanceCounterID $mapping.Category
-    if (-not $categoryId) {
-        throw "Could not resolve category ID for: $($mapping.Category)"
-    }
-    
-    return $categoryId
 }
 
 $hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty name
 
 <# Zabbix Hyper-V Virtual Machine Discovery #>
 if ($QueryName -eq '') {
-    
-	
+
+
     $colItems = Get-VM
 
     write-host "{"
     write-host " `"data`":["
     write-host
-	
+
     $n = $colItems.Count
 
     foreach ($objItem in $colItems) {
         $originalName = $objItem.Name
         $sanitizedName = Sanitize-VMName $originalName
-        
+
         $line =  ' { "{#VMNAME}":"' + $originalName + '" ,"{#VMNAME_SAFE}":"' + $sanitizedName + '" ,"{#VMSTATE}":"' + $objItem.State  +
                      '", "{#VMHOST}":"' + $hostname + '" ,"{#REPLICATION}":"' + $objItem.ReplicationState +'" }'
         if ($n -gt 1){
@@ -444,40 +680,184 @@ if ($psboundparameters.Count -eq 2) {
     }
 	if ($QueryName -eq "GetPerformanceCounterID")
 	{
-		$pcID= Get-PerformanceCounterID($VMName)
-		write "ID of counter name <"$VMName"> is <"$pcID">"
+		$pcID= Get-EnglishCounterID($VMName)
+		write "ID of English counter name <"$VMName"> is <"$pcID">"
 		exit
 	}
 	elseif ($QueryName -eq "GetPerformanceCounterLocalName")
 	{
 		$pcLN= Get-PerformanceCounterLocalName($VMName);
-		write "ID of counter name <"$VMName"> is <"$pcNL">"
+		write "Localized name of counter ID <"$VMName"> is <"$pcLN">"
+		exit
+	}
+	elseif ($QueryName -eq "ClearCache")
+	{
+		Clear-CounterCaches
+		write "Performance counter caches cleared. Next run will rebuild cache."
+		exit
+	}
+	elseif ($QueryName -eq "TestVMDisks")
+	{
+		# Test the VM disk discovery for a specific VM
+		Write-Host "Testing VM disk discovery for '$VMName'..."
+
+		try {
+			# Get the original VM name
+			$originalVMName = Get-OriginalVMName $VMName
+			Write-Host "Original VM name: '$originalVMName'"
+
+			# First show the VM's actual disks
+			$vm = Get-VM -Name $originalVMName -ErrorAction Stop
+			$vmDisks = Get-VMHardDiskDrive -VM $vm -ErrorAction Stop
+
+			Write-Host "`nVM has $($vmDisks.Count) disks:"
+			foreach ($disk in $vmDisks) {
+				Write-Host "  Path: $($disk.Path)"
+				Write-Host "  Controller: $($disk.ControllerType) $($disk.ControllerNumber):$($disk.ControllerLocation)"
+			}
+
+			# Test the disk discovery method
+			$diskInstances = Get-VMDiskInstances -VMName $originalVMName
+
+			Write-Host "`nFound $($diskInstances.Count) performance counter instances:"
+			foreach ($disk in $diskInstances) {
+				Write-Host "  Instance: $($disk.InstanceName)"
+				Write-Host "  Path: $($disk.DiskPath)"
+				Write-Host "  Controller: $($disk.ControllerType) $($disk.ControllerNumber):$($disk.ControllerLocation)"
+				Write-Host ""
+			}
+		}
+		catch {
+			Write-Warning "Error testing VM disks: $($_.Exception.Message)"
+		}
+		exit
+	}
+	elseif ($QueryName -eq "ListStorageCounters")
+	{
+		# Show all counters in the Virtual Storage Device category
+		Write-Host "Listing all counters in 'Virtuelle Hyper-V-Speichervorrichtung'..."
+
+		try {
+			$storageCounters = Get-Counter -ListSet "Virtuelle Hyper-V-Speichervorrichtung" -ErrorAction Stop
+			Write-Host "`nCounters in '$($storageCounters.CounterSetName)':"
+			foreach ($counter in $storageCounters.Counter) {
+				$counterName = $counter.Split('(')[0].Split('\')[-1]
+				Write-Host "  - $counterName"
+			}
+
+			# Try to get some sample instances
+			Write-Host "`nTrying to get sample instances..."
+			$sampleCounter = $storageCounters.Counter | Select-Object -First 1
+			if ($sampleCounter) {
+				try {
+					$instances = (Get-Counter -Counter $sampleCounter -ErrorAction Stop).CounterSamples
+					Write-Host "Sample instances:"
+					$instances | ForEach-Object { Write-Host "  - $($_.InstanceName)" }
+				}
+				catch {
+					Write-Warning "Failed to get sample instances: $($_.Exception.Message)"
+				}
+			}
+		}
+		catch {
+			Write-Warning "Error accessing storage counters: $($_.Exception.Message)"
+		}
+		exit
+	}
+	elseif ($QueryName -eq "FindHyperVCounters")
+	{
+		# Help find the correct Hyper-V counter names on this system
+		Write-Host "Searching for Hyper-V related performance counters..."
+
+		try {
+			# Get all available counter sets
+			$allCounterSets = Get-Counter -ListSet "*"
+			$hyperVSets = $allCounterSets | Where-Object {
+				$_.CounterSetName -like "*Hyper*" -or
+				$_.CounterSetName -like "*Virtual*" -or
+				$_.CounterSetName -like "*Speicher*" -or
+				$_.CounterSetName -like "*Storage*"
+			}
+
+			Write-Host "`nFound $($hyperVSets.Count) Hyper-V/Virtual related counter sets:"
+			foreach ($set in $hyperVSets) {
+				Write-Host "`nCategory: '$($set.CounterSetName)'"
+				Write-Host "  Description: $($set.Description)"
+				Write-Host "  Relevant Counters:"
+
+				$relevantCounters = $set.Counter | Where-Object {
+					$_ -like "*Bytes*" -or $_ -like "*Run*" -or $_ -like "*Packets*" -or $_ -like "*Operations*"
+				}
+
+				if ($relevantCounters.Count -gt 0) {
+					foreach ($counter in $relevantCounters) {
+						$counterName = $counter.Split('(')[0].Split('\')[-1]
+						Write-Host "    - $counterName"
+					}
+				} else {
+					Write-Host "    (No relevant counters found)"
+				}
+			}
+
+			Write-Host "`n=== ALL COUNTER CATEGORIES (filtered) ==="
+			$allCounterSets | Where-Object {
+				$_.CounterSetName -like "*Speicher*" -or
+				$_.CounterSetName -like "*Storage*" -or
+				$_.CounterSetName -like "*Disk*" -or
+				$_.CounterSetName -like "*Datenträger*"
+			} | ForEach-Object {
+				Write-Host "- $($_.CounterSetName)"
+			}
+		}
+		catch {
+			Write-Warning "Error finding counters: $($_.Exception.Message)"
+		}
 		exit
 	}
 	else
 	{
-		<# $counterNames = LoadCounterNames <# Load localized counter names #>
 		switch ($QueryName)
 			{
-			
+
 			('GetVMDisks'){
 				$ItemType = "VMDISK"
-				$counterName = Build-SafeCounterPath -CategoryId 9470 -CounterId 9482 -Instance "*"
-				# Try matching with both original and safe VM names
-				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {
-					$_.InstanceName -like '*-'+$originalVMName+'*' -or 
-					$_.InstanceName -like '*-'+$safeVMName+'*' -or
-					$_.InstanceName -like '*'+$originalVMName+'*' -or
-					$_.InstanceName -like '*'+$safeVMName+'*'
-				} | select InstanceName
+
+				# Use Hyper-V cmdlets to get accurate VM disk instances
+				$diskInstances = Get-VMDiskInstances -VMName $originalVMName
+
+				if ($diskInstances.Count -gt 0) {
+					$Results = $diskInstances | Select-Object @{Name="InstanceName"; Expression={$_.InstanceName}}
+				} else {
+					# Fallback: try name-based matching with storage counter instances
+					$allStorageInstances = Get-StorageCounterInstances
+
+					if ($allStorageInstances.Count -gt 0) {
+						# Try matching with both original and safe VM names
+						$baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
+						$baseSafeVMName = $safeVMName -replace '_.*$', ''
+
+						$Results = $allStorageInstances | Where-Object  {
+							$_.InstanceName -like '*-'+$originalVMName+'*' -or
+							$_.InstanceName -like '*-'+$safeVMName+'*' -or
+							$_.InstanceName -like '*'+$originalVMName+'*' -or
+							$_.InstanceName -like '*'+$safeVMName+'*' -or
+							$_.InstanceName -like '*-'+$baseVMName+'*' -or
+							$_.InstanceName -like '*-'+$baseSafeVMName+'*' -or
+							$_.InstanceName -like '*'+$baseVMName+'*' -or
+							$_.InstanceName -like '*'+$baseSafeVMName+'*'
+						} | select InstanceName
+					} else {
+						$Results = @()
+					}
+				}
 			}
 
 			('GetVMNICs'){
 				$ItemType = "VMNIC"
-				$counterName = Build-SafeCounterPath -CategoryId 11386 -CounterId 11248 -Instance "*"
+				$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Packets Sent/sec" -Instance "*"
 				# Try matching with both original and safe VM names
 				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {
-					$_.InstanceName -like '*-'+$originalVMName+'*' -or 
+					$_.InstanceName -like '*-'+$originalVMName+'*' -or
 					$_.InstanceName -like '*-'+$safeVMName+'*' -or
 					$_.InstanceName -like '*'+$originalVMName+'*' -or
 					$_.InstanceName -like '*'+$safeVMName+'*'
@@ -486,82 +866,40 @@ if ($psboundparameters.Count -eq 2) {
 
 			('GetVMCPUs'){
 				 $ItemType  ="VMCPU"
-				
-				# Try multiple approaches to get the counter
-				$counterFound = $false
-				$Results = @()
-				
-				# Method 1: Use safe counter path building
-				try {
-					$counterName = Build-SafeCounterPath -CategoryId 10500 -CounterId 10788 -Instance "*"
-					
-					if (Test-PerformanceCounter $counterName) {
-						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
-							$_.InstanceName -like $originalVMName+':*' -or 
-							$_.InstanceName -like $safeVMName+':*' -or
-							$_.InstanceName -like '*-'+$originalVMName+'*' -or 
-							$_.InstanceName -like '*-'+$safeVMName+'*' -or
-							$_.InstanceName -like '*'+$originalVMName+'*' -or 
-							$_.InstanceName -like '*'+$safeVMName+'*'
-						} | select InstanceName
-						$counterFound = $true
-					}
+
+				# Use English counter names and let the function handle localization
+				$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+
+				if (Test-PerformanceCounter $counterName) {
+					$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
+						$_.InstanceName -like $originalVMName+':*' -or
+						$_.InstanceName -like $safeVMName+':*' -or
+						$_.InstanceName -like '*-'+$originalVMName+'*' -or
+						$_.InstanceName -like '*-'+$safeVMName+'*' -or
+						$_.InstanceName -like '*'+$originalVMName+'*' -or
+						$_.InstanceName -like '*'+$safeVMName+'*'
+					} | select InstanceName
 				}
-				catch {
-					Write-Warning "Method 1 failed for GetVMCPUs: $($_.Exception.Message)"
-				}
-				
-				# Method 2: Try with English counter names if method 1 failed
-				if (-not $counterFound) {
-					try {
-						$englishCounterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
-						if (Test-PerformanceCounter $englishCounterName) {
-							$Results = (Get-Counter -Counter $englishCounterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
-								$_.InstanceName -like $originalVMName+':*' -or 
-								$_.InstanceName -like $safeVMName+':*' -or
-								$_.InstanceName -like '*-'+$originalVMName+'*' -or 
-								$_.InstanceName -like '*-'+$safeVMName+'*' -or
-								$_.InstanceName -like '*'+$originalVMName+'*' -or 
-								$_.InstanceName -like '*'+$safeVMName+'*'
-							} | select InstanceName
-							$counterFound = $true
-						}
-					}
-					catch {
-						Write-Warning "Method 2 failed for GetVMCPUs: $($_.Exception.Message)"
-					}
-				}
-				
-				# Method 3: Try alternative pattern matching
-				if (-not $counterFound) {
-					try {
-						$counterPart1 = Get-PerformanceCounterLocalName(10500)
-						$counterPart2 = Get-PerformanceCounterLocalName(10788)
-						$counterName= "\$counterPart1(*)\$counterPart2"
-						$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
-							$_.InstanceName -match $originalVMName -or $_.InstanceName -match $safeVMName
-						} | select InstanceName
-					}
-					catch {
-						Write-Warning "Method 3 failed for GetVMCPUs: $($_.Exception.Message)"
-					}
+				else {
+					Write-Warning "Could not access counter: $counterName"
+					$Results = @()
 				}
 			}
-				
+
 			default {$Results = "Bad Request"; write-host $Results; exit}
 			}
 
 		write-host "{"
 		write-host " `"data`":["
-		write-host      
+		write-host
 		#write-host $Results
-				   
-		   
+
+
 		$n = ($Results | measure).Count
 
 				foreach ($objItem in $Results) {
 					$line = " { `"{#"+$ItemType+"}`":`""+$objItem.InstanceName+"`"}"
-					 
+
 					if ($n -gt 1 ){
 						$line += ","
 					}
@@ -569,7 +907,7 @@ if ($psboundparameters.Count -eq 2) {
 					write-host $line
 					$n--
 				}
-		
+
 		write-host " ]"
 		write-host "}"
 		write-host
@@ -582,7 +920,7 @@ if ($psboundparameters.Count -eq 2) {
 
 
 <# Zabbix Hyper-V VM Get Performance Counter Value #>
-if ($psboundparameters.Count -eq 3) 
+if ($psboundparameters.Count -eq 3)
 {
     if ($QueryName -eq 'GetVMReplication')
     {
@@ -606,42 +944,42 @@ if ($psboundparameters.Count -eq 3)
                 <# Disk Counters #>
                 ('VMDISKBytesRead'){
 					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9480 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Read Bytes/sec" -InstanceName $VMObject
                 }
                 ('VMDISKBytesWrite'){
 					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9482 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Write Bytes/sec" -InstanceName $VMObject
                 }
                 ('VMDISKOpsRead'){
 					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9484 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Read Operations/sec" -InstanceName $VMObject
                 }
                 ('VMDISKOpsWrite'){
 					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 9470 -CounterId 9486 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Write Operations/sec" -InstanceName $VMObject
                 }
 
                 <# Network Counters #>
                 ('VMNICSent'){
 					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 11386 -CounterId 11236 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Bytes Sent/sec" -InstanceName $VMObject
                 }
                 ('VMNICRecv'){
 					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 11386 -CounterId 11232 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Bytes Received/sec" -InstanceName $VMObject
                 }
 
 
                 <# Virtual CPU Counters #>
                 ('VMCPUTotal'){
                     $ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -CategoryId 10500 -CounterId 10788 -InstanceName $VMObject
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -InstanceName $VMObject
                 }
 
                 default {$Results = "Bad Request"; exit}
         }
 
-    
+
         foreach ($objItem in $Results) {
                 $line = [int]$objItem.CookedValue
                 write-host $line
@@ -650,4 +988,3 @@ if ($psboundparameters.Count -eq 3)
         exit
     }
 }
-
