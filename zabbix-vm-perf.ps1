@@ -199,22 +199,39 @@ function Get-SafePerformanceCounter
         [Parameter(Mandatory=$true)]
         $InstanceName
     )
-    
-    # Try with original instance name first
+
+    # Get the original VM name if we received a sanitized one
+    $originalInstanceName = Get-OriginalVMName $InstanceName
+
+    # Try with original instance name first (performance counters typically use original names)
     try {
-        $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $InstanceName
+        $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $originalInstanceName
         $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
         if ($result) {
             return $result
         }
     }
     catch {
-        Write-Warning "Failed with original instance name '$InstanceName': $($_.Exception.Message)"
+        Write-Warning "Failed with original instance name '$originalInstanceName': $($_.Exception.Message)"
     }
-    
-    # Try with sanitized instance name if original failed
-    $safeInstanceName = Sanitize-VMName $InstanceName
-    if ($safeInstanceName -ne $InstanceName) {
+
+    # Try with the provided instance name if it's different from original
+    if ($InstanceName -ne $originalInstanceName) {
+        try {
+            $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $InstanceName
+            $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+            if ($result) {
+                return $result
+            }
+        }
+        catch {
+            Write-Warning "Failed with provided instance name '$InstanceName': $($_.Exception.Message)"
+        }
+    }
+
+    # Try with sanitized instance name as last resort
+    $safeInstanceName = Sanitize-VMName $originalInstanceName
+    if ($safeInstanceName -ne $originalInstanceName -and $safeInstanceName -ne $InstanceName) {
         try {
             $counterPath = Build-SafeCounterPath -CategoryId $CategoryId -CounterId $CounterId -Instance $safeInstanceName
             $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
@@ -226,7 +243,7 @@ function Get-SafePerformanceCounter
             Write-Warning "Failed with sanitized instance name '$safeInstanceName': $($_.Exception.Message)"
         }
     }
-    
+
     return $null
 }
 
@@ -237,13 +254,13 @@ function Sanitize-VMName
         [Parameter(Mandatory=$true)]
         [string]$VMName
     )
-    
+
     # Remove or replace characters that are invalid in Zabbix item keys and performance counter paths
     # Zabbix doesn't allow: ( ) [ ] { } | \ / ? * " ' : ; , = + & % @ ! # $ ^
     # Performance counters are especially sensitive to ( ) [ ] { }
-    
+
     $sanitized = $VMName
-    
+
     # Replace problematic characters with safe alternatives
     $sanitized = $sanitized -replace '\(', '_'    # Replace ( with _
     $sanitized = $sanitized -replace '\)', '_'    # Replace ) with _
@@ -272,18 +289,51 @@ function Sanitize-VMName
     $sanitized = $sanitized -replace '\^', '_'    # Replace ^ with _
     $sanitized = $sanitized -replace '`', '_'     # Replace ` with _
     $sanitized = $sanitized -replace '~', '_'     # Replace ~ with _
-    
+
     # Remove any leading/trailing underscores and collapse multiple underscores
     $sanitized = $sanitized -replace '^_+', ''    # Remove leading underscores
     $sanitized = $sanitized -replace '_+$', ''    # Remove trailing underscores
     $sanitized = $sanitized -replace '_+', '_'    # Collapse multiple underscores
-    
+
     # Ensure we don't return an empty string
     if ([string]::IsNullOrWhiteSpace($sanitized)) {
         $sanitized = "VM_" + $VMName.GetHashCode().ToString().Replace('-', '')
     }
-    
+
     return $sanitized
+}
+
+function Get-OriginalVMName
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$SafeVMName
+    )
+
+    try {
+        # Get all current VM names
+        $allVMs = Get-VM | Select-Object -ExpandProperty Name
+
+        # First try exact match (for VMs that didn't need sanitization)
+        if ($allVMs -contains $SafeVMName) {
+            return $SafeVMName
+        }
+
+        # Try to find original VM by comparing sanitized versions
+        foreach ($vm in $allVMs) {
+            if ((Sanitize-VMName $vm) -eq $SafeVMName) {
+                return $vm
+            }
+        }
+
+        # If no match found, return the safe name as fallback
+        return $SafeVMName
+    }
+    catch {
+        Write-Warning "Error in Get-OriginalVMName for '$SafeVMName': $($_.Exception.Message)"
+        return $SafeVMName
+    }
 }
 
 function Get-HyperVCounterPath
@@ -383,14 +433,14 @@ if ($psboundparameters.Count -eq 2) {
         }
     }
 
-    # Store both original and sanitized VM name for different uses
-    $originalVMName = $VMName
-    $safeVMName = Sanitize-VMName $VMName
+    # Get the original VM name if we received a sanitized one
+    $originalVMName = Get-OriginalVMName $VMName
+    $safeVMName = Sanitize-VMName $originalVMName
 
-    # Also sanitize VMObject if provided (contains instance names)
+    # Also handle VMObject if provided (contains instance names)
     if ($VMObject) {
-        $originalVMObject = $VMObject
-        $safeVMObject = Sanitize-VMName $VMObject
+        $originalVMObject = Get-OriginalVMName $VMObject
+        $safeVMObject = Sanitize-VMName $originalVMObject
     }
 	if ($QueryName -eq "GetPerformanceCounterID")
 	{
@@ -536,13 +586,17 @@ if ($psboundparameters.Count -eq 3)
 {
     if ($QueryName -eq 'GetVMReplication')
     {
-        $Results = (Get-VMReplication | Where-Object {$_.VMName -eq $VMName}).ReplicationHealth
+        # Try with original VM name first, then with provided name
+        $originalVMName = Get-OriginalVMName $VMName
+        $Results = (Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}).ReplicationHealth
         write-host $Results
         exit
     }
     elseif ($QueryName -eq 'GetVMStatus')
     {
-        $Results =  (Get-VM | Where-Object {$_.Name -eq $VMName}).State
+        # Try with original VM name first, then with provided name
+        $originalVMName = Get-OriginalVMName $VMName
+        $Results = (Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}).State
         write-host $Results
         exit
     }
