@@ -354,6 +354,29 @@ function Test-PerformanceCounter
     }
 }
 
+function Get-CounterNameVariations
+{
+    param($CounterName)
+
+    $variations = @($CounterName)
+
+    # Try common German localization variations
+    if ($CounterName -like "*Sek.*") {
+        $variations += $CounterName -replace "Sek\.", "s"
+    }
+    if ($CounterName -like "*s") {
+        $variations += $CounterName -replace "s$", "Sek."
+    }
+
+    # Try CPU counter variations
+    if ($CounterName -like "*Gesamtlaufzeit*") {
+        $variations += $CounterName -replace "Gesamtlaufzeit", "Gesamte Laufzeit"
+        $variations += $CounterName -replace "% Gesamtlaufzeit", "Gesamte Laufzeit in %"
+    }
+
+    return $variations
+}
+
 function Build-SafeCounterPath
 {
     param
@@ -363,20 +386,43 @@ function Build-SafeCounterPath
         [Parameter(Mandatory=$true)]
         $EnglishCounterName,
         [Parameter(Mandatory=$false)]
-        $Instance = "*"
+        $Instance = "*",
+        [Parameter(Mandatory=$false)]
+        [switch]$TryVariations
     )
 
     # Get localized names from English names
     $localCategoryName = Get-LocalizedCounterName $EnglishCategoryName
     $localCounterName = Get-LocalizedCounterName $EnglishCounterName
 
+    # Quote instance names that contain spaces or special characters
+    $quotedInstance = $Instance
+    if ($Instance -ne "*" -and ($Instance -like "* *" -or $Instance -like "*:*" -or $Instance -like "*(*")) {
+        $quotedInstance = "`"$Instance`""
+    }
+
     if ($localCategoryName -and $localCounterName) {
-        return "\$localCategoryName($Instance)\$localCounterName"
+        $counterPaths = @()
+
+        if ($TryVariations) {
+            # Try counter name variations
+            $nameVariations = Get-CounterNameVariations $localCounterName
+            foreach ($variation in $nameVariations) {
+                $counterPaths += "\$localCategoryName($quotedInstance)\$variation"
+            }
+        }
+        else {
+            $counterPaths += "\$localCategoryName($quotedInstance)\$localCounterName"
+        }
+
+        # Always add English fallback as last resort
+        $counterPaths += "\$EnglishCategoryName($quotedInstance)\$EnglishCounterName"
+
+        return $counterPaths
     }
     else {
         # Fallback to English names if localization fails
-        Write-Warning "Using English counter names as fallback: \$EnglishCategoryName($Instance)\$EnglishCounterName"
-        return "\$EnglishCategoryName($Instance)\$EnglishCounterName"
+        return @("\$EnglishCategoryName($quotedInstance)\$EnglishCounterName")
     }
 }
 
@@ -392,47 +438,146 @@ function Get-SafePerformanceCounter
         $InstanceName
     )
 
-    # Get the original VM name if we received a sanitized one
-    $originalInstanceName = Get-OriginalVMName $InstanceName
+    # For disk instance names, don't try to resolve VM names - use the instance name directly
+    if ($InstanceName -like "*hyper-v*" -and ($InstanceName -like "*vhd*" -or $InstanceName -like "*disk*")) {
+        # This is likely a disk performance counter instance - try multiple categories
 
-    # Try with original instance name first (performance counters typically use original names)
-    try {
-        $counterPath = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $originalInstanceName
-        $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
-        if ($result) {
-            return $result
-        }
-    }
-    catch {
-        Write-Warning "Failed with original instance name '$originalInstanceName': $($_.Exception.Message)"
-    }
+        # Disk counters can be in different categories depending on controller type
+        $diskCategories = @(
+            "Virtuelle Hyper-V-Speichervorrichtung",      # German - SCSI/VHD
+            "Hyper-V - virtueller IDE-Controller (emuliert)"  # German - IDE
+        )
 
-    # Try with the provided instance name if it's different from original
-    if ($InstanceName -ne $originalInstanceName) {
-        try {
-            $counterPath = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $InstanceName
-            $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
-            if ($result) {
-                return $result
+        # Try each disk category to find the right controller type
+        foreach ($category in $diskCategories) {
+            # Get all possible counter path variations to try
+            $counterPaths = Build-SafeCounterPath -EnglishCategoryName $category -EnglishCounterName $EnglishCounterName -Instance "*" -TryVariations
+
+            foreach ($counterPath in $counterPaths) {
+                try {
+                    $allInstances = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+
+                    if ($allInstances) {
+                        # Try to find an instance that matches our disk
+                        # Extract key parts from the discovery instance name for matching
+                        $fileName = Split-Path $InstanceName -Leaf -ErrorAction SilentlyContinue
+                        $guidPattern = [regex]::Matches($InstanceName, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}') | Select-Object -First 1
+
+                        $matchingInstance = $allInstances | Where-Object {
+                            $instance = $_.InstanceName
+                            # Try multiple matching strategies
+                            ($fileName -and $instance -like "*$fileName*") -or
+                            ($guidPattern -and $instance -like "*$($guidPattern.Value)*") -or
+                            ($instance -eq $InstanceName)
+                        } | Select-Object -First 1
+
+                        if ($matchingInstance) {
+                            return $matchingInstance
+                        }
+                    }
+                }
+                catch {
+                    # Try next counter name variation - silently continue
+                }
             }
         }
-        catch {
-            Write-Warning "Failed with provided instance name '$InstanceName': $($_.Exception.Message)"
-        }
-    }
 
-    # Try with sanitized instance name as last resort
-    $safeInstanceName = Sanitize-VMName $originalInstanceName
-    if ($safeInstanceName -ne $originalInstanceName -and $safeInstanceName -ne $InstanceName) {
-        try {
-            $counterPath = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $safeInstanceName
-            $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
-            if ($result) {
-                return $result
+
+        return $null
+    } else {
+
+        # This is likely a VM name - try VM name resolution
+        $originalInstanceName = Get-OriginalVMName $InstanceName
+
+        # Try with original instance name first (performance counters typically use original names)
+        $counterPaths = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $originalInstanceName -TryVariations
+        foreach ($counterPath in $counterPaths) {
+            try {
+                $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+                if ($result) {
+                    return $result
+                }
+            }
+            catch {
+                # Try next variation silently
             }
         }
-        catch {
-            Write-Warning "Failed with sanitized instance name '$safeInstanceName': $($_.Exception.Message)"
+
+        # Try with the provided instance name if it's different from original
+        if ($InstanceName -ne $originalInstanceName) {
+            $counterPaths = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $InstanceName -TryVariations
+            foreach ($counterPath in $counterPaths) {
+                try {
+                    $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+                    if ($result) {
+                        return $result
+                    }
+                }
+                catch {
+                    # Try next variation silently
+                }
+            }
+        }
+
+        # Try with hp->hv conversion for CPU instances (hp is used in discovery, hv in performance counters)
+        if ($EnglishCategoryName -like "*Virtual Processor*" -and $InstanceName -like "*:hp vp *") {
+            $hvInstanceName = $InstanceName -replace ":hp vp ", ":hv vp "
+
+            # Get all CPU instances and find exact match
+            try {
+                $listPath = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
+                $allInstances = (Get-Counter -Counter $listPath -ErrorAction Stop).CounterSamples
+                $exactMatch = $allInstances | Where-Object { $_.InstanceName -eq $hvInstanceName }
+                if ($exactMatch) {
+                    return $exactMatch
+                }
+            }
+            catch {
+                # Failed to get instance list, try individual counter paths
+            }
+
+            # Try direct English counter path
+            try {
+                $englishPath = "\Hyper-V Hypervisor Virtual Processor(`"$hvInstanceName`")\% Total Run Time"
+                $result = (Get-Counter -Counter $englishPath -ErrorAction Stop).CounterSamples
+                if ($result -and $result.Count -gt 0) {
+                    return $result[0]  # Return the first counter sample
+                }
+            }
+            catch {
+                # English path failed, try other variations
+            }
+
+            # If English failed, try the localized paths
+            $counterPaths = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $hvInstanceName -TryVariations
+            foreach ($counterPath in $counterPaths) {
+                try {
+                    $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+                    if ($result -and $result.Count -gt 0) {
+                        return $result[0]  # Return the first counter sample
+                    }
+                }
+                catch {
+                    # Try next variation silently
+                }
+            }
+        }
+
+        # Try with sanitized instance name as last resort for VM instances
+        $safeInstanceName = Sanitize-VMName $originalInstanceName
+        if ($safeInstanceName -ne $originalInstanceName -and $safeInstanceName -ne $InstanceName) {
+            $counterPaths = Build-SafeCounterPath -EnglishCategoryName $EnglishCategoryName -EnglishCounterName $EnglishCounterName -Instance $safeInstanceName -TryVariations
+            foreach ($counterPath in $counterPaths) {
+                try {
+                    $result = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+                    if ($result) {
+                        return $result
+                    }
+                }
+                catch {
+                    # Try next variation silently
+                }
+            }
         }
     }
 
