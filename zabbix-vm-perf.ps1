@@ -586,11 +586,18 @@ function Get-SafePerformanceCounter
 
             # Get all CPU instances and find exact match
             try {
-                $listPath = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
-                $allInstances = (Get-Counter -Counter $listPath -ErrorAction Stop).CounterSamples
-                $exactMatch = $allInstances | Where-Object { $_.InstanceName -eq $hvInstanceName }
-                if ($exactMatch) {
-                    return $exactMatch
+                $counterPaths = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+                foreach ($listPath in $counterPaths) {
+                    try {
+                        $allInstances = (Get-Counter -Counter $listPath -ErrorAction Stop).CounterSamples
+                        $exactMatch = $allInstances | Where-Object { $_.InstanceName -eq $hvInstanceName }
+                        if ($exactMatch) {
+                            return $exactMatch
+                        }
+                    }
+                    catch {
+                        continue
+                    }
                 }
             }
             catch {
@@ -1052,10 +1059,11 @@ if ($psboundparameters.Count -eq 2) {
 	elseif ($QueryName -eq "ListStorageCounters")
 	{
 		# Show all counters in the Virtual Storage Device category
-		Write-Host "Listing all counters in 'Virtuelle Hyper-V-Speichervorrichtung'..."
+		$localCategoryName = Get-LocalizedCounterName "Hyper-V Virtual Storage Device"
+		Write-Host "Listing all counters in '$localCategoryName'..."
 
 		try {
-			$storageCounters = Get-Counter -ListSet "Virtuelle Hyper-V-Speichervorrichtung" -ErrorAction Stop
+			$storageCounters = Get-Counter -ListSet $localCategoryName -ErrorAction Stop
 			Write-Host "`nCounters in '$($storageCounters.CounterSetName)':"
 			foreach ($counter in $storageCounters.Counter) {
 				$counterName = $counter.Split('(')[0].Split('\')[-1]
@@ -1086,11 +1094,12 @@ if ($psboundparameters.Count -eq 2) {
 		# Search specifically for network counter instances
 		Write-Host "Searching for Hyper-V network counter instances..."
 
+		# Use localized counter resolution system for consistency
 		$networkCategories = @(
-			"Virtueller Hyper-V-Netzwerkadapter",
-			"Virtuelle Hyper-V-Netzwerkkarte - vRSS",
+			(Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"),
+			"Virtuelle Hyper-V-Netzwerkkarte - vRSS",  # This specific vRSS category may not have English equivalent
 			"RemoteFX-Netzwerk",
-			"Hyper-V Virtual Network Adapter",
+			"Hyper-V Virtual Network Adapter",  # English fallback
 			"Netzwerkschnittstelle",
 			"Netzwerkadapter"
 		)
@@ -1144,9 +1153,10 @@ if ($psboundparameters.Count -eq 2) {
 		# Search specifically for storage counter instances
 		Write-Host "Searching for Hyper-V storage counter instances..."
 
+		# Use localized counter resolution system for consistency
 		$storageCategories = @(
-			"Virtuelle Hyper-V-Speichervorrichtung",
-			"Hyper-V Virtual Storage Device",
+			(Get-LocalizedCounterName "Hyper-V Virtual Storage Device"),
+			"Hyper-V Virtual Storage Device",  # English fallback
 			"PhysicalDisk",
 			"LogicalDisk"
 		)
@@ -1436,20 +1446,19 @@ if ($psboundparameters.Count -eq 2) {
 	{
 		$ItemType = "VMCPU"
 
-		# Try direct German counter path that we know works
-		$counterName = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
+		# Try localized counter paths using the counter resolution system
+		$counterPaths = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*" -TryVariations
 
-		try {
-			$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
-		}
-		catch {
-			# Fallback to English counter path
+		$allCpuInstances = @()
+		foreach ($counterPath in $counterPaths) {
 			try {
-				$counterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
-				$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
+				$allCpuInstances = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+				if ($allCpuInstances -and $allCpuInstances.Count -gt 0) {
+					break  # Found working counter path
+				}
 			}
 			catch {
-				$allCpuInstances = @()
+				continue  # Try next variation
 			}
 		}
 
@@ -1616,11 +1625,11 @@ if ($psboundparameters.Count -eq 2) {
 	{
 		$ItemType = "VMNIC"
 
-		# Try multiple network counter categories found on German systems
+		# Try multiple network counter categories using localized resolution
 		$networkCategories = @(
-			"Virtueller Hyper-V-Netzwerkadapter",
-			"Virtuelle Hyper-V-Netzwerkkarte - vRSS",
-			"Hyper-V Virtual Network Adapter"  # English fallback
+			(Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"),
+			"Virtuelle Hyper-V-Netzwerkkarte - vRSS",   # Specific vRSS category
+			"Hyper-V Virtual Network Adapter"           # English fallback
 		)
 
 		$allNetworkInstances = @()
@@ -1860,11 +1869,11 @@ else {
 			('GetVMNICs'){
 				$ItemType = "VMNIC"
 
-				# Try multiple network counter categories found on German systems
+				# Try multiple network counter categories using localized resolution
 				$networkCategories = @(
-					"Virtueller Hyper-V-Netzwerkadapter",
-					"Virtuelle Hyper-V-Netzwerkkarte - vRSS",
-					"Hyper-V Virtual Network Adapter"  # English fallback
+					(Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"),
+					"Virtuelle Hyper-V-Netzwerkkarte - vRSS",   # Specific vRSS category
+					"Hyper-V Virtual Network Adapter"           # English fallback
 				)
 
 				$allNetworkInstances = @()
@@ -1915,20 +1924,19 @@ else {
 			('GetVMCPUs'){
 				$ItemType  ="VMCPU"
 
-				# Try direct German counter path that we know works
-				$counterName = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
+				# Try localized counter paths using the counter resolution system
+				$counterPaths = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*" -TryVariations
 
-				try {
-					$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
-				}
-				catch {
-					# Fallback to English counter path
+				$allCpuInstances = @()
+				foreach ($counterPath in $counterPaths) {
 					try {
-						$counterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
-						$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
+						$allCpuInstances = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+						if ($allCpuInstances -and $allCpuInstances.Count -gt 0) {
+							break  # Found working counter path
+						}
 					}
 					catch {
-						$allCpuInstances = @()
+						continue  # Try next variation
 					}
 				}
 
