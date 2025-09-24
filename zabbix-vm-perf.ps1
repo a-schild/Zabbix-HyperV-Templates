@@ -1352,11 +1352,24 @@ if ($psboundparameters.Count -eq 2) {
 	{
 		$ItemType = "VMCPU"
 
-		# Use English counter names and let the function handle localization
-		$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+		# Try direct German counter path that we know works
+		$counterName = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
 
-		if (Test-PerformanceCounter $counterName) {
-			$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+		try {
+			$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
+		}
+		catch {
+			# Fallback to English counter path
+			try {
+				$counterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
+				$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
+			}
+			catch {
+				$allCpuInstances = @()
+			}
+		}
+
+		if ($allCpuInstances -and $allCpuInstances.Count -gt 0) {
 
 			# Create different VM name variations for matching
 			$bracketsName = ($originalVMName -replace '\(', '[') -replace '\)', ']'
@@ -1399,7 +1412,9 @@ if ($psboundparameters.Count -eq 2) {
 
 		$n = ($Results | measure).Count
 		foreach ($objItem in $Results) {
-			$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'"}'
+			# Convert hv back to hp for discovery (monitoring will convert hp->hv internally)
+			$discoveryInstanceName = $objItem.InstanceName -replace ":hv vp ", ":hp vp "
+			$line = ' { "{#'+$ItemType+'}":"'+$discoveryInstanceName+'"}'
 
 			if ($n -gt 1 ){
 				$line += ","
@@ -1804,14 +1819,36 @@ else {
 			}
 
 			('GetVMCPUs'){
-				Write-Host "DEBUG: GetVMCPUs started for VM: '$originalVMName' / '$safeVMName'" -ForegroundColor Red
 				$ItemType  ="VMCPU"
 
-				# Use English counter names and let the function handle localization
-				$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+				# Try direct German counter path that we know works
+				$counterName = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
+				Write-Host "DEBUG DISC: Trying German path: $counterName" -ForegroundColor Cyan
 
-				if (Test-PerformanceCounter $counterName) {
-					$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+				try {
+					$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
+					Write-Host "DEBUG DISC: German path got $($allCpuInstances.Count) instances" -ForegroundColor Green
+				}
+				catch {
+					Write-Host "DEBUG DISC: German path failed: $($_.Exception.Message)" -ForegroundColor Red
+					# Fallback to English counter path
+					try {
+						$counterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
+						$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
+						Write-Host "DEBUG DISC: English path got $($allCpuInstances.Count) instances" -ForegroundColor Green
+					}
+					catch {
+						Write-Host "DEBUG DISC: English path also failed: $($_.Exception.Message)" -ForegroundColor Red
+						$allCpuInstances = @()
+					}
+				}
+
+				Write-Host "DEBUG DISC: Looking for VM: '$originalVMName' / '$safeVMName'" -ForegroundColor Yellow
+				if ($allCpuInstances -and $allCpuInstances.Count -gt 0) {
+					Write-Host "DEBUG DISC: Sample instances:" -ForegroundColor Yellow
+					$allCpuInstances | Select-Object -First 5 | ForEach-Object {
+						Write-Host "  - '$($_.InstanceName)'" -ForegroundColor Yellow
+					}
 
 					# Create different VM name variations for matching
 					$bracketsName = ($originalVMName -replace '\(', '[') -replace '\)', ']'
