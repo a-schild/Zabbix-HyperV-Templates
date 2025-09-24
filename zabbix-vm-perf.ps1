@@ -28,6 +28,8 @@ param(
 	[string]$VMObject
 )
 
+
+
 # Get script directory for cache files
 $script:ScriptDirectory = Split-Path $MyInvocation.MyCommand.Path -Parent
 
@@ -526,6 +528,79 @@ function Get-OriginalVMName
     }
 }
 
+function Get-ShortResourceName
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$FullName,
+        [Parameter(Mandatory=$false)]
+        [int]$MaxLength = 20
+    )
+
+    # Handle different types of resource names
+    if ($FullName -like "*-hyper-v-*") {
+        # Disk instances: "d:-hyper-v-hyper-v replica-virtual hard disks-17808674-b02d-408c-9ab8-a85700685ff7-sv101.vhd"
+        # Extract the meaningful part (usually the filename at the end)
+        $parts = $FullName -split '-'
+        $lastPart = $parts[-1]  # e.g., "sv101.vhd"
+
+        if ($lastPart.Length -le $MaxLength) {
+            return $lastPart
+        }
+
+        # If still too long, try to extract VM name from filename
+        $fileName = [System.IO.Path]::GetFileNameWithoutExtension($lastPart)
+        if ($fileName.Length -le $MaxLength) {
+            return $fileName
+        }
+
+        # Fallback: truncate with ellipsis
+        return $fileName.Substring(0, $MaxLength - 3) + "..."
+    }
+    elseif ($FullName -like "*:*" -and $FullName -like "*-*") {
+        # Network instances: "vmname:Microsoft Hyper-V Network Adapter"
+        # Take the part before the colon (VM identifier)
+        $vmPart = ($FullName -split ':')[0]
+        if ($vmPart.Length -le $MaxLength) {
+            return $vmPart
+        }
+        return $vmPart.Substring(0, $MaxLength - 3) + "..."
+    }
+    else {
+        # Generic approach: try to find the most identifying part
+        # Look for patterns with dashes, underscores, or dots
+        $candidates = @()
+
+        # Split by common separators and find the most meaningful parts
+        $separators = @('-', '_', '.', '\', '/')
+        foreach ($sep in $separators) {
+            if ($FullName.Contains($sep)) {
+                $parts = $FullName -split [regex]::Escape($sep)
+                # Add non-empty parts that aren't too generic
+                foreach ($part in $parts) {
+                    if ($part.Length -gt 2 -and $part -notmatch '^\d+$' -and $part -notlike "*hyper-v*") {
+                        $candidates += $part
+                    }
+                }
+            }
+        }
+
+        # Pick the best candidate (shortest meaningful one)
+        $bestCandidate = $candidates | Where-Object { $_.Length -le $MaxLength } | Sort-Object Length | Select-Object -First 1
+
+        if ($bestCandidate) {
+            return $bestCandidate
+        }
+
+        # Final fallback: truncate the full name
+        if ($FullName.Length -le $MaxLength) {
+            return $FullName
+        }
+        return $FullName.Substring(0, $MaxLength - 3) + "..."
+    }
+}
+
 function Get-StorageCounterInstances
 {
     # Get storage performance counter instances using proper localized counter names
@@ -657,28 +732,50 @@ if ($QueryName -eq '') {
 }
 
 <# Zabbix Hyper-V VM Perf Counter Discovery #>
-if ($psboundparameters.Count -eq 2) {
-    # Only remove hostname suffix if it actually exists at the end of the VM name
-    $hostnameSuffix = "_" + $hostname
-    if ($VMName.EndsWith($hostnameSuffix)) {
-        $VMName = $VMName.Substring(0, $VMName.Length - $hostnameSuffix.Length)
 
-        # Ensure VMName is not empty after hostname removal
-        if ([string]::IsNullOrWhiteSpace($VMName)) {
-            Write-Error "VMName became empty after hostname removal. Original VMName may have been only the hostname suffix."
-            exit 1
+# Define diagnostic commands that don't require VM names
+$diagnosticCommands = @(
+    "SearchStorageCounters",
+    "SearchNetworkCounters",
+    "SearchAllCounters",
+    "FindHyperVCounters",
+    "SearchCPUCounters",
+    "TestCPUMatching",
+    "ClearCache"
+)
+
+if ($psboundparameters.Count -eq 2) {
+    # Skip VM name processing for diagnostic commands
+    if ($QueryName -in $diagnosticCommands) {
+        # For diagnostic commands, set empty VM names to avoid parameter binding errors
+        $originalVMName = ""
+        $safeVMName = ""
+        $originalVMObject = ""
+        $safeVMObject = ""
+    } else {
+        # Only remove hostname suffix if it actually exists at the end of the VM name
+        $hostnameSuffix = "_" + $hostname
+        if ($VMName.EndsWith($hostnameSuffix)) {
+            $VMName = $VMName.Substring(0, $VMName.Length - $hostnameSuffix.Length)
+
+            # Ensure VMName is not empty after hostname removal
+            if ([string]::IsNullOrWhiteSpace($VMName)) {
+                Write-Error "VMName became empty after hostname removal. Original VMName may have been only the hostname suffix."
+                exit 1
+            }
+        }
+
+        # Get the original VM name if we received a sanitized one
+        $originalVMName = Get-OriginalVMName $VMName
+        $safeVMName = Sanitize-VMName $originalVMName
+
+        # Also handle VMObject if provided (contains instance names)
+        if ($VMObject) {
+            $originalVMObject = Get-OriginalVMName $VMObject
+            $safeVMObject = Sanitize-VMName $originalVMObject
         }
     }
 
-    # Get the original VM name if we received a sanitized one
-    $originalVMName = Get-OriginalVMName $VMName
-    $safeVMName = Sanitize-VMName $originalVMName
-
-    # Also handle VMObject if provided (contains instance names)
-    if ($VMObject) {
-        $originalVMObject = Get-OriginalVMName $VMObject
-        $safeVMObject = Sanitize-VMName $originalVMObject
-    }
 	if ($QueryName -eq "GetPerformanceCounterID")
 	{
 		$pcID= Get-EnglishCounterID($VMName)
@@ -765,6 +862,143 @@ if ($psboundparameters.Count -eq 2) {
 		}
 		exit
 	}
+	elseif ($QueryName -eq "SearchNetworkCounters")
+	{
+		# Search specifically for network counter instances
+		Write-Host "Searching for Hyper-V network counter instances..."
+
+		$networkCategories = @(
+			"Virtueller Hyper-V-Netzwerkadapter",
+			"Virtuelle Hyper-V-Netzwerkkarte - vRSS",
+			"RemoteFX-Netzwerk",
+			"Hyper-V Virtual Network Adapter",
+			"Netzwerkschnittstelle",
+			"Netzwerkadapter"
+		)
+
+		foreach ($categoryName in $networkCategories) {
+			Write-Host "`nTrying category: '$categoryName'"
+			try {
+				$counterSet = Get-Counter -ListSet $categoryName -ErrorAction Stop
+				Write-Host "  Category exists with $($counterSet.Counter.Count) counters"
+
+				if ($counterSet.Counter.Count -gt 0) {
+					$firstCounter = $counterSet.Counter[0]
+					$counterName = $firstCounter.Split('(')[0].Split('\')[-1]
+					Write-Host "  Using counter: $counterName"
+
+					$instances = (Get-Counter -Counter $firstCounter -ErrorAction Stop).CounterSamples
+					Write-Host "  Found $($instances.Count) instances:"
+
+					foreach ($instance in $instances) {
+						Write-Host "    - $($instance.InstanceName)"
+					}
+				}
+			}
+			catch {
+				Write-Host "  Category not available: $($_.Exception.Message)"
+			}
+		}
+
+		# Also check if the VM has network adapters configured
+		Write-Host "`nChecking VM network adapter configuration..."
+		try {
+			$originalVMName = Get-OriginalVMName $VMName
+			$vm = Get-VM -Name $originalVMName -ErrorAction Stop
+			$networkAdapters = Get-VMNetworkAdapter -VM $vm -ErrorAction Stop
+
+			Write-Host "VM '$originalVMName' has $($networkAdapters.Count) network adapters:"
+			foreach ($adapter in $networkAdapters) {
+				Write-Host "  - Name: $($adapter.Name)"
+				Write-Host "    Switch: $($adapter.SwitchName)"
+				Write-Host "    Status: $($adapter.Status)"
+				Write-Host "    MAC: $($adapter.MacAddress)"
+			}
+		}
+		catch {
+			Write-Host "Error checking VM network adapters: $($_.Exception.Message)"
+		}
+		exit
+	}
+	elseif ($QueryName -eq "SearchStorageCounters")
+	{
+		# Search specifically for storage counter instances
+		Write-Host "Searching for Hyper-V storage counter instances..."
+
+		$storageCategories = @(
+			"Virtuelle Hyper-V-Speichervorrichtung",
+			"Hyper-V Virtual Storage Device",
+			"PhysicalDisk",
+			"LogicalDisk"
+		)
+
+		foreach ($categoryName in $storageCategories) {
+			Write-Host "`nTrying category: '$categoryName'"
+			try {
+				$counterSet = Get-Counter -ListSet $categoryName -ErrorAction Stop
+				Write-Host "  Category exists with $($counterSet.Counter.Count) counters"
+
+				if ($counterSet.Counter.Count -gt 0) {
+					$firstCounter = $counterSet.Counter[0]
+					$counterName = $firstCounter.Split('(')[0].Split('\')[-1]
+					Write-Host "  Using counter: $counterName"
+
+					$instances = (Get-Counter -Counter $firstCounter -ErrorAction Stop).CounterSamples
+					Write-Host "  Found $($instances.Count) instances:"
+
+					foreach ($instance in $instances) {
+						Write-Host "    - $($instance.InstanceName)"
+					}
+				}
+			}
+			catch {
+				Write-Host "  Category not available: $($_.Exception.Message)"
+			}
+		}
+		exit
+	}
+	elseif ($QueryName -eq "SearchAllCounters")
+	{
+		# Search ALL counter categories for any that might contain VM network instances
+		Write-Host "Searching ALL performance counter categories..."
+
+		try {
+			$allCounterSets = Get-Counter -ListSet "*"
+			Write-Host "Found $($allCounterSets.Count) total counter categories"
+
+			Write-Host "`nLooking for categories that might contain VM network instances..."
+			foreach ($set in $allCounterSets) {
+				try {
+					# Get first counter from this category
+					if ($set.Counter.Count -gt 0) {
+						$firstCounter = $set.Counter[0]
+						$instances = (Get-Counter -Counter $firstCounter -ErrorAction Stop).CounterSamples
+
+						# Check if any instances match our VM patterns
+						$vmMatches = $instances | Where-Object {
+							$_.InstanceName -like '*sv101*' -or
+							$_.InstanceName -like '*linux*' -or
+							$_.InstanceName -like '*:*' -and $_.InstanceName -like '*adapter*'
+						}
+
+						if ($vmMatches.Count -gt 0) {
+							Write-Host "`nFOUND POTENTIAL MATCH:"
+							Write-Host "Category: $($set.CounterSetName)"
+							Write-Host "Matching instances:"
+							$vmMatches | ForEach-Object { Write-Host "  - $($_.InstanceName)" }
+						}
+					}
+				}
+				catch {
+					# Ignore categories that fail to query
+				}
+			}
+		}
+		catch {
+			Write-Warning "Error searching counters: $($_.Exception.Message)"
+		}
+		exit
+	}
 	elseif ($QueryName -eq "FindHyperVCounters")
 	{
 		# Help find the correct Hyper-V counter names on this system
@@ -777,7 +1011,10 @@ if ($psboundparameters.Count -eq 2) {
 				$_.CounterSetName -like "*Hyper*" -or
 				$_.CounterSetName -like "*Virtual*" -or
 				$_.CounterSetName -like "*Speicher*" -or
-				$_.CounterSetName -like "*Storage*"
+				$_.CounterSetName -like "*Storage*" -or
+				$_.CounterSetName -like "*Netzwerk*" -or
+				$_.CounterSetName -like "*Network*" -or
+				$_.CounterSetName -like "*Adapter*"
 			}
 
 			Write-Host "`nFound $($hyperVSets.Count) Hyper-V/Virtual related counter sets:"
@@ -805,7 +1042,11 @@ if ($psboundparameters.Count -eq 2) {
 				$_.CounterSetName -like "*Speicher*" -or
 				$_.CounterSetName -like "*Storage*" -or
 				$_.CounterSetName -like "*Disk*" -or
-				$_.CounterSetName -like "*Datenträger*"
+				$_.CounterSetName -like "*Datenträger*" -or
+				$_.CounterSetName -like "*Netzwerk*" -or
+				$_.CounterSetName -like "*Network*" -or
+				$_.CounterSetName -like "*Adapter*" -or
+				$_.CounterSetName -like "*NIC*"
 			} | ForEach-Object {
 				Write-Host "- $($_.CounterSetName)"
 			}
@@ -815,10 +1056,453 @@ if ($psboundparameters.Count -eq 2) {
 		}
 		exit
 	}
-	else
+	elseif ($QueryName -eq "SearchCPUCounters")
 	{
-		switch ($QueryName)
-			{
+		# Search specifically for CPU counter instances
+		Write-Host "Searching for Hyper-V CPU counter instances..."
+
+		$cpuCategories = @(
+			"Hyper-V Hypervisor Virtual Processor",
+			"Hyper-V Hypervisor Logical Processor",
+			"Processor",
+			"Prozessor"
+		)
+
+		foreach ($categoryName in $cpuCategories) {
+			Write-Host "`nTrying category: '$categoryName'"
+			try {
+				$counterSet = Get-Counter -ListSet $categoryName -ErrorAction Stop
+				Write-Host "  Category exists with $($counterSet.Counter.Count) counters"
+
+				if ($counterSet.Counter.Count -gt 0) {
+					# Look for Total Run Time or similar counter
+					$runTimeCounter = $counterSet.Counter | Where-Object { $_ -like "*Total Run Time*" -or $_ -like "*Laufzeit*" } | Select-Object -First 1
+					if ($runTimeCounter) {
+						$counterName = $runTimeCounter.Split('(')[0].Split('\')[-1]
+						Write-Host "  Using counter: $counterName"
+
+						$instances = (Get-Counter -Counter $runTimeCounter -ErrorAction Stop).CounterSamples
+						Write-Host "  Found $($instances.Count) instances:"
+
+						foreach ($instance in $instances) {
+							Write-Host "    - $($instance.InstanceName)"
+						}
+					} else {
+						Write-Host "  No suitable run time counter found"
+					}
+				}
+			}
+			catch {
+				Write-Host "  Category not available: $($_.Exception.Message)"
+			}
+		}
+
+		# Try to build the safe counter path and test it
+		Write-Host "`n=== Testing Build-SafeCounterPath ==="
+		try {
+			$counterPath = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+			Write-Host "Built counter path: $counterPath"
+
+			$testResult = Test-PerformanceCounter $counterPath
+			Write-Host "Counter path test result: $testResult"
+
+			if ($testResult) {
+				$samples = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+				Write-Host "Successfully retrieved $($samples.Count) samples:"
+				$samples | ForEach-Object { Write-Host "  - $($_.InstanceName)" }
+			}
+		}
+		catch {
+			Write-Host "Error testing counter path: $($_.Exception.Message)"
+		}
+		exit
+	}
+	elseif ($QueryName -eq "TestCPUMatching")
+	{
+		# Test CPU matching logic with the VM name from VMName parameter
+		$testVMName = $VMName
+		Write-Host "Testing CPU matching for VM: '$testVMName'"
+
+		# Get the original VM name if we received a sanitized one
+		$originalVMName = Get-OriginalVMName $testVMName
+		$safeVMName = Sanitize-VMName $originalVMName
+
+		Write-Host "Original VM name: '$originalVMName'"
+		Write-Host "Safe VM name: '$safeVMName'"
+
+		# Build counter path
+		$counterPath = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+		Write-Host "Counter path: $counterPath"
+
+		# Get all CPU instances
+		$allCpuInstances = (Get-Counter -Counter $counterPath -ErrorAction SilentlyContinue).CounterSamples
+		Write-Host "Total CPU instances found: $($allCpuInstances.Count)"
+
+		# Create different VM name variations for matching
+		$bracketsName = ($originalVMName -replace '\(', '[') -replace '\)', ']'
+		$spacesName = $safeVMName -replace '_', ' '
+
+		$vmNameVariations = @(
+			$originalVMName,
+			$safeVMName,
+			$bracketsName,  # Convert parentheses to brackets
+			$spacesName     # Convert underscores back to spaces for matching
+		) | Sort-Object -Unique
+
+		Write-Host "VM name variations to test:"
+		foreach ($variation in $vmNameVariations) {
+			Write-Host "  - '$variation'"
+		}
+
+		Write-Host "`nTesting matches:"
+		foreach ($instance in $allCpuInstances) {
+			$instanceMatched = $false
+			$matchedVariation = ""
+			foreach ($vmName in $vmNameVariations) {
+				if ($instance.InstanceName -like "${vmName}:*") {
+					$instanceMatched = $true
+					$matchedVariation = $vmName
+					break
+				}
+			}
+
+			if ($instanceMatched) {
+				Write-Host "  MATCH: '$($instance.InstanceName)' matched variation '$matchedVariation'"
+			} else {
+				# Only show first few non-matches to avoid spam
+				if ($allCpuInstances.IndexOf($instance) -lt 5) {
+					Write-Host "  no match: '$($instance.InstanceName)'"
+				}
+			}
+		}
+		exit
+	}
+	elseif ($QueryName -eq 'GetVMStatus')
+	{
+		# Try with original VM name first, then with provided name
+		$originalVMName = Get-OriginalVMName $VMName
+		$vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}
+		if ($vm) {
+			$Results = $vm.State
+		} else {
+			$Results = "VM not found"
+		}
+		write-host $Results
+		exit
+	}
+	elseif ($QueryName -eq 'GetVMReplication')
+	{
+		# Try with original VM name first, then with provided name
+		$originalVMName = Get-OriginalVMName $VMName
+		$vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}
+		if ($vmReplication) {
+			$Results = $vmReplication.ReplicationHealth
+		} else {
+			$Results = "VM replication not found"
+		}
+		write-host $Results
+		exit
+	}
+	elseif ($QueryName -eq 'GetVMCPUs')
+	{
+		$ItemType = "VMCPU"
+
+		# Use English counter names and let the function handle localization
+		$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
+
+		if (Test-PerformanceCounter $counterName) {
+			$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+
+			# Create different VM name variations for matching
+			$bracketsName = ($originalVMName -replace '\(', '[') -replace '\)', ']'
+			$spacesName = $safeVMName -replace '_', ' '
+
+			$vmNameVariations = @(
+				$originalVMName,
+				$safeVMName,
+				$bracketsName,  # Convert parentheses to brackets
+				$spacesName     # Convert underscores back to spaces for matching
+			) | Sort-Object -Unique
+
+
+			$Results = $allCpuInstances | Where-Object {
+				$instanceMatched = $false
+				foreach ($vmName in $vmNameVariations) {
+					# Escape square brackets for PowerShell -like operator
+					$escapedVmName = $vmName -replace '\[', '`[' -replace '\]', '`]'
+					if ($_.InstanceName -like "${escapedVmName}:*") {
+						$instanceMatched = $true
+						break
+					}
+				}
+				return $instanceMatched
+			} | select InstanceName
+
+			# If no matches found, return empty results
+			if (($Results | Measure-Object).Count -eq 0) {
+				$Results = @()
+			}
+		}
+		else {
+			$Results = @()
+		}
+
+		# Output JSON format
+		write-host "{"
+		write-host ' "data":['
+		write-host
+
+		$n = ($Results | measure).Count
+		foreach ($objItem in $Results) {
+			$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'"}'
+
+			if ($n -gt 1 ){
+				$line += ","
+			}
+
+			write-host $line
+			$n--
+		}
+
+		write-host " ]"
+		write-host "}"
+		write-host
+
+		exit
+	}
+	elseif ($QueryName -eq 'GetVMDisks')
+	{
+		$ItemType = "VMDISK"
+
+		# Use Hyper-V cmdlets to get accurate VM disk instances
+		$diskInstances = Get-VMDiskInstances -VMName $originalVMName
+
+		if ($diskInstances -and (($diskInstances | Measure-Object).Count -gt 0)) {
+			$Results = $diskInstances | Select-Object @{
+				Name="InstanceName"
+				Expression={$_.InstanceName}
+			}, @{
+				Name="ShortName"
+				Expression={Get-ShortResourceName $_.InstanceName}
+			}
+		} else {
+			# Fallback: try name-based matching with storage counter instances
+			$allStorageInstances = Get-StorageCounterInstances
+
+			if ($allStorageInstances.Count -gt 0) {
+				# Try matching with both original and safe VM names
+				$baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
+				$baseSafeVMName = $safeVMName -replace '_.*$', ''
+
+				$Results = $allStorageInstances | Where-Object  {
+					$_.InstanceName -like '*-'+$originalVMName+'*' -or
+					$_.InstanceName -like '*-'+$safeVMName+'*' -or
+					$_.InstanceName -like '*'+$originalVMName+'*' -or
+					$_.InstanceName -like '*'+$safeVMName+'*' -or
+					$_.InstanceName -like '*-'+$baseVMName+'*' -or
+					$_.InstanceName -like '*-'+$baseSafeVMName+'*' -or
+					$_.InstanceName -like '*'+$baseVMName+'*' -or
+					$_.InstanceName -like '*'+$baseSafeVMName+'*'
+				} | Select-Object @{
+					Name="InstanceName"
+					Expression={$_.InstanceName}
+				}, @{
+					Name="ShortName"
+					Expression={Get-ShortResourceName $_.InstanceName}
+				}
+			} else {
+				$Results = @()
+			}
+		}
+
+		# Output JSON format
+		write-host "{"
+		write-host ' "data":['
+		write-host
+
+		$n = ($Results | measure).Count
+		foreach ($objItem in $Results) {
+			if ($objItem.ShortName) {
+				$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'", "{#'+$ItemType+'_SHORT}":"'+$objItem.ShortName+'"}'
+			} else {
+				$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'"}'
+			}
+
+			if ($n -gt 1 ){
+				$line += ","
+			}
+
+			write-host $line
+			$n--
+		}
+
+		write-host " ]"
+		write-host "}"
+		write-host
+
+		exit
+	}
+	elseif ($QueryName -eq 'GetVMNICs')
+	{
+		$ItemType = "VMNIC"
+
+		# Try multiple network counter categories found on German systems
+		$networkCategories = @(
+			"Virtueller Hyper-V-Netzwerkadapter",
+			"Virtuelle Hyper-V-Netzwerkkarte - vRSS",
+			"Hyper-V Virtual Network Adapter"  # English fallback
+		)
+
+		$allNetworkInstances = @()
+		foreach ($categoryName in $networkCategories) {
+			try {
+				$counterSet = Get-Counter -ListSet $categoryName -ErrorAction Stop
+				if ($counterSet.Counter.Count -gt 0) {
+					$anyCounter = $counterSet.Counter[0]
+					$instances = (Get-Counter -Counter $anyCounter -ErrorAction Stop).CounterSamples
+					$allNetworkInstances += $instances
+				}
+			}
+			catch {
+				continue
+			}
+		}
+
+		# Try matching with both original and safe VM names
+		$baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
+		$baseSafeVMName = $safeVMName -replace '_.*$', ''
+
+		$matchedInstances = $allNetworkInstances | Where-Object  {
+			$_.InstanceName -like '*'+$originalVMName+'*' -or
+			$_.InstanceName -like '*'+$safeVMName+'*' -or
+			$_.InstanceName -like '*'+$baseVMName+'*' -or
+			$_.InstanceName -like '*'+$baseSafeVMName+'*' -or
+			$_.InstanceName -like $originalVMName+'_*' -or
+			$_.InstanceName -like $safeVMName+'_*' -or
+			$_.InstanceName -like $baseVMName+'_*' -or
+			$_.InstanceName -like $baseSafeVMName+'_*'
+		}
+
+		# If no VM-specific matches found and we have instances, return all available
+		# This helps when VM access is restricted due to permissions
+		if ($matchedInstances.Count -eq 0 -and $allNetworkInstances.Count -gt 0) {
+			$matchedInstances = $allNetworkInstances
+		}
+
+		$Results = $matchedInstances | Select-Object @{
+			Name="InstanceName"
+			Expression={$_.InstanceName}
+		}, @{
+			Name="ShortName"
+			Expression={Get-ShortResourceName $_.InstanceName}
+		}
+
+		# Output JSON format
+		write-host "{"
+		write-host ' "data":['
+		write-host
+
+		$n = ($Results | measure).Count
+		foreach ($objItem in $Results) {
+			if ($objItem.ShortName) {
+				$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'", "{#'+$ItemType+'_SHORT}":"'+$objItem.ShortName+'"}'
+			} else {
+				$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'"}'
+			}
+
+			if ($n -gt 1 ){
+				$line += ","
+			}
+
+			write-host $line
+			$n--
+		}
+
+		write-host " ]"
+		write-host "}"
+		write-host
+
+		exit
+	}
+}
+elseif ($psboundparameters.Count -eq 3)
+{
+    if ($QueryName -eq 'GetVMReplication')
+    {
+        # Try with original VM name first, then with provided name
+        $originalVMName = Get-OriginalVMName $VMName
+        $vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}
+        if ($vmReplication) {
+            $Results = $vmReplication.ReplicationHealth
+        } else {
+            $Results = "VM replication not found"
+        }
+        write-host $Results
+        exit
+    }
+    elseif ($QueryName -eq 'GetVMStatus')
+    {
+        # Try with original VM name first, then with provided name
+        $originalVMName = Get-OriginalVMName $VMName
+        $vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}
+        if ($vm) {
+            $Results = $vm.State
+        } else {
+            $Results = "VM not found"
+        }
+        write-host $Results
+        exit
+    }
+    else
+    {
+        switch ($QueryName){
+                <# Disk Counters #>
+                ('VMDISKBytesRead'){
+					$ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Read Bytes/sec" -InstanceName $VMObject
+                }
+                ('VMDISKBytesWrite'){
+					$ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Write Bytes/sec" -InstanceName $VMObject
+                }
+                ('VMDISKOpsRead'){
+					$ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Read Operations/sec" -InstanceName $VMObject
+                }
+                ('VMDISKOpsWrite'){
+					$ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Write Operations/sec" -InstanceName $VMObject
+                }
+
+                <# Network Counters #>
+                ('VMNICSent'){
+					$ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Bytes Sent/sec" -InstanceName $VMObject
+                }
+                ('VMNICRecv'){
+					$ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Bytes Received/sec" -InstanceName $VMObject
+                }
+
+                <# Virtual CPU Counters #>
+                ('VMCPUTotal'){
+                    $ItemType = $QueryName
+					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -InstanceName $VMObject
+                }
+
+                default {$Results = "Bad Request"; exit}
+        }
+
+        foreach ($objItem in $Results) {
+                $line = [int]$objItem.CookedValue
+                write-host $line
+        }
+
+        exit
+    }
+}
+else {
+	switch ($QueryName) {
 
 			('GetVMDisks'){
 				$ItemType = "VMDISK"
@@ -827,7 +1511,13 @@ if ($psboundparameters.Count -eq 2) {
 				$diskInstances = Get-VMDiskInstances -VMName $originalVMName
 
 				if ($diskInstances -and (($diskInstances | Measure-Object).Count -gt 0)) {
-					$Results = $diskInstances | Select-Object @{Name="InstanceName"; Expression={$_.InstanceName}}
+					$Results = $diskInstances | Select-Object @{
+						Name="InstanceName"
+						Expression={$_.InstanceName}
+					}, @{
+						Name="ShortName"
+						Expression={Get-ShortResourceName $_.InstanceName}
+					}
 				} else {
 					# Fallback: try name-based matching with storage counter instances
 					$allStorageInstances = Get-StorageCounterInstances
@@ -846,7 +1536,13 @@ if ($psboundparameters.Count -eq 2) {
 							$_.InstanceName -like '*-'+$baseSafeVMName+'*' -or
 							$_.InstanceName -like '*'+$baseVMName+'*' -or
 							$_.InstanceName -like '*'+$baseSafeVMName+'*'
-						} | select InstanceName
+						} | Select-Object @{
+							Name="InstanceName"
+							Expression={$_.InstanceName}
+						}, @{
+							Name="ShortName"
+							Expression={Get-ShortResourceName $_.InstanceName}
+						}
 					} else {
 						$Results = @()
 					}
@@ -855,31 +1551,101 @@ if ($psboundparameters.Count -eq 2) {
 
 			('GetVMNICs'){
 				$ItemType = "VMNIC"
-				$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Packets Sent/sec" -Instance "*"
+
+				# Try multiple network counter categories found on German systems
+				$networkCategories = @(
+					"Virtueller Hyper-V-Netzwerkadapter",
+					"Virtuelle Hyper-V-Netzwerkkarte - vRSS",
+					"Hyper-V Virtual Network Adapter"  # English fallback
+				)
+
+				$allNetworkInstances = @()
+				foreach ($categoryName in $networkCategories) {
+					try {
+						$counterSet = Get-Counter -ListSet $categoryName -ErrorAction Stop
+						if ($counterSet.Counter.Count -gt 0) {
+							$anyCounter = $counterSet.Counter[0]
+							$instances = (Get-Counter -Counter $anyCounter -ErrorAction Stop).CounterSamples
+							$allNetworkInstances += $instances
+						}
+					}
+					catch {
+						continue
+					}
+				}
+
 				# Try matching with both original and safe VM names
-				$Results =  (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples  | Where-Object  {
-					$_.InstanceName -like '*-'+$originalVMName+'*' -or
-					$_.InstanceName -like '*-'+$safeVMName+'*' -or
+				$baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
+				$baseSafeVMName = $safeVMName -replace '_.*$', ''
+
+				$matchedInstances = $allNetworkInstances | Where-Object  {
 					$_.InstanceName -like '*'+$originalVMName+'*' -or
-					$_.InstanceName -like '*'+$safeVMName+'*'
-				} | select InstanceName
+					$_.InstanceName -like '*'+$safeVMName+'*' -or
+					$_.InstanceName -like '*'+$baseVMName+'*' -or
+					$_.InstanceName -like '*'+$baseSafeVMName+'*' -or
+					$_.InstanceName -like $originalVMName+'_*' -or
+					$_.InstanceName -like $safeVMName+'_*' -or
+					$_.InstanceName -like $baseVMName+'_*' -or
+					$_.InstanceName -like $baseSafeVMName+'_*'
+				}
+
+				# If no VM-specific matches found and we have instances, return all available
+				# This helps when VM access is restricted due to permissions
+				if ($matchedInstances.Count -eq 0 -and $allNetworkInstances.Count -gt 0) {
+					$matchedInstances = $allNetworkInstances
+				}
+
+				$Results = $matchedInstances | Select-Object @{
+					Name="InstanceName"
+					Expression={$_.InstanceName}
+				}, @{
+					Name="ShortName"
+					Expression={Get-ShortResourceName $_.InstanceName}
+				}
 			}
 
 			('GetVMCPUs'){
-				 $ItemType  ="VMCPU"
+				Write-Host "DEBUG: GetVMCPUs started for VM: '$originalVMName' / '$safeVMName'" -ForegroundColor Red
+				$ItemType  ="VMCPU"
 
 				# Use English counter names and let the function handle localization
 				$counterName = Build-SafeCounterPath -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -Instance "*"
 
 				if (Test-PerformanceCounter $counterName) {
-					$Results = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples | Where-Object {
-						$_.InstanceName -like $originalVMName+':*' -or
-						$_.InstanceName -like $safeVMName+':*' -or
-						$_.InstanceName -like '*-'+$originalVMName+'*' -or
-						$_.InstanceName -like '*-'+$safeVMName+'*' -or
-						$_.InstanceName -like '*'+$originalVMName+'*' -or
-						$_.InstanceName -like '*'+$safeVMName+'*'
+					$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction SilentlyContinue).CounterSamples
+
+					# Create different VM name variations for matching
+					$bracketsName = ($originalVMName -replace '\(', '[') -replace '\)', ']'
+					$spacesName = $safeVMName -replace '_', ' '
+
+					$vmNameVariations = @(
+						$originalVMName,
+						$safeVMName,
+						$bracketsName,  # Convert parentheses to brackets
+						$spacesName     # Convert underscores back to spaces for matching
+					) | Sort-Object -Unique
+
+					$Results = $allCpuInstances | Where-Object {
+						$instanceMatched = $false
+						foreach ($vmName in $vmNameVariations) {
+							if ($_.InstanceName -like "${vmName}:*") {
+								$instanceMatched = $true
+								break
+							}
+						}
+						return $instanceMatched
 					} | select InstanceName
+
+					# Debug: if no matches found, show what instances are available
+					if (($Results | Measure-Object).Count -eq 0) {
+						Write-Warning "No CPU instances matched for VM '$originalVMName' or '$safeVMName'"
+						Write-Warning "Available CPU instances:"
+						$allCpuInstances | ForEach-Object { Write-Warning "  - $($_.InstanceName)" }
+						$Results = @()
+					}
+					else {
+						Write-Warning "Found $($Results.Count) CPU instances for VM '$originalVMName'"
+					}
 				}
 				else {
 					Write-Warning "Could not access counter: $counterName"
@@ -891,31 +1657,33 @@ if ($psboundparameters.Count -eq 2) {
 			}
 
 		write-host "{"
-		write-host " `"data`":["
+		write-host ' "data":['
 		write-host
 		#write-host $Results
 
 
 		$n = ($Results | measure).Count
 
-				foreach ($objItem in $Results) {
-					$line = " { `"{#"+$ItemType+"}`":`""+$objItem.InstanceName+"`"}"
+		foreach ($objItem in $Results) {
+			if ($objItem.ShortName) {
+				$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'", "{#'+$ItemType+'_SHORT}":"'+$objItem.ShortName+'"}'
+			} else {
+				$line = ' { "{#'+$ItemType+'}":"'+$objItem.InstanceName+'"}'
+			}
 
-					if ($n -gt 1 ){
-						$line += ","
-					}
+			if ($n -gt 1 ){
+				$line += ","
+			}
 
-					write-host $line
-					$n--
-				}
+			write-host $line
+			$n--
+		}
 
 		write-host " ]"
 		write-host "}"
 		write-host
 
-
 		exit
-	}
 }
 
 
@@ -923,11 +1691,17 @@ if ($psboundparameters.Count -eq 2) {
 <# Zabbix Hyper-V VM Get Performance Counter Value #>
 if ($psboundparameters.Count -eq 3)
 {
+    Write-Host "DEBUG: Entered 3-parameter section for '$QueryName'" -ForegroundColor Magenta
     if ($QueryName -eq 'GetVMReplication')
     {
         # Try with original VM name first, then with provided name
         $originalVMName = Get-OriginalVMName $VMName
-        $Results = (Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}).ReplicationHealth
+        $vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}
+        if ($vmReplication) {
+            $Results = $vmReplication.ReplicationHealth
+        } else {
+            $Results = "VM replication not found"
+        }
         write-host $Results
         exit
     }
@@ -935,7 +1709,12 @@ if ($psboundparameters.Count -eq 3)
     {
         # Try with original VM name first, then with provided name
         $originalVMName = Get-OriginalVMName $VMName
-        $Results = (Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}).State
+        $vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}
+        if ($vm) {
+            $Results = $vm.State
+        } else {
+            $Results = "VM not found"
+        }
         write-host $Results
         exit
     }
