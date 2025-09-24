@@ -986,6 +986,12 @@ if ($psboundparameters.Count -eq 2) {
         $originalVMObject = ""
         $safeVMObject = ""
     } else {
+        # Validate that VMName is provided for non-diagnostic commands
+        if ([string]::IsNullOrWhiteSpace($VMName)) {
+            Write-Host "Error: VMName parameter is required for QueryName '$QueryName'" -ForegroundColor Red
+            Write-Host "Usage: .\zabbix-vm-perf.ps1 $QueryName VMName" -ForegroundColor Yellow
+            exit 1
+        }
         # Only remove hostname suffix if it actually exists at the end of the VM name
         $hostnameSuffix = "_" + $hostname
         if ($VMName.EndsWith($hostnameSuffix)) {
@@ -1789,6 +1795,21 @@ if ($psboundparameters.Count -eq 2) {
 }
 elseif ($psboundparameters.Count -eq 3)
 {
+    # Validate required parameters for three-parameter commands
+    if ([string]::IsNullOrWhiteSpace($QueryName)) {
+        Write-Host "Error: QueryName parameter is required" -ForegroundColor Red
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace($VMName)) {
+        Write-Host "Error: VMName parameter is required for QueryName '$QueryName'" -ForegroundColor Red
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace($VMObject) -and $QueryName -notin @('GetVMReplication', 'GetVMStatus')) {
+        Write-Host "Error: VMObject parameter is required for QueryName '$QueryName'" -ForegroundColor Red
+        Write-Host "Usage: .\zabbix-vm-perf.ps1 $QueryName VMName VMObject" -ForegroundColor Yellow
+        exit 1
+    }
+
     if ($QueryName -eq 'GetVMReplication')
     {
         # Try with original VM name first, then with provided name
@@ -1862,7 +1883,11 @@ elseif ($psboundparameters.Count -eq 3)
 					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -InstanceName $VMObject
                 }
 
-                default {$Results = "Bad Request"; exit}
+                default {
+                    Write-Host "Error: Invalid QueryName '$QueryName'" -ForegroundColor Red
+                    Write-Host "Valid QueryNames: VMDISKBytesRead, VMDISKBytesWrite, VMDISKOpsRead, VMDISKOpsWrite, VMNICSent, VMNICRecv, VMCPUTotal" -ForegroundColor Yellow
+                    exit 1
+                }
         }
 
         foreach ($objItem in $Results) {
@@ -1874,6 +1899,24 @@ elseif ($psboundparameters.Count -eq 3)
     }
 }
 else {
+    if ([string]::IsNullOrWhiteSpace($QueryName)) {
+        Write-Host "Error: Missing QueryName parameter" -ForegroundColor Red
+        Write-Host "Usage examples:" -ForegroundColor Yellow
+        Write-Host "  .\zabbix-vm-perf.ps1                                    # VM discovery" -ForegroundColor Gray
+        Write-Host "  .\zabbix-vm-perf.ps1 GetVMStatus VMName                # VM status" -ForegroundColor Gray
+        Write-Host "  .\zabbix-vm-perf.ps1 GetVMCPUs VMName                  # CPU discovery" -ForegroundColor Gray
+        Write-Host "  .\zabbix-vm-perf.ps1 VMCPUTotal VMName InstanceName    # Get CPU metrics" -ForegroundColor Gray
+        exit 1
+    }
+
+    # Check if commands that require VM names have the VMName parameter
+    $commandsRequiringVMName = @('GetVMDisks', 'GetVMNICs', 'GetVMCPUs')
+    if ($QueryName -in $commandsRequiringVMName -and [string]::IsNullOrWhiteSpace($VMName)) {
+        Write-Host "Error: VMName parameter is required for QueryName '$QueryName'" -ForegroundColor Red
+        Write-Host "Usage: .\zabbix-vm-perf.ps1 $QueryName VMName" -ForegroundColor Yellow
+        exit 1
+    }
+
 	switch ($QueryName) {
 
 			('GetVMDisks'){
@@ -2084,7 +2127,11 @@ else {
 				exit
 			}
 
-			default {$Results = "Bad Request"; write-host $Results; exit}
+			default {
+                Write-Host "Error: Invalid QueryName '$QueryName'" -ForegroundColor Red
+                Write-Host "Valid QueryNames for discovery: GetVMDisks, GetVMNICs, GetVMCPUs, FindAllStorageCounters" -ForegroundColor Yellow
+                exit 1
+            }
 			}
 
 		write-host "{"
