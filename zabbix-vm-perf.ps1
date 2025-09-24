@@ -1416,7 +1416,34 @@ if ($psboundparameters.Count -eq 2) {
 			$matchedInstances = @()
 		}
 
-		$Results = $matchedInstances | Select-Object @{
+		# Deduplicate network interfaces by removing entry variants
+		# Keep only the main interface, filter out "entry_X" duplicates
+		$deduplicatedInstances = @()
+		$seenBaseNames = @{}
+
+		# First pass: collect all main interfaces (without "entry_")
+		foreach ($instance in $matchedInstances) {
+			if ($instance.InstanceName -notlike "*_entry_*") {
+				$shortName = Get-ShortResourceName $instance.InstanceName
+				if (-not $seenBaseNames.ContainsKey($shortName)) {
+					$seenBaseNames[$shortName] = $true
+					$deduplicatedInstances += $instance
+				}
+			}
+		}
+
+		# Second pass: if no main interface found, take the first entry variant
+		if ($deduplicatedInstances.Count -eq 0) {
+			foreach ($instance in $matchedInstances) {
+				$shortName = Get-ShortResourceName $instance.InstanceName
+				if (-not $seenBaseNames.ContainsKey($shortName)) {
+					$seenBaseNames[$shortName] = $true
+					$deduplicatedInstances += $instance
+				}
+			}
+		}
+
+		$Results = $deduplicatedInstances | Select-Object @{
 			Name="InstanceName"
 			Expression={$_.InstanceName}
 		}, @{
