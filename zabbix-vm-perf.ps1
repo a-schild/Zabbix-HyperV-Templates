@@ -1278,7 +1278,19 @@ if ($psboundparameters.Count -eq 2) {
 		$diskInstances = Get-VMDiskInstances -VMName $originalVMName
 
 		if ($diskInstances -and (($diskInstances | Measure-Object).Count -gt 0)) {
-			$Results = $diskInstances | Select-Object @{
+			# Deduplicate based on short name (disk file name) to avoid Hyper-V Replica duplicates
+			$uniqueDisks = @{}
+			$deduplicatedInstances = @()
+
+			foreach ($disk in $diskInstances) {
+				$shortName = Get-ShortResourceName $disk.InstanceName
+				if (-not $uniqueDisks.ContainsKey($shortName)) {
+					$uniqueDisks[$shortName] = $true
+					$deduplicatedInstances += $disk
+				}
+			}
+
+			$Results = $deduplicatedInstances | Select-Object @{
 				Name="InstanceName"
 				Expression={$_.InstanceName}
 			}, @{
@@ -1294,7 +1306,7 @@ if ($psboundparameters.Count -eq 2) {
 				$baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
 				$baseSafeVMName = $safeVMName -replace '_.*$', ''
 
-				$Results = $allStorageInstances | Where-Object  {
+				$matchedInstances = $allStorageInstances | Where-Object  {
 					$_.InstanceName -like '*-'+$originalVMName+'*' -or
 					$_.InstanceName -like '*-'+$safeVMName+'*' -or
 					$_.InstanceName -like '*'+$originalVMName+'*' -or
@@ -1303,7 +1315,21 @@ if ($psboundparameters.Count -eq 2) {
 					$_.InstanceName -like '*-'+$baseSafeVMName+'*' -or
 					$_.InstanceName -like '*'+$baseVMName+'*' -or
 					$_.InstanceName -like '*'+$baseSafeVMName+'*'
-				} | Select-Object @{
+				}
+
+				# Deduplicate based on short name (disk file name) to avoid Hyper-V Replica duplicates
+				$uniqueDisks = @{}
+				$deduplicatedInstances = @()
+
+				foreach ($instance in $matchedInstances) {
+					$shortName = Get-ShortResourceName $instance.InstanceName
+					if (-not $uniqueDisks.ContainsKey($shortName)) {
+						$uniqueDisks[$shortName] = $true
+						$deduplicatedInstances += $instance
+					}
+				}
+
+				$Results = $deduplicatedInstances | Select-Object @{
 					Name="InstanceName"
 					Expression={$_.InstanceName}
 				}, @{
