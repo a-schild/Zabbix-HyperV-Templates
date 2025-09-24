@@ -190,6 +190,29 @@ function Clear-CounterCaches
     }
 }
 
+function Save-LocalizedCacheIfDirty
+{
+    # Save localized counter cache if it has been modified
+    if ($script:localizedCacheDirty -and $script:localizedCounterCache) {
+        $cacheFile = Get-CacheFilePath "localized"
+        try {
+            Save-CounterCache $script:localizedCounterCache $cacheFile
+            $script:localizedCacheDirty = $false
+        }
+        catch {
+            # Don't fail if cache save fails - just log warning
+            Write-Warning "Failed to save localized counter cache: $($_.Exception.Message)"
+        }
+    }
+}
+
+function Exit-WithCacheSave
+{
+    param([int]$ExitCode = 0)
+    Save-LocalizedCacheIfDirty
+    exit $ExitCode
+}
+
 function Get-HyperVCounterNames
 {
     # Return only the Hyper-V counters we actually use
@@ -325,14 +348,8 @@ function Get-LocalizedCounterName
     # Store in cache for future use
     $script:localizedCounterCache.$EnglishName = $localizedName
 
-    # Save updated cache to file (async to avoid blocking)
-    $cacheFile = Get-CacheFilePath "localized"
-    try {
-        Save-CounterCache $script:localizedCounterCache $cacheFile
-    }
-    catch {
-        # Don't fail if cache save fails
-    }
+    # Mark cache as dirty for batch save at script end
+    $script:localizedCacheDirty = $true
 
     return $localizedName
 }
@@ -482,9 +499,53 @@ function Get-SafePerformanceCounter
             }
         }
 
+        return $null
+    }
+    elseif ($InstanceName -like "*network adapter*" -or $InstanceName -like "*-*-*-*-*" -or $EnglishCategoryName -like "*Network*") {
+        # This is likely a network adapter performance counter instance - try network categories
+
+        # Network counters can be in different categories
+        $networkCategories = @(
+            "Virtueller Hyper-V-Netzwerkadapter",        # German
+            "Virtuelle Hyper-V-Netzwerkkarte - vRSS",   # German vRSS
+            "Hyper-V Virtual Network Adapter"           # English fallback
+        )
+
+        # Try each network category
+        foreach ($category in $networkCategories) {
+            # Get all possible counter path variations to try
+            $counterPaths = Build-SafeCounterPath -EnglishCategoryName $category -EnglishCounterName $EnglishCounterName -Instance "*" -TryVariations
+
+            foreach ($counterPath in $counterPaths) {
+                try {
+                    $allInstances = (Get-Counter -Counter $counterPath -ErrorAction Stop).CounterSamples
+
+                    if ($allInstances) {
+                        # Try to find an instance that matches our network adapter
+                        # Extract GUID patterns for matching
+                        $guidPatterns = [regex]::Matches($InstanceName, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+
+                        $matchingInstance = $allInstances | Where-Object {
+                            $instance = $_.InstanceName
+                            # Try multiple matching strategies
+                            ($instance -eq $InstanceName) -or
+                            ($guidPatterns -and ($guidPatterns | ForEach-Object { $instance -like "*$($_.Value)*" } | Where-Object { $_ -eq $true }).Count -gt 0)
+                        } | Select-Object -First 1
+
+                        if ($matchingInstance) {
+                            return $matchingInstance
+                        }
+                    }
+                }
+                catch {
+                    # Try next counter name variation - silently continue
+                }
+            }
+        }
 
         return $null
-    } else {
+    }
+    else {
 
         # This is likely a VM name - try VM name resolution
         $originalInstanceName = Get-OriginalVMName $InstanceName
@@ -843,13 +904,26 @@ function Get-VMDiskInstances
     }
 }
 
-$hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty name
+try {
+    $hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty name
+}
+catch {
+    $hostname = $env:COMPUTERNAME  # Fallback to environment variable
+}
 
 <# Zabbix Hyper-V Virtual Machine Discovery #>
 if ($QueryName -eq '') {
 
-
-    $colItems = Get-VM
+    try {
+        $colItems = Get-VM -ErrorAction Stop
+    }
+    catch {
+        write-host "{"
+        write-host ' "data":[]'
+        write-host "}"
+        Write-Warning "Error accessing Hyper-V VMs: $($_.Exception.Message)"
+        Exit-WithCacheSave 1
+    }
 
     write-host "{"
     write-host " `"data`":["
@@ -873,7 +947,7 @@ if ($QueryName -eq '') {
     write-host " ]"
     write-host "}"
     write-host
-    exit
+    Exit-WithCacheSave
 }
 
 <# Zabbix Hyper-V VM Perf Counter Discovery #>
@@ -1326,11 +1400,16 @@ if ($psboundparameters.Count -eq 2) {
 	{
 		# Try with original VM name first, then with provided name
 		$originalVMName = Get-OriginalVMName $VMName
-		$vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}
-		if ($vm) {
-			$Results = $vm.State
-		} else {
-			$Results = "VM not found"
+		try {
+			$vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName} -ErrorAction Stop
+			if ($vm) {
+				$Results = $vm.State
+			} else {
+				$Results = "VM not found"
+			}
+		}
+		catch {
+			$Results = "Error accessing Hyper-V: $($_.Exception.Message)"
 		}
 		write-host $Results
 		exit
@@ -1339,11 +1418,16 @@ if ($psboundparameters.Count -eq 2) {
 	{
 		# Try with original VM name first, then with provided name
 		$originalVMName = Get-OriginalVMName $VMName
-		$vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}
-		if ($vmReplication) {
-			$Results = $vmReplication.ReplicationHealth
-		} else {
-			$Results = "VM replication not found"
+		try {
+			$vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName} -ErrorAction Stop
+			if ($vmReplication) {
+				$Results = $vmReplication.ReplicationHealth
+			} else {
+				$Results = "VM replication not found"
+			}
+		}
+		catch {
+			$Results = "Error accessing VM replication: $($_.Exception.Message)"
 		}
 		write-host $Results
 		exit
@@ -1645,11 +1729,16 @@ elseif ($psboundparameters.Count -eq 3)
     {
         # Try with original VM name first, then with provided name
         $originalVMName = Get-OriginalVMName $VMName
-        $vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}
-        if ($vmReplication) {
-            $Results = $vmReplication.ReplicationHealth
-        } else {
-            $Results = "VM replication not found"
+        try {
+            $vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName} -ErrorAction Stop
+            if ($vmReplication) {
+                $Results = $vmReplication.ReplicationHealth
+            } else {
+                $Results = "VM replication not found"
+            }
+        }
+        catch {
+            $Results = "Error accessing VM replication: $($_.Exception.Message)"
         }
         write-host $Results
         exit
@@ -1658,11 +1747,16 @@ elseif ($psboundparameters.Count -eq 3)
     {
         # Try with original VM name first, then with provided name
         $originalVMName = Get-OriginalVMName $VMName
-        $vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}
-        if ($vm) {
-            $Results = $vm.State
-        } else {
-            $Results = "VM not found"
+        try {
+            $vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName} -ErrorAction Stop
+            if ($vm) {
+                $Results = $vm.State
+            } else {
+                $Results = "VM not found"
+            }
+        }
+        catch {
+            $Results = "Error accessing Hyper-V: $($_.Exception.Message)"
         }
         write-host $Results
         exit
@@ -1712,7 +1806,7 @@ elseif ($psboundparameters.Count -eq 3)
                 write-host $line
         }
 
-        exit
+        Exit-WithCacheSave
     }
 }
 else {
@@ -1823,32 +1917,22 @@ else {
 
 				# Try direct German counter path that we know works
 				$counterName = "\Hyper-V Hypervisor: virtueller Prozessor(*)\% Gesamtlaufzeit"
-				Write-Host "DEBUG DISC: Trying German path: $counterName" -ForegroundColor Cyan
 
 				try {
 					$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
-					Write-Host "DEBUG DISC: German path got $($allCpuInstances.Count) instances" -ForegroundColor Green
 				}
 				catch {
-					Write-Host "DEBUG DISC: German path failed: $($_.Exception.Message)" -ForegroundColor Red
 					# Fallback to English counter path
 					try {
 						$counterName = "\Hyper-V Hypervisor Virtual Processor(*)\% Total Run Time"
 						$allCpuInstances = (Get-Counter -Counter $counterName -ErrorAction Stop).CounterSamples
-						Write-Host "DEBUG DISC: English path got $($allCpuInstances.Count) instances" -ForegroundColor Green
 					}
 					catch {
-						Write-Host "DEBUG DISC: English path also failed: $($_.Exception.Message)" -ForegroundColor Red
 						$allCpuInstances = @()
 					}
 				}
 
-				Write-Host "DEBUG DISC: Looking for VM: '$originalVMName' / '$safeVMName'" -ForegroundColor Yellow
 				if ($allCpuInstances -and $allCpuInstances.Count -gt 0) {
-					Write-Host "DEBUG DISC: Sample instances:" -ForegroundColor Yellow
-					$allCpuInstances | Select-Object -First 5 | ForEach-Object {
-						Write-Host "  - '$($_.InstanceName)'" -ForegroundColor Yellow
-					}
 
 					# Create different VM name variations for matching
 					$bracketsName = ($originalVMName -replace '\(', '[') -replace '\)', ']'
@@ -1919,88 +2003,8 @@ else {
 		write-host "}"
 		write-host
 
-		exit
+		Exit-WithCacheSave
 }
 
 
 
-<# Zabbix Hyper-V VM Get Performance Counter Value #>
-if ($psboundparameters.Count -eq 3)
-{
-    Write-Host "DEBUG: Entered 3-parameter section for '$QueryName'" -ForegroundColor Magenta
-    if ($QueryName -eq 'GetVMReplication')
-    {
-        # Try with original VM name first, then with provided name
-        $originalVMName = Get-OriginalVMName $VMName
-        $vmReplication = Get-VMReplication | Where-Object {$_.VMName -eq $originalVMName -or $_.VMName -eq $VMName}
-        if ($vmReplication) {
-            $Results = $vmReplication.ReplicationHealth
-        } else {
-            $Results = "VM replication not found"
-        }
-        write-host $Results
-        exit
-    }
-    elseif ($QueryName -eq 'GetVMStatus')
-    {
-        # Try with original VM name first, then with provided name
-        $originalVMName = Get-OriginalVMName $VMName
-        $vm = Get-VM | Where-Object {$_.Name -eq $originalVMName -or $_.Name -eq $VMName}
-        if ($vm) {
-            $Results = $vm.State
-        } else {
-            $Results = "VM not found"
-        }
-        write-host $Results
-        exit
-    }
-    else
-    {
-        switch ($QueryName){
-                <# Disk Counters #>
-                ('VMDISKBytesRead'){
-					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Read Bytes/sec" -InstanceName $VMObject
-                }
-                ('VMDISKBytesWrite'){
-					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Write Bytes/sec" -InstanceName $VMObject
-                }
-                ('VMDISKOpsRead'){
-					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Read Operations/sec" -InstanceName $VMObject
-                }
-                ('VMDISKOpsWrite'){
-					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Storage Device" -EnglishCounterName "Write Operations/sec" -InstanceName $VMObject
-                }
-
-                <# Network Counters #>
-                ('VMNICSent'){
-					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Bytes Sent/sec" -InstanceName $VMObject
-                }
-                ('VMNICRecv'){
-					$ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Virtual Network Adapter" -EnglishCounterName "Bytes Received/sec" -InstanceName $VMObject
-                }
-
-
-                <# Virtual CPU Counters #>
-                ('VMCPUTotal'){
-                    $ItemType = $QueryName
-					$Results = Get-SafePerformanceCounter -EnglishCategoryName "Hyper-V Hypervisor Virtual Processor" -EnglishCounterName "% Total Run Time" -InstanceName $VMObject
-                }
-
-                default {$Results = "Bad Request"; exit}
-        }
-
-
-        foreach ($objItem in $Results) {
-                $line = [int]$objItem.CookedValue
-                write-host $line
-        }
-
-        exit
-    }
-}
