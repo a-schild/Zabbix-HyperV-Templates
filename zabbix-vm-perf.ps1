@@ -460,9 +460,15 @@ function Get-SafePerformanceCounter
         # This is likely a disk performance counter instance - try multiple categories
 
         # Disk counters can be in different categories depending on controller type
+        # Use both localized and fallback categories
         $diskCategories = @(
-            "Virtuelle Hyper-V-Speichervorrichtung",      # German - SCSI/VHD
-            "Hyper-V - virtueller IDE-Controller (emuliert)"  # German - IDE
+            (Get-LocalizedCounterName "Hyper-V Virtual Storage Device"),  # Primary localized category
+            "Hyper-V Virtual Storage Device",                             # English fallback
+            "Virtuelle Hyper-V-Speichervorrichtung",                     # German SCSI/VHD
+            "Hyper-V - virtueller IDE-Controller (emuliert)",            # German IDE
+            "Hyper-V Virtual IDE Controller (Emulated)",                 # English IDE
+            "Hyper-V Virtual SCSI Controller",                           # English SCSI
+            "Hyper-V Virtual NVMe Controller"                            # NVMe support
         )
 
         # Try each disk category to find the right controller type
@@ -962,6 +968,7 @@ if ($QueryName -eq '') {
 # Define diagnostic commands that don't require VM names
 $diagnosticCommands = @(
     "SearchStorageCounters",
+    "FindAllStorageCounters",
     "SearchNetworkCounters",
     "SearchAllCounters",
     "FindHyperVCounters",
@@ -1183,6 +1190,54 @@ if ($psboundparameters.Count -eq 2) {
 			catch {
 				Write-Host "  Category not available: $($_.Exception.Message)"
 			}
+		}
+		exit
+	}
+	elseif ($QueryName -eq "FindAllStorageCounters")
+	{
+		# Find ALL available storage-related performance counter categories
+		Write-Host "Searching for ALL storage-related performance counter categories..."
+
+		try {
+			$allCounterSets = Get-Counter -ListSet "*"
+			$storageRelated = $allCounterSets | Where-Object {
+				$_.CounterSetName -like "*Storage*" -or
+				$_.CounterSetName -like "*Disk*" -or
+				$_.CounterSetName -like "*Speicher*" -or
+				$_.CounterSetName -like "*Datenträger*" -or
+				$_.CounterSetName -like "*Virtual*" -or
+				$_.CounterSetName -like "*Hyper-V*" -or
+				$_.CounterSetName -like "*IDE*" -or
+				$_.CounterSetName -like "*SCSI*" -or
+				$_.CounterSetName -like "*NVMe*"
+			}
+
+			Write-Host "`nFound $($storageRelated.Count) storage-related counter categories:"
+			foreach ($set in $storageRelated) {
+				Write-Host "`n=== $($set.CounterSetName) ==="
+				Write-Host "  Description: $($set.Description)"
+
+				# Try to get sample instances
+				if ($set.Counter.Count -gt 0) {
+					try {
+						$sampleCounter = $set.Counter[0]
+						$instances = (Get-Counter -Counter $sampleCounter -ErrorAction Stop).CounterSamples
+						Write-Host "  Sample instances ($($instances.Count)):"
+						$instances | Select-Object -First 5 | ForEach-Object {
+							Write-Host "    - $($_.InstanceName)"
+						}
+						if ($instances.Count -gt 5) {
+							Write-Host "    ... and $($instances.Count - 5) more"
+						}
+					}
+					catch {
+						Write-Host "  Unable to get instances: $($_.Exception.Message)"
+					}
+				}
+			}
+		}
+		catch {
+			Write-Host "Error searching for storage counters: $($_.Exception.Message)"
 		}
 		exit
 	}
@@ -1979,6 +2034,54 @@ else {
 					Write-Warning "Could not access counter: $counterName"
 					$Results = @()
 				}
+			}
+
+			('FindAllStorageCounters'){
+				# Find ALL available storage-related performance counter categories
+				Write-Host "Searching for ALL storage-related performance counter categories..."
+
+				try {
+					$allCounterSets = Get-Counter -ListSet "*"
+					$storageRelated = $allCounterSets | Where-Object {
+						$_.CounterSetName -like "*Storage*" -or
+						$_.CounterSetName -like "*Disk*" -or
+						$_.CounterSetName -like "*Speicher*" -or
+						$_.CounterSetName -like "*Datenträger*" -or
+						$_.CounterSetName -like "*Virtual*" -or
+						$_.CounterSetName -like "*Hyper-V*" -or
+						$_.CounterSetName -like "*IDE*" -or
+						$_.CounterSetName -like "*SCSI*" -or
+						$_.CounterSetName -like "*NVMe*"
+					}
+
+					Write-Host "`nFound $($storageRelated.Count) storage-related counter categories:"
+					foreach ($set in $storageRelated) {
+						Write-Host "`n=== $($set.CounterSetName) ==="
+						Write-Host "  Description: $($set.Description)"
+
+						# Try to get sample instances
+						if ($set.Counter.Count -gt 0) {
+							try {
+								$sampleCounter = $set.Counter[0]
+								$instances = (Get-Counter -Counter $sampleCounter -ErrorAction Stop).CounterSamples
+								Write-Host "  Sample instances ($($instances.Count)):"
+								$instances | Select-Object -First 5 | ForEach-Object {
+									Write-Host "    - $($_.InstanceName)"
+								}
+								if ($instances.Count -gt 5) {
+									Write-Host "    ... and $($instances.Count - 5) more"
+								}
+							}
+							catch {
+								Write-Host "  Unable to get instances: $($_.Exception.Message)"
+							}
+						}
+					}
+				}
+				catch {
+					Write-Host "Error searching for storage counters: $($_.Exception.Message)"
+				}
+				exit
 			}
 
 			default {$Results = "Bad Request"; write-host $Results; exit}
