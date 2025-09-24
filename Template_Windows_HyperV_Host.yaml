@@ -279,7 +279,7 @@ zabbix_export:
             - uuid: d366f7317b6c4fc6a7614dbab691b0a2
               name: 'Replication {#VMNAME}'
               type: ZABBIX_ACTIVE
-              key: 'hyperv.check[GetVMReplication,{#VMNAME}]'
+              key: 'hyperv.check[GetVMReplication,{#VMNAME_SAFE}]'
               delay: 10m
               history: 90d
               value_type: TEXT
@@ -290,17 +290,17 @@ zabbix_export:
                   value: 'HyperV Host'
               trigger_prototypes:
                 - uuid: 0785d2e285bf4ed5a4670f46afc8475d
-                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME}],,"regexp","Critical")=1'
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME_SAFE}],,"regexp","Critical")=1'
                   name: 'Replication state {#VMNAME} critical'
                   priority: HIGH
                 - uuid: 21d06d873e0c41c28a1d8bf628e8df8d
-                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME}],,"regexp","Warning")=1'
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMReplication,{#VMNAME_SAFE}],,"regexp","Warning")=1'
                   name: 'Replication state {#VMNAME} warning'
                   priority: WARNING
             - uuid: 64af9035a2a349d2a81d9509210d82f2
               name: 'VM status {#VMNAME}'
               type: ZABBIX_ACTIVE
-              key: 'hyperv.check[GetVMStatus,{#VMNAME}]'
+              key: 'hyperv.check[GetVMStatus,{#VMNAME_SAFE}]'
               delay: 5m
               history: 90d
               value_type: TEXT
@@ -311,16 +311,16 @@ zabbix_export:
                   value: 'HyperV Host'
               trigger_prototypes:
                 - uuid: 3b1e3570ed934918bcbc4b60602f563d
-                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME}],1s,"like","Saved")=1'
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME_SAFE}],1s,"like","Saved")=1'
                   name: '{#VMNAME} in saved state'
                   priority: HIGH
                 - uuid: 89182d0d0f42489ca449896f7dbc7dbd
-                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME}],1s,"like","Off")=1'
+                  expression: 'find(/Template Windows HyperV Host/hyperv.check[GetVMStatus,{#VMNAME_SAFE}],1s,"like","Off")=1'
                   name: '{#VMNAME} is Off'
                   priority: INFO
           host_prototypes:
             - uuid: b3daed7e19fd492e969f1e2cf7207f42
-              host: '{#VMNAME}_{#VMHOST}'
+              host: '{#VMNAME_SAFE}_{#VMHOST}'
               name: '{#VMNAME}_{#VMHOST}'
               group_links:
                 - group:

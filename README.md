@@ -84,7 +84,7 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 ## F.A.Q.
 
 - Depending on the load of your Hyper-V server, you will have to increase the default
-  Zabbix Temout from 3 to 10-30 seconds
+  **Zabbix Timeout from 3 to 10-30 seconds
   
 - Make sure the agent is allowed to execute the zabbix-vm-perf.ps1 file.
   For this open a cmd console in the `C:\Program Files\Zabbix Agent 2` location
@@ -126,6 +126,8 @@ zabbix_get -s 127.0.0.1 -k hyperv.discovery --tls-connect psk \
 * There are no Triggers for VM Guest.
 
 ## Changelog
+- 2025-09-22
+  - Better handling of special characters in VM names
 - 2024-11-20
   - Switch item prototypes in VM Guest template to Zabbix passive agent
 - 2024-11-13
