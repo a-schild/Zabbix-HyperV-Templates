@@ -1398,6 +1398,7 @@ if ($psboundparameters.Count -eq 2) {
 		$baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
 		$baseSafeVMName = $safeVMName -replace '_.*$', ''
 
+
 		$matchedInstances = $allNetworkInstances | Where-Object  {
 			$_.InstanceName -like '*'+$originalVMName+'*' -or
 			$_.InstanceName -like '*'+$safeVMName+'*' -or
@@ -1409,10 +1410,10 @@ if ($psboundparameters.Count -eq 2) {
 			$_.InstanceName -like $baseSafeVMName+'_*'
 		}
 
-		# If no VM-specific matches found and we have instances, return all available
-		# This helps when VM access is restricted due to permissions
-		if ($matchedInstances.Count -eq 0 -and $allNetworkInstances.Count -gt 0) {
-			$matchedInstances = $allNetworkInstances
+		# If no VM-specific matches found, return empty results instead of all interfaces
+		# The previous behavior of returning all interfaces was too broad
+		if ($matchedInstances.Count -eq 0) {
+			$matchedInstances = @()
 		}
 
 		$Results = $matchedInstances | Select-Object @{
