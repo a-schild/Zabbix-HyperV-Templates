@@ -670,15 +670,34 @@ function Get-PerformanceCounterValue
     try {
         $result = (Get-Counter -Counter $CounterPath -ErrorAction Stop).CounterSamples
         if ($result -and $result.Count -gt 0) {
-            return [int]$result[0].CookedValue
+            $value = $result[0].CookedValue
+            # Handle null or invalid values
+            if ($value -eq $null) {
+                return "ZBX_NOTSUPPORTED: Counter returned null value"
+            }
+            return [int]$value
         }
         else {
-            return 0
+            return "ZBX_NOTSUPPORTED: Counter returned no data samples"
         }
     }
     catch {
-        Write-Warning "Failed to get counter value for '$CounterPath': $($_.Exception.Message)"
-        return 0
+        # Extract meaningful error information
+        $errorMsg = $_.Exception.Message
+        if ($errorMsg -like "*counter*not*found*" -or $errorMsg -like "*Indikator*nicht*gefunden*") {
+            return "ZBX_NOTSUPPORTED: Performance counter does not exist"
+        }
+        elseif ($errorMsg -like "*access*denied*" -or $errorMsg -like "*Zugriff*verweigert*") {
+            return "ZBX_NOTSUPPORTED: Access denied to performance counter"
+        }
+        elseif ($errorMsg -like "*invalid*path*" -or $errorMsg -like "*ungültiger*Pfad*") {
+            return "ZBX_NOTSUPPORTED: Invalid counter path format"
+        }
+        else {
+            # Generic error with first 50 characters of error message
+            $shortError = $errorMsg.Substring(0, [Math]::Min(50, $errorMsg.Length))
+            return "ZBX_NOTSUPPORTED: $shortError"
+        }
     }
 }
 
@@ -873,6 +892,14 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
 
             foreach ($disk in $deduplicatedInstances) {
                 $shortName = Get-ShortResourceName $disk.InstanceName
+
+                # Get localized disk counter names
+                $localDiskCategory = Get-LocalizedCounterName "Hyper-V Virtual Storage Device"
+                $localReadBytesCounter = Get-LocalizedCounterName "Read Bytes/sec"
+                $localWriteBytesCounter = Get-LocalizedCounterName "Write Bytes/sec"
+                $localReadOpsCounter = Get-LocalizedCounterName "Read Operations/sec"
+                $localWriteOpsCounter = Get-LocalizedCounterName "Write Operations/sec"
+
                 # Create counter paths for each disk metric
                 $discoveryItems += [PSCustomObject]@{
                     "{#VMNAME}" = $originalVMName
@@ -880,6 +907,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
                     "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Bytes/sec"
+                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadBytesCounter"
                     "{#METRIC}" = "ReadBytes"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -890,6 +918,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
                     "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Bytes/sec"
+                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteBytesCounter"
                     "{#METRIC}" = "WriteBytes"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -900,6 +929,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
                     "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Operations/sec"
+                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadOpsCounter"
                     "{#METRIC}" = "ReadOps"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -910,6 +940,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
                     "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Operations/sec"
+                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteOpsCounter"
                     "{#METRIC}" = "WriteOps"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -949,43 +980,55 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
 
                 foreach ($disk in $deduplicatedInstances) {
                     $shortName = Get-ShortResourceName $disk.InstanceName
+
+                    # Get localized disk counter names
+                    $localDiskCategory = Get-LocalizedCounterName "Hyper-V Virtual Storage Device"
+                    $localReadBytesCounter = Get-LocalizedCounterName "Read Bytes/sec"
+                    $localWriteBytesCounter = Get-LocalizedCounterName "Write Bytes/sec"
+                    $localReadOpsCounter = Get-LocalizedCounterName "Read Operations/sec"
+                    $localWriteOpsCounter = Get-LocalizedCounterName "Write Operations/sec"
+
                     # Create counter paths for each disk metric
                     $discoveryItems += [PSCustomObject]@{
                         "{#VMNAME}" = $originalVMName
-                    "{#VMNAME_SAFE}" = $safeVMName
-                    "{#ITEM_TYPE}" = "DISK"
+                        "{#VMNAME_SAFE}" = $safeVMName
+                        "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
                         "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Bytes/sec"
+                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadBytesCounter"
                         "{#METRIC}" = "ReadBytes"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
                     }
                     $discoveryItems += [PSCustomObject]@{
                         "{#VMNAME}" = $originalVMName
-                    "{#VMNAME_SAFE}" = $safeVMName
-                    "{#ITEM_TYPE}" = "DISK"
+                        "{#VMNAME_SAFE}" = $safeVMName
+                        "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
                         "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Bytes/sec"
+                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteBytesCounter"
                         "{#METRIC}" = "WriteBytes"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
                     }
                     $discoveryItems += [PSCustomObject]@{
                         "{#VMNAME}" = $originalVMName
-                    "{#VMNAME_SAFE}" = $safeVMName
-                    "{#ITEM_TYPE}" = "DISK"
+                        "{#VMNAME_SAFE}" = $safeVMName
+                        "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
                         "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Operations/sec"
+                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadOpsCounter"
                         "{#METRIC}" = "ReadOps"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
                     }
                     $discoveryItems += [PSCustomObject]@{
                         "{#VMNAME}" = $originalVMName
-                    "{#VMNAME_SAFE}" = $safeVMName
-                    "{#ITEM_TYPE}" = "DISK"
+                        "{#VMNAME_SAFE}" = $safeVMName
+                        "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
                         "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Operations/sec"
+                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteOpsCounter"
                         "{#METRIC}" = "WriteOps"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
@@ -1071,33 +1114,43 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
 
         foreach ($nic in $deduplicatedInstances) {
             $shortName = Get-ShortResourceName $nic.InstanceName
+
+            # Get localized NIC counter names
+            $localNicCategory = Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"
+            $localBytesReceivedCounter = Get-LocalizedCounterName "Bytes Received/sec"
+            $localBytesSentCounter = Get-LocalizedCounterName "Bytes Sent/sec"
+            $localPacketsSentCounter = Get-LocalizedCounterName "Packets Sent/sec"
+
             # Create counter paths for each NIC metric
             $discoveryItems += [PSCustomObject]@{
                 "{#VMNAME}" = $originalVMName
-            "{#VMNAME_SAFE}" = $safeVMName
-            "{#ITEM_TYPE}" = "NIC"
+                "{#VMNAME_SAFE}" = $safeVMName
+                "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = "\Hyper-V Virtual Network Adapter($($nic.InstanceName))\Bytes Received/sec"
+                "{#COUNTER_PATH_LOCAL}" = "\$localNicCategory($($nic.InstanceName))\$localBytesReceivedCounter"
                 "{#METRIC}" = "BytesReceived"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
             }
             $discoveryItems += [PSCustomObject]@{
                 "{#VMNAME}" = $originalVMName
-            "{#VMNAME_SAFE}" = $safeVMName
-            "{#ITEM_TYPE}" = "NIC"
+                "{#VMNAME_SAFE}" = $safeVMName
+                "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = "\Hyper-V Virtual Network Adapter($($nic.InstanceName))\Bytes Sent/sec"
+                "{#COUNTER_PATH_LOCAL}" = "\$localNicCategory($($nic.InstanceName))\$localBytesSentCounter"
                 "{#METRIC}" = "BytesSent"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
             }
             $discoveryItems += [PSCustomObject]@{
                 "{#VMNAME}" = $originalVMName
-            "{#VMNAME_SAFE}" = $safeVMName
-            "{#ITEM_TYPE}" = "NIC"
+                "{#VMNAME_SAFE}" = $safeVMName
+                "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = "\Hyper-V Virtual Network Adapter($($nic.InstanceName))\Packets Sent/sec"
+                "{#COUNTER_PATH_LOCAL}" = "\$localNicCategory($($nic.InstanceName))\$localPacketsSentCounter"
                 "{#METRIC}" = "PacketsSent"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost

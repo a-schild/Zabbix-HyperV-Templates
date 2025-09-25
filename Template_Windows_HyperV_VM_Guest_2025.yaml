@@ -37,35 +37,17 @@ zabbix_export:
           description: 'Discovers CPU performance counters for this Hyper-V VM'
           item_prototypes:
             - uuid: 2ff9d70a0f41427e831760badda86ed8
-              name: 'Hyper-V CPU Usage2 - {#VMNAME} - {#INSTANCE}'
-              type: DEPENDENT
-              key: 'hyperv.vm.cpu.usage[{#VMNAME_SAFE},{#COUNTER_PATH}]'
-              delay: '0'
-              value_type: FLOAT
-              units: '%'
-              description: 'CPU usage for virtual processor {#INSTANCE}'
-              master_item:
-                key: 'hyperv.vm.counters[{HOST.HOST}]'
-            - uuid: e9a4af3444684eadb285526e58a5ec28
               name: 'Hyper-V CPU Usage - {#VMNAME} - {#INSTANCE}'
-              type: DEPENDENT
-              key: 'hyperv.vm.cpu.usage[{#VMNAME_SAFE},{#INSTANCE}]'
-              delay: '0'
+              key: 'hyperv.vm.cpu.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
               value_type: FLOAT
+              trends: '0'
               units: '%'
-              description: 'CPU usage for virtual processor {#INSTANCE}'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var counterPath = "{#COUNTER_PATH}";
-                      counterPath = counterPath.replace(/\\\\/g, "\\");
-                      return Zabbix.call("perf_counter_en", [counterPath, "60"]);
-              master_item:
-                key: 'hyperv.vm.counters[{HOST.HOST}]'
+              description: 'CPU usage for virtual processor {#VMNAME} {#INSTANCE}'
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
+            - lld_macro: '{#COUNTER_PATH_LOCAL}'
+              path: '$["{#COUNTER_PATH_LOCAL}"]'
             - lld_macro: '{#COUNTER_PATH}'
               path: '$["{#COUNTER_PATH}"]'
             - lld_macro: '{#INSTANCE}'
@@ -82,6 +64,17 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.data[?(@["{#ITEM_TYPE}"]=="CPU")]'
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Fix double backslash escaping in COUNTER_PATH_LOCAL
+                  var data = JSON.parse(value);
+                  for (var i = 0; i < data.length; i++) {
+                    if (data[i]["{#COUNTER_PATH_LOCAL}"]) {
+                      data[i]["{#COUNTER_PATH_LOCAL}"] = data[i]["{#COUNTER_PATH_LOCAL}"].replace(/\\\\/g, "\\");
+                    }
+                  }
+                  return JSON.stringify(data);
         - uuid: 21b202dcf4cf4be68e751963040ab4c1
           name: 'Hyper-V VM Disk Discovery'
           type: DEPENDENT
@@ -90,24 +83,14 @@ zabbix_export:
           description: 'Discovers Disk performance counters for this Hyper-V VM'
           item_prototypes:
             - uuid: 16ea378f7218481ba6435b61dedc617e
-              name: 'Hyper-V Disk Usage2 - {#VMNAME} - {#DISK_SHORT} - {#METRIC}'
-              type: DEPENDENT
-              key: 'hyperv.vm.disk.usage[{#VMNAME_SAFE},{#COUNTER_PATH}]'
-              delay: '0'
-              value_type: FLOAT
-              master_item:
-                key: 'hyperv.vm.counters[{HOST.HOST}]'
-            - uuid: b378dc7589c54c5b949dd7e7799fd160
               name: 'Hyper-V Disk Usage - {#VMNAME} - {#DISK_SHORT} - {#METRIC}'
-              type: DEPENDENT
-              key: 'hypervm.vm.disk.usage[{#VMNAME_SAFE},{#INSTANCE},{#METRIC}]'
-              delay: '0'
+              key: 'hyperv.vm.disk.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
               value_type: FLOAT
-              master_item:
-                key: 'hyperv.vm.counters[{HOST.HOST}]'
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
+            - lld_macro: '{#COUNTER_PATH_LOCAL}'
+              path: '$["{#COUNTER_PATH_LOCAL}"]'
             - lld_macro: '{#COUNTER_PATH}'
               path: '$["{#COUNTER_PATH}"]'
             - lld_macro: '{#DISK_SHORT}'
@@ -126,6 +109,17 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.data[?(@["{#ITEM_TYPE}"]=="DISK")]'
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Fix double backslash escaping in COUNTER_PATH_LOCAL
+                  var data = JSON.parse(value);
+                  for (var i = 0; i < data.length; i++) {
+                    if (data[i]["{#COUNTER_PATH_LOCAL}"]) {
+                      data[i]["{#COUNTER_PATH_LOCAL}"] = data[i]["{#COUNTER_PATH_LOCAL}"].replace(/\\\\/g, "\\");
+                    }
+                  }
+                  return JSON.stringify(data);
         - uuid: f3ca099ae3fd4925a77eaebb5d2eaf29
           name: 'Hyper-V VM NIC Discovery'
           type: DEPENDENT
@@ -134,24 +128,14 @@ zabbix_export:
           description: 'Discovers network performance counters for this Hyper-V VM'
           item_prototypes:
             - uuid: 3d83dfedd67e4f609f66c1e6666cd0b7
-              name: 'Hyper-V NIC Usage2 - {#VMNAME} - {#NIC_SHORT} - {#METRIC}'
-              type: DEPENDENT
-              key: 'hyperv.vm.nic.usage[{#VMNAME_SAFE},{#COUNTER_PATH}]'
-              delay: '0'
-              value_type: FLOAT
-              master_item:
-                key: 'hyperv.vm.counters[{HOST.HOST}]'
-            - uuid: 1b24b94e01424075b876b8a1862a6e4b
               name: 'Hyper-V NIC Usage - {#VMNAME} - {#NIC_SHORT} - {#METRIC}'
-              type: DEPENDENT
-              key: 'hypervm.vm.nic.usage[{#VMNAME_SAFE},{#NIC_SHORT},{#METRIC}]'
-              delay: '0'
+              key: 'hyperv.vm.nic.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
               value_type: FLOAT
-              master_item:
-                key: 'hyperv.vm.counters[{HOST.HOST}]'
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
+            - lld_macro: '{#COUNTER_PATH_LOCAL}'
+              path: '$["{#COUNTER_PATH_LOCAL}"]'
             - lld_macro: '{#COUNTER_PATH}'
               path: '$["{#COUNTER_PATH}"]'
             - lld_macro: '{#INSTANCE}'
@@ -170,6 +154,17 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.data[?(@["{#ITEM_TYPE}"]=="NIC")]'
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Fix double backslash escaping in COUNTER_PATH_LOCAL
+                  var data = JSON.parse(value);
+                  for (var i = 0; i < data.length; i++) {
+                    if (data[i]["{#COUNTER_PATH_LOCAL}"]) {
+                      data[i]["{#COUNTER_PATH_LOCAL}"] = data[i]["{#COUNTER_PATH_LOCAL}"].replace(/\\\\/g, "\\");
+                    }
+                  }
+                  return JSON.stringify(data);
       tags:
         - tag: class
           value: software
