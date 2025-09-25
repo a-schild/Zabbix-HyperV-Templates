@@ -179,6 +179,7 @@ function Get-HyperVCounterNames
         'Hyper-V Virtual Network Adapter',
         'Bytes Received/sec',
         'Bytes Sent/sec',
+        'Packets Received/sec',
         'Packets Sent/sec'
     )
 }
@@ -186,6 +187,14 @@ function Get-HyperVCounterNames
 function Initialize-EnglishCounterCache
 {
     $cacheFile = Get-CacheFilePath "english"
+
+    # Try to load from cache first
+    if (Test-CacheValid $cacheFile) {
+        $script:englishPerfHash = Load-CounterCache $cacheFile
+        if ($script:englishPerfHash -and $script:englishPerfHash.Count -gt 0) {
+            return
+        }
+    }
 
     # Cache miss or invalid - build comprehensive cache like original script
     $script:englishPerfHash = @{}
@@ -246,7 +255,10 @@ function Get-LocalizedCounterName
         # Try to load from cache file
         $cacheFile = Get-CacheFilePath "localized"
         if (Test-CacheValid $cacheFile) {
-            $script:localizedCounterCache = Load-CounterCache $cacheFile
+            $loadedCache = Load-CounterCache $cacheFile
+            if ($loadedCache -and $loadedCache.Count -gt 0) {
+                $script:localizedCounterCache = $loadedCache
+            }
         }
     }
 
@@ -275,7 +287,8 @@ function Get-LocalizedCounterName
         "Hyper-V Virtual Network Adapter" = "Virtueller Hyper-V-Netzwerkadapter"
         "Bytes Received/sec" = "Empfangene Bytes/s"
         "Bytes Sent/sec" = "Gesendete Bytes/s"
-        "Packets Sent/sec" = "Pakete gesendet/s"
+        "Packets Received/sec" = "Empfangene Pakete/s"
+        "Packets Sent/sec" = "Gesendete Pakete/s"
     }
 
     # Use direct mapping instead of registry lookup
@@ -283,8 +296,20 @@ function Get-LocalizedCounterName
         $localizedName = $counterMappings[$EnglishName]
     }
 
-    # Store in cache for future use
-    $script:localizedCounterCache.$EnglishName = $localizedName
+    # Store in cache for future use (only if not already cached)
+    if (-not $script:localizedCounterCache.ContainsKey($EnglishName)) {
+        $script:localizedCounterCache.$EnglishName = $localizedName
+
+        # Save updated cache to disk for persistence across script executions
+        try {
+            $cacheFile = Get-CacheFilePath "localized"
+            Save-CounterCache $script:localizedCounterCache $cacheFile
+        }
+        catch {
+            # Ignore save errors to avoid breaking functionality
+            Write-Warning "Failed to save localized cache: $_"
+        }
+    }
 
     return $localizedName
 }
@@ -798,8 +823,10 @@ catch {
     $hostname = $env:COMPUTERNAME  # Fallback to environment variable
 }
 
-# Initialize counter cache
-Initialize-EnglishCounterCache
+# Initialize counter cache only if needed (not for simple counter value queries)
+if ($QueryName -ne 'GetCounterValue' -and $QueryName -ne 'GetVMStatus' -and $QueryName -ne 'GetVMReplication') {
+    Initialize-EnglishCounterCache
+}
 
 <# Main Logic #>
 
@@ -1240,6 +1267,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
             $localNicCategory = Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"
             $localBytesReceivedCounter = Get-LocalizedCounterName "Bytes Received/sec"
             $localBytesSentCounter = Get-LocalizedCounterName "Bytes Sent/sec"
+            $localPacketsReceivedCounter = Get-LocalizedCounterName "Packets Received/sec"
             $localPacketsSentCounter = Get-LocalizedCounterName "Packets Sent/sec"
 
             # Create counter paths for each NIC metric
@@ -1262,6 +1290,17 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Bytes Sent/sec" $nic.InstanceName)
                 "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localBytesSentCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesSent"
+                "{#NIC_SHORT}" = $shortName
+                "{#VMHOST}" = $vmHost
+            }
+            $discoveryItems += [PSCustomObject]@{
+                "{#VMNAME}" = $originalVMName
+                "{#VMNAME_SAFE}" = $safeVMName
+                "{#ITEM_TYPE}" = "NIC"
+                "{#INSTANCE}" = $nic.InstanceName
+                "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Packets Received/sec" $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localPacketsReceivedCounter $nic.InstanceName)
+                "{#METRIC}" = "PacketsReceived"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
             }
@@ -1434,41 +1473,72 @@ elseif ($QueryName -eq 'RebuildCache') {
     # Rebuild counter caches from scratch
     Write-Host "=== Rebuilding Counter Caches ===" -ForegroundColor Yellow
 
-    # Delete existing cache files
+    # Get cache file paths
     $englishCacheFile = Get-CacheFilePath "english"
     $localizedCacheFile = Get-CacheFilePath "localized"
 
-    if (Test-Path $englishCacheFile) {
-        Remove-Item $englishCacheFile -Force
-        Write-Host "Deleted English cache: $englishCacheFile" -ForegroundColor Green
-    }
+    # Create temporary file names
+    $tempEnglishCacheFile = $englishCacheFile + ".tmp"
+    $tempLocalizedCacheFile = $localizedCacheFile + ".tmp"
 
-    if (Test-Path $localizedCacheFile) {
-        Remove-Item $localizedCacheFile -Force
-        Write-Host "Deleted localized cache: $localizedCacheFile" -ForegroundColor Green
-    }
-
-    # Clear script variables
+    # Clear script variables to force rebuild
     $script:englishPerfHash = $null
     $script:localizedCounterCache = $null
 
-    # Force rebuild of English cache
-    Write-Host "Rebuilding English cache..." -ForegroundColor Cyan
-    Initialize-EnglishCounterCache
+    try {
+        # Force rebuild of English cache
+        Write-Host "Building new English cache..." -ForegroundColor Cyan
+        Initialize-EnglishCounterCache
 
-    Write-Host "English cache now has $($script:englishPerfHash.Count) entries" -ForegroundColor Green
+        # Save to temporary file
+        Save-CounterCache $script:englishPerfHash $tempEnglishCacheFile
+        Write-Host "Built English cache with $($script:englishPerfHash.Count) entries" -ForegroundColor Green
 
-    # Force rebuild of localized cache for all needed counters
-    Write-Host "Rebuilding localized cache..." -ForegroundColor Cyan
-    $neededCounters = Get-HyperVCounterNames
+        # Force rebuild of localized cache for all needed counters
+        Write-Host "Building new localized cache..." -ForegroundColor Cyan
+        $script:localizedCounterCache = @{}
+        $neededCounters = Get-HyperVCounterNames
 
-    foreach ($counterName in $neededCounters) {
-        $localizedName = Get-LocalizedCounterName $counterName
-        Write-Host "  '$counterName' -> '$localizedName'" -ForegroundColor Gray
+        foreach ($counterName in $neededCounters) {
+            $localizedName = Get-LocalizedCounterName $counterName
+            Write-Host "  '$counterName' -> '$localizedName'" -ForegroundColor Gray
+        }
+
+        # Save to temporary file
+        Save-CounterCache $script:localizedCounterCache $tempLocalizedCacheFile
+        Write-Host "Built localized cache with $($script:localizedCounterCache.Count) entries" -ForegroundColor Green
+
+        # Atomic replacement: move temp files to final locations
+        Write-Host "Replacing cache files..." -ForegroundColor Cyan
+
+        if (Test-Path $englishCacheFile) {
+            Remove-Item $englishCacheFile -Force
+        }
+        Move-Item $tempEnglishCacheFile $englishCacheFile
+        Write-Host "Replaced English cache: $englishCacheFile" -ForegroundColor Green
+
+        if (Test-Path $localizedCacheFile) {
+            Remove-Item $localizedCacheFile -Force
+        }
+        Move-Item $tempLocalizedCacheFile $localizedCacheFile
+        Write-Host "Replaced localized cache: $localizedCacheFile" -ForegroundColor Green
+
+        Write-Host "Cache rebuild complete!" -ForegroundColor Yellow
     }
+    catch {
+        Write-Host "Error during cache rebuild: $($_.Exception.Message)" -ForegroundColor Red
 
-    Write-Host "Localized cache now has $($script:localizedCounterCache.Count) entries" -ForegroundColor Green
-    Write-Host "Cache rebuild complete!" -ForegroundColor Yellow
+        # Clean up temp files if they exist
+        if (Test-Path $tempEnglishCacheFile) {
+            Remove-Item $tempEnglishCacheFile -Force -ErrorAction SilentlyContinue
+            Write-Host "Cleaned up temporary English cache file" -ForegroundColor Yellow
+        }
+
+        if (Test-Path $tempLocalizedCacheFile) {
+            Remove-Item $tempLocalizedCacheFile -Force -ErrorAction SilentlyContinue
+            Write-Host "Cleaned up temporary localized cache file" -ForegroundColor Yellow
+        }
+    }
 
     exit
 }
