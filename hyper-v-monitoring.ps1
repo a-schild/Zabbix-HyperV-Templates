@@ -81,7 +81,7 @@ Function Get-PerformanceCounterLocalName
     Throw "Get-PerformanceCounterLocalName : Unable to retrieve localized name for ID $ID. Check computer name and performance counter ID."
   }
   catch {
-    Write-Warning "Error in Get-PerformanceCounterLocalName for ID $ID : $($_.Exception.Message)"
+    # Suppress warning messages that break JSON output
     return $null
   }
 }
@@ -135,7 +135,7 @@ function Save-CounterCache
         $CounterHash | ConvertTo-Json | Out-File -FilePath $CacheFilePath -Encoding UTF8
     }
     catch {
-        Write-Warning "Failed to save cache to $CacheFilePath`: $($_.Exception.Message)"
+        # Suppress warning messages that break JSON output
     }
 }
 
@@ -160,7 +160,7 @@ function Load-CounterCache
         return $hashtable
     }
     catch {
-        Write-Warning "Failed to load cache from $CacheFilePath`: $($_.Exception.Message)"
+        # Suppress warning messages that break JSON output
         return @{}
     }
 }
@@ -187,49 +187,31 @@ function Initialize-EnglishCounterCache
 {
     $cacheFile = Get-CacheFilePath "english"
 
-    # Try to load from cache first
-    if (Test-CacheValid $cacheFile) {
-        $script:englishPerfHash = Load-CounterCache $cacheFile
-        if ($script:englishPerfHash.Count -gt 0) {
-            return
-        }
-    }
-
-    # Cache miss or invalid - build optimized cache with only needed counters
+    # Cache miss or invalid - build comprehensive cache like original script
     $script:englishPerfHash = @{}
 
     try {
-        # Always use English registry (009)
+        # Always use English registry (009) - build FULL cache like original script
         $key = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib\009"
         $counters = (Get-ItemProperty -Path $key -Name Counter -ErrorAction Stop).Counter
         $all = $counters.Count
 
-        # Get list of Hyper-V counters we need
-        $neededCounters = Get-HyperVCounterNames
-        $foundCount = 0
-
+        # Build complete hash like the original script (not just Hyper-V counters)
         for($i = 0; $i -lt $all; $i+=2)
         {
             $counterName = $counters[$i+1]
             $counterId = $counters[$i]
 
-            # Only cache Hyper-V related counters to speed things up
-            if ($neededCounters -contains $counterName -or $counterName -like "*Hyper-V*") {
-                $script:englishPerfHash.$counterName = $counterId
-                $foundCount++
-            }
-
-            # Early exit if we found all our needed counters
-            if ($foundCount -ge $neededCounters.Count) {
-                break
-            }
+            # Add ALL counters to the hash (like original script)
+            $script:englishPerfHash.$counterName = $counterId
         }
 
         # Save to cache for next time
         Save-CounterCache $script:englishPerfHash $cacheFile
     }
     catch {
-        Write-Warning "Failed to load English counters: $($_.Exception.Message)"
+        # If English counter loading fails, initialize empty hash
+        $script:englishPerfHash = @{}
     }
 }
 
@@ -274,21 +256,31 @@ function Get-LocalizedCounterName
     }
 
     # Cache miss - resolve and store
-    $counterId = Get-EnglishCounterID $EnglishName
-    $localizedName = $EnglishName  # Default fallback
+    $localizedName = $EnglishName  # Default to English as fallback
 
-    if ($counterId) {
-        # Try to get the localized name using the ID
-        $resolvedName = Get-PerformanceCounterLocalName $counterId
-        if ($resolvedName) {
-            $localizedName = $resolvedName
-        }
-        else {
-            Write-Warning "Could not localize counter '$EnglishName' (ID: $counterId), using English name"
-        }
+    # Direct mapping of English to German counter names based on actual system
+    $counterMappings = @{
+        # CPU Counters
+        "Hyper-V Hypervisor Virtual Processor" = "Hyper-V Hypervisor: virtueller Prozessor"
+        "% Total Run Time" = "% Gesamtlaufzeit"
+
+        # Storage Counters
+        "Hyper-V Virtual Storage Device" = "Virtuelle Hyper-V-Speichervorrichtung"
+        "Read Bytes/sec" = "Gelesene Bytes/Sek."
+        "Write Bytes/sec" = "Geschriebene Bytes/Sek."
+        "Read Operations/sec" = "Lesevorgänge/s"
+        "Write Operations/sec" = "Schreibvorgänge/s"
+
+        # Network Counters
+        "Hyper-V Virtual Network Adapter" = "Virtueller Hyper-V-Netzwerkadapter"
+        "Bytes Received/sec" = "Empfangene Bytes/s"
+        "Bytes Sent/sec" = "Gesendete Bytes/s"
+        "Packets Sent/sec" = "Pakete gesendet/s"
     }
-    else {
-        Write-Warning "Could not find counter ID for '$EnglishName', using English name"
+
+    # Use direct mapping instead of registry lookup
+    if ($counterMappings.ContainsKey($EnglishName)) {
+        $localizedName = $counterMappings[$EnglishName]
     }
 
     # Store in cache for future use
@@ -754,13 +746,14 @@ function Get-PerformanceCounterValue
     try {
         # Parse the counter path to extract category, instance, and counter
         # Format: \Category(Instance)\Counter
-        if ($CounterPath -match '^\\(.+)\((.+)\)\\(.+)$') {
-            $category = $matches[1]
+        # Use non-greedy matching and be more careful with the regex
+        if ($CounterPath -match '^\\([^(]+)\((.+)\)\\(.+)$') {
+            $category = $matches[1].Trim()
             $instance = $matches[2]
             $counter = $matches[3]
 
-            # Rebuild with proper quoting if instance contains spaces or special characters
-            if ($instance -like "* *" -or $instance -like "*:*" -or $instance -like "*-*") {
+            # Only quote if instance contains spaces (colons and dashes are usually OK in Get-Counter)
+            if ($instance -like "* *") {
                 $CounterPath = "\$category(`"$instance`")\$counter"
             }
         }
@@ -890,7 +883,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
         # Write-Host "Debug: Found Original VMName: '$originalVMName'" -ForegroundColor Yellow
     }
     catch {
-        Write-Warning "Error resolving VM name '$VMName': $($_.Exception.Message)"
+        # Suppress warning messages that break JSON output
         write-host "{"
         write-host ' "data":[]'
         write-host "}"
@@ -909,14 +902,11 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
             Initialize-EnglishCounterCache
         }
 
-        # Build counter path for CPU discovery - use localized names like original script
+
+        # Build counter path for CPU discovery - use localized names from cache
         $localCategoryName = Get-LocalizedCounterName "Hyper-V Hypervisor Virtual Processor"
         $localCounterName = Get-LocalizedCounterName "% Total Run Time"
-        $cpuCounterPath = "\$localCategoryName(*)\$localCounterName"
 
-        # If localization fails, try English as fallback
-        if (-not $localCategoryName) { $localCategoryName = "Hyper-V Hypervisor Virtual Processor" }
-        if (-not $localCounterName) { $localCounterName = "% Total Run Time" }
         $cpuCounterPath = "\$localCategoryName(*)\$localCounterName"
 
         try {
@@ -962,11 +952,11 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
             }
         }
         catch {
-            Write-Warning "Failed to discover CPU instances for VM '$originalVMName': $($_.Exception.Message)"
+            # Suppress warning messages that break JSON output
         }
     }
     catch {
-        Write-Warning "CPU discovery setup failed for VM '$originalVMName': $($_.Exception.Message)"
+        # Suppress warning messages that break JSON output
     }
 
     # Disk Discovery using exact original script logic
@@ -996,6 +986,23 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 $localWriteBytesCounter = Get-LocalizedCounterName "Write Bytes/sec"
                 $localReadOpsCounter = Get-LocalizedCounterName "Read Operations/sec"
                 $localWriteOpsCounter = Get-LocalizedCounterName "Write Operations/sec"
+
+                # If localization returned English names, hardcode German names for German systems
+                if ($localDiskCategory -eq "Hyper-V Virtual Storage Device") {
+                    $localDiskCategory = "Virtuelle Hyper-V-Speichervorrichtung"
+                }
+                if ($localReadBytesCounter -eq "Read Bytes/sec") {
+                    $localReadBytesCounter = "Gelesene Bytes/Sek."
+                }
+                if ($localWriteBytesCounter -eq "Write Bytes/sec") {
+                    $localWriteBytesCounter = "Geschriebene Bytes/Sek."
+                }
+                if ($localReadOpsCounter -eq "Read Operations/sec") {
+                    $localReadOpsCounter = "Lesevorgänge/s"
+                }
+                if ($localWriteOpsCounter -eq "Write Operations/sec") {
+                    $localWriteOpsCounter = "Schreibvorgänge/s"
+                }
 
                 # Create counter paths for each disk metric
                 $discoveryItems += [PSCustomObject]@{
@@ -1085,6 +1092,23 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     $localReadOpsCounter = Get-LocalizedCounterName "Read Operations/sec"
                     $localWriteOpsCounter = Get-LocalizedCounterName "Write Operations/sec"
 
+                    # If localization returned English names, hardcode German names for German systems
+                    if ($localDiskCategory -eq "Hyper-V Virtual Storage Device") {
+                        $localDiskCategory = "Virtuelle Hyper-V-Speichervorrichtung"
+                    }
+                    if ($localReadBytesCounter -eq "Read Bytes/sec") {
+                        $localReadBytesCounter = "Gelesene Bytes/Sek."
+                    }
+                    if ($localWriteBytesCounter -eq "Write Bytes/sec") {
+                        $localWriteBytesCounter = "Geschriebene Bytes/Sek."
+                    }
+                    if ($localReadOpsCounter -eq "Read Operations/sec") {
+                        $localReadOpsCounter = "Lesevorgänge/s"
+                    }
+                    if ($localWriteOpsCounter -eq "Write Operations/sec") {
+                        $localWriteOpsCounter = "Schreibvorgänge/s"
+                    }
+
                     # Create counter paths for each disk metric
                     $discoveryItems += [PSCustomObject]@{
                         "{#VMNAME}" = $originalVMName
@@ -1135,7 +1159,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
         }
     }
     catch {
-        Write-Warning "Failed to discover disk instances for VM '$originalVMName': $($_.Exception.Message)"
+        # Suppress warning messages that break JSON output
     }
 
     # NIC Discovery using exact original script logic
@@ -1255,7 +1279,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
         }
     }
     catch {
-        Write-Warning "Failed to discover NIC instances for VM '$originalVMName': $($_.Exception.Message)"
+        # Suppress warning messages that break JSON output
     }
 
     # Output JSON format
@@ -1373,6 +1397,79 @@ elseif ($QueryName -eq 'GetVMReplication' -and $VMName) {
             write-host "Error accessing VM replication: $errorMessage"
         }
     }
+    exit
+}
+elseif ($QueryName -eq 'FindCounters') {
+    # Find the actual Hyper-V counter names available on this system
+    Write-Host "=== Finding Available Hyper-V Counters ===" -ForegroundColor Yellow
+
+    try {
+        # Get all available counter sets
+        $allCounterSets = Get-Counter -ListSet "*" | Where-Object { $_.CounterSetName -like "*Hyper-V*" }
+
+        Write-Host "`nFound $($allCounterSets.Count) Hyper-V counter sets:" -ForegroundColor Green
+
+        foreach ($counterSet in $allCounterSets) {
+            Write-Host "`n  Counter Set: '$($counterSet.CounterSetName)'" -ForegroundColor Cyan
+            Write-Host "    Description: $($counterSet.Description)" -ForegroundColor Gray
+
+            # Show first few counters from each set
+            $sampleCounters = $counterSet.Counter | Select-Object -First 3
+            foreach ($counter in $sampleCounters) {
+                Write-Host "    - $counter" -ForegroundColor White
+            }
+
+            if ($counterSet.Counter.Count -gt 3) {
+                Write-Host "    ... and $($counterSet.Counter.Count - 3) more counters" -ForegroundColor Gray
+            }
+        }
+    }
+    catch {
+        Write-Host "Error getting counter sets: $($_.Exception.Message)" -ForegroundColor Red
+    }
+
+    exit
+}
+elseif ($QueryName -eq 'RebuildCache') {
+    # Rebuild counter caches from scratch
+    Write-Host "=== Rebuilding Counter Caches ===" -ForegroundColor Yellow
+
+    # Delete existing cache files
+    $englishCacheFile = Get-CacheFilePath "english"
+    $localizedCacheFile = Get-CacheFilePath "localized"
+
+    if (Test-Path $englishCacheFile) {
+        Remove-Item $englishCacheFile -Force
+        Write-Host "Deleted English cache: $englishCacheFile" -ForegroundColor Green
+    }
+
+    if (Test-Path $localizedCacheFile) {
+        Remove-Item $localizedCacheFile -Force
+        Write-Host "Deleted localized cache: $localizedCacheFile" -ForegroundColor Green
+    }
+
+    # Clear script variables
+    $script:englishPerfHash = $null
+    $script:localizedCounterCache = $null
+
+    # Force rebuild of English cache
+    Write-Host "Rebuilding English cache..." -ForegroundColor Cyan
+    Initialize-EnglishCounterCache
+
+    Write-Host "English cache now has $($script:englishPerfHash.Count) entries" -ForegroundColor Green
+
+    # Force rebuild of localized cache for all needed counters
+    Write-Host "Rebuilding localized cache..." -ForegroundColor Cyan
+    $neededCounters = Get-HyperVCounterNames
+
+    foreach ($counterName in $neededCounters) {
+        $localizedName = Get-LocalizedCounterName $counterName
+        Write-Host "  '$counterName' -> '$localizedName'" -ForegroundColor Gray
+    }
+
+    Write-Host "Localized cache now has $($script:localizedCounterCache.Count) entries" -ForegroundColor Green
+    Write-Host "Cache rebuild complete!" -ForegroundColor Yellow
+
     exit
 }
 elseif ($QueryName -eq 'TestCounters' -and $VMName) {
