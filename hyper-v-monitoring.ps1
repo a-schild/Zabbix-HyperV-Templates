@@ -374,6 +374,24 @@ function Build-EnglishCounterPath
     return "\$EnglishCategoryName($quotedInstance)\$EnglishCounterName"
 }
 
+function Build-LocalizedCounterPath
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$LocalizedCategoryName,
+        [Parameter(Mandatory=$true)]
+        [string]$LocalizedCounterName,
+        [Parameter(Mandatory=$false)]
+        [string]$InstanceName = "*"
+    )
+
+    # Build localized counter path - don't quote here, let Get-Counter handle it
+    # The issue is that pre-quoted paths cause problems when passed as PowerShell parameters
+
+    return "\$LocalizedCategoryName($InstanceName)\$LocalizedCounterName"
+}
+
 function Get-ShortResourceName
 {
     param
@@ -381,8 +399,15 @@ function Get-ShortResourceName
         [Parameter(Mandatory=$true)]
         [string]$FullName,
         [Parameter(Mandatory=$false)]
-        [int]$MaxLength = 20
+        [int]$MaxLength = 20,
+        [Parameter(Mandatory=$false)]
+        [string]$ResourceType = "GENERIC"
     )
+
+    # Special handling for NIC resources
+    if ($ResourceType -eq "NIC") {
+        return Get-NicShortName $FullName
+    }
 
     # Handle different types of resource names
     if ($FullName -like "*-hyper-v-*") {
@@ -445,6 +470,65 @@ function Get-ShortResourceName
         }
         return $FullName.Substring(0, $MaxLength - 3) + "..."
     }
+}
+
+function Get-NicShortName
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$NicInstanceName
+    )
+
+    # Create a clear 10-character NIC identifier without VM name
+    # Focus on identifying the NIC adapter itself
+
+    $shortName = ""
+
+    # Look for adapter type indicators
+    if ($NicInstanceName -like "*Legacy*") {
+        $shortName = "LegacyNIC1"
+    }
+    elseif ($NicInstanceName -like "*Synthetic*") {
+        $shortName = "SynthNIC01"
+    }
+    elseif ($NicInstanceName -like "*Microsoft*Hyper-V*Network*Adapter*") {
+        $shortName = "HyperVNIC1"
+    }
+    elseif ($NicInstanceName -like "*External*") {
+        $shortName = "ExtNIC001"
+    }
+    elseif ($NicInstanceName -like "*Internal*") {
+        $shortName = "IntNIC001"
+    }
+    elseif ($NicInstanceName -like "*Private*") {
+        $shortName = "PvtNIC001"
+    }
+    else {
+        # Generic NIC - try to extract meaningful identifier
+        # Remove common words and get unique part
+        $cleaned = $NicInstanceName -replace "Microsoft|Hyper-V|Network|Adapter|Virtual", ""
+        $cleaned = $cleaned -replace "[^a-zA-Z0-9]", ""
+
+        if ($cleaned.Length -ge 4) {
+            $shortName = "NIC" + $cleaned.Substring(0, 7).ToUpper()
+        }
+        else {
+            # Use hash of full name for uniqueness
+            $hash = [System.Math]::Abs($NicInstanceName.GetHashCode()) % 999999
+            $shortName = "NIC" + $hash.ToString("D6")
+        }
+    }
+
+    # Ensure exactly 10 characters
+    if ($shortName.Length -lt 10) {
+        $shortName = $shortName.PadRight(10, '0')
+    }
+    elseif ($shortName.Length -gt 10) {
+        $shortName = $shortName.Substring(0, 10)
+    }
+
+    return $shortName
 }
 
 function Get-StorageCounterInstances
@@ -668,6 +752,19 @@ function Get-PerformanceCounterValue
     )
 
     try {
+        # Parse the counter path to extract category, instance, and counter
+        # Format: \Category(Instance)\Counter
+        if ($CounterPath -match '^\\(.+)\((.+)\)\\(.+)$') {
+            $category = $matches[1]
+            $instance = $matches[2]
+            $counter = $matches[3]
+
+            # Rebuild with proper quoting if instance contains spaces or special characters
+            if ($instance -like "* *" -or $instance -like "*:*" -or $instance -like "*-*") {
+                $CounterPath = "\$category(`"$instance`")\$counter"
+            }
+        }
+
         $result = (Get-Counter -Counter $CounterPath -ErrorAction Stop).CounterSamples
         if ($result -and $result.Count -gt 0) {
             $value = $result[0].CookedValue
@@ -684,7 +781,7 @@ function Get-PerformanceCounterValue
     catch {
         # Extract meaningful error information
         $errorMsg = $_.Exception.Message
-        if ($errorMsg -like "*counter*not*found*" -or $errorMsg -like "*Indikator*nicht*gefunden*") {
+        if ($errorMsg -like "*counter*not*found*" -or $errorMsg -like "*Indikator*nicht*gefunden*" -or $errorMsg -like "*nicht gefunden*") {
             return "ZBX_NOTSUPPORTED: Performance counter does not exist"
         }
         elseif ($errorMsg -like "*access*denied*" -or $errorMsg -like "*Zugriff*verweigert*") {
@@ -906,8 +1003,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#VMNAME_SAFE}" = $safeVMName
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
-                    "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Bytes/sec"
-                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadBytesCounter"
+                    "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Read Bytes/sec" $disk.InstanceName)
+                    "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadBytesCounter $disk.InstanceName)
                     "{#METRIC}" = "ReadBytes"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -917,8 +1014,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#VMNAME_SAFE}" = $safeVMName
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
-                    "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Bytes/sec"
-                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteBytesCounter"
+                    "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Write Bytes/sec" $disk.InstanceName)
+                    "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteBytesCounter $disk.InstanceName)
                     "{#METRIC}" = "WriteBytes"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -928,8 +1025,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#VMNAME_SAFE}" = $safeVMName
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
-                    "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Operations/sec"
-                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadOpsCounter"
+                    "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Read Operations/sec" $disk.InstanceName)
+                    "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadOpsCounter $disk.InstanceName)
                     "{#METRIC}" = "ReadOps"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -939,8 +1036,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#VMNAME_SAFE}" = $safeVMName
                     "{#ITEM_TYPE}" = "DISK"
                     "{#INSTANCE}" = $disk.InstanceName
-                    "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Operations/sec"
-                    "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteOpsCounter"
+                    "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Write Operations/sec" $disk.InstanceName)
+                    "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteOpsCounter $disk.InstanceName)
                     "{#METRIC}" = "WriteOps"
                     "{#DISK_SHORT}" = $shortName
                     "{#VMHOST}" = $vmHost
@@ -994,8 +1091,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#VMNAME_SAFE}" = $safeVMName
                         "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
-                        "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Bytes/sec"
-                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadBytesCounter"
+                        "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Read Bytes/sec" $disk.InstanceName)
+                        "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadBytesCounter $disk.InstanceName)
                         "{#METRIC}" = "ReadBytes"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
@@ -1005,8 +1102,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#VMNAME_SAFE}" = $safeVMName
                         "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
-                        "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Bytes/sec"
-                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteBytesCounter"
+                        "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Write Bytes/sec" $disk.InstanceName)
+                        "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteBytesCounter $disk.InstanceName)
                         "{#METRIC}" = "WriteBytes"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
@@ -1016,8 +1113,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#VMNAME_SAFE}" = $safeVMName
                         "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
-                        "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Read Operations/sec"
-                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localReadOpsCounter"
+                        "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Read Operations/sec" $disk.InstanceName)
+                        "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadOpsCounter $disk.InstanceName)
                         "{#METRIC}" = "ReadOps"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
@@ -1027,8 +1124,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#VMNAME_SAFE}" = $safeVMName
                         "{#ITEM_TYPE}" = "DISK"
                         "{#INSTANCE}" = $disk.InstanceName
-                        "{#COUNTER_PATH}" = "\Hyper-V Virtual Storage Device($($disk.InstanceName))\Write Operations/sec"
-                        "{#COUNTER_PATH_LOCAL}" = "\$localDiskCategory($($disk.InstanceName))\$localWriteOpsCounter"
+                        "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Storage Device" "Write Operations/sec" $disk.InstanceName)
+                        "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteOpsCounter $disk.InstanceName)
                         "{#METRIC}" = "WriteOps"
                         "{#DISK_SHORT}" = $shortName
                         "{#VMHOST}" = $vmHost
@@ -1113,7 +1210,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
         }
 
         foreach ($nic in $deduplicatedInstances) {
-            $shortName = Get-ShortResourceName $nic.InstanceName
+            $shortName = Get-ShortResourceName $nic.InstanceName -ResourceType "NIC"
 
             # Get localized NIC counter names
             $localNicCategory = Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"
@@ -1127,8 +1224,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#VMNAME_SAFE}" = $safeVMName
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
-                "{#COUNTER_PATH}" = "\Hyper-V Virtual Network Adapter($($nic.InstanceName))\Bytes Received/sec"
-                "{#COUNTER_PATH_LOCAL}" = "\$localNicCategory($($nic.InstanceName))\$localBytesReceivedCounter"
+                "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Bytes Received/sec" $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localBytesReceivedCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesReceived"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
@@ -1138,8 +1235,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#VMNAME_SAFE}" = $safeVMName
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
-                "{#COUNTER_PATH}" = "\Hyper-V Virtual Network Adapter($($nic.InstanceName))\Bytes Sent/sec"
-                "{#COUNTER_PATH_LOCAL}" = "\$localNicCategory($($nic.InstanceName))\$localBytesSentCounter"
+                "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Bytes Sent/sec" $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localBytesSentCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesSent"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
@@ -1149,8 +1246,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#VMNAME_SAFE}" = $safeVMName
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
-                "{#COUNTER_PATH}" = "\Hyper-V Virtual Network Adapter($($nic.InstanceName))\Packets Sent/sec"
-                "{#COUNTER_PATH_LOCAL}" = "\$localNicCategory($($nic.InstanceName))\$localPacketsSentCounter"
+                "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Packets Sent/sec" $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localPacketsSentCounter $nic.InstanceName)
                 "{#METRIC}" = "PacketsSent"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
