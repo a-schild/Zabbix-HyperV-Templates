@@ -12,9 +12,15 @@
 
 - Storing the cache as json does not work, since the names sometimes contain utf8 entities
   This is why we switched to the xml format for the cache
+
+- The xml cache is rebuilt once a day, which will probably cause some
+  detection timeouts or message errors
   
 - The whole counter naming is a big mess in windows and even worse 
-  when used via powershell
+  when used via powershell.
+  It detects the file age and rebuilds as needed.
+  We could also rebuild it separatly all 23h to prevent
+  interfering with zabbix agent operation
   
 - Usually counters and instances are not case sensitive
 - But for the legacy network adapter, in german it's called 
