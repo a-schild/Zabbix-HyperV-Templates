@@ -783,20 +783,8 @@ function Get-PerformanceCounterValue
     )
 
     try {
-        # Parse the counter path to extract category, instance, and counter
-        # Format: \Category(Instance)\Counter
-        # Use non-greedy matching and be more careful with the regex
-        if ($CounterPath -match '^\\([^(]+)\((.+)\)\\(.+)$') {
-            $category = $matches[1].Trim()
-            $instance = $matches[2]
-            $counter = $matches[3]
-
-            # Only quote if instance contains spaces (colons and dashes are usually OK in Get-Counter)
-            if ($instance -like "* *") {
-                $CounterPath = "\" + $category + '("' + $instance + '")' + "\" + $counter
-            }
-        }
-
+        # Just pass the counter path directly to Get-Counter without modification
+        # The caller is responsible for providing the correct format
         $result = (Get-Counter -Counter $CounterPath -ErrorAction Stop).CounterSamples
         if ($result -and $result.Count -gt 0) {
             $value = $result[0].CookedValue
