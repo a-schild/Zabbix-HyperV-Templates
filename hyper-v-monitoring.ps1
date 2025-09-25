@@ -1,6 +1,8 @@
-<#
+﻿<#
 Zabbix Agent PowerShell script for optimized Hyper-V monitoring
 Returns VMs with their performance counter paths in a single discovery
+
+Make sure this script is saved as UTF8 including BOM
 
 Copyright (c) 2015, Dmitry Sarkisov <ait.meijin@gmail.com>
 Enhanced by Andre Schild <a.schild@aarboard.ch>
@@ -25,6 +27,9 @@ param(
 	[string]$VMName,
 	[string]$CounterPath
 )
+
+# Make sure to output the json names correctly encoded
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # Get script directory for cache files
 $script:ScriptDirectory = Split-Path $MyInvocation.MyCommand.Path -Parent
@@ -131,8 +136,9 @@ function Save-CounterCache
         [string]$CacheFilePath
     )
 
+
     try {
-        $CounterHash | ConvertTo-Json | Out-File -FilePath $CacheFilePath -Encoding UTF8
+        $CounterHash | ConvertTo-Json | Out-File -FilePath $CacheFilePath -Encoding utf8
     }
     catch {
         # Suppress warning messages that break JSON output
@@ -148,8 +154,15 @@ function Load-CounterCache
     )
 
     try {
-        $json = Get-Content -Path $CacheFilePath -Raw -Encoding UTF8
+        $json = Get-Content -Path $CacheFilePath -Raw 
+        if ([string]::IsNullOrWhiteSpace($json)) {
+            return $null
+        }
+
         $obj = $json | ConvertFrom-Json
+        if (-not $obj) {
+            return $null
+        }
 
         # Convert PSCustomObject to hashtable for PowerShell 5.1 compatibility
         $hashtable = @{}
@@ -160,8 +173,8 @@ function Load-CounterCache
         return $hashtable
     }
     catch {
-        # Suppress warning messages that break JSON output
-        return @{}
+        # Return null instead of empty hashtable to indicate load failure
+        return $null
     }
 }
 
@@ -190,8 +203,9 @@ function Initialize-EnglishCounterCache
 
     # Try to load from cache first
     if (Test-CacheValid $cacheFile) {
-        $script:englishPerfHash = Load-CounterCache $cacheFile
-        if ($script:englishPerfHash -and $script:englishPerfHash.Count -gt 0) {
+        $loadedCache = Load-CounterCache $cacheFile
+        if ($loadedCache -and $loadedCache.Count -gt 0) {
+            $script:englishPerfHash = $loadedCache
             return
         }
     }
@@ -278,8 +292,8 @@ function Get-LocalizedCounterName
 
         # Storage Counters
         "Hyper-V Virtual Storage Device" = "Virtuelle Hyper-V-Speichervorrichtung"
-        "Read Bytes/sec" = "Gelesene Bytes/Sek."
-        "Write Bytes/sec" = "Geschriebene Bytes/Sek."
+        "Read Bytes/sec" = "Gelesene Bytes/s"
+        "Write Bytes/sec" = "Geschriebene Bytes/s"
         "Read Operations/sec" = "Lesevorgänge/s"
         "Write Operations/sec" = "Schreibvorgänge/s"
 
@@ -779,7 +793,7 @@ function Get-PerformanceCounterValue
 
             # Only quote if instance contains spaces (colons and dashes are usually OK in Get-Counter)
             if ($instance -like "* *") {
-                $CounterPath = "\$category(`"$instance`")\$counter"
+                $CounterPath = "\" + $category + '("' + $instance + '")' + "\" + $counter
             }
         }
 
