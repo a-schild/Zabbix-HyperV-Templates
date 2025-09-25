@@ -107,7 +107,7 @@ function Get-CacheFilePath
         $scriptDir = Get-Location
     }
 
-    return Join-Path $scriptDir "zabbix-hyperv-$CacheType-cache.json"
+    return Join-Path $scriptDir "zabbix-hyperv-$CacheType-cache.xml"
 }
 
 function Test-CacheValid
@@ -136,9 +136,9 @@ function Save-CounterCache
         [string]$CacheFilePath
     )
 
-
     try {
-        $CounterHash | ConvertTo-Json | Out-File -FilePath $CacheFilePath -Encoding utf8
+        # Use CliXML instead of JSON - it handles Unicode characters properly
+        $CounterHash | Export-Clixml -Path $CacheFilePath -Force
     }
     catch {
         # Suppress warning messages that break JSON output
@@ -154,20 +154,11 @@ function Load-CounterCache
     )
 
     try {
-        $json = Get-Content -Path $CacheFilePath -Raw 
-        if ([string]::IsNullOrWhiteSpace($json)) {
-            return $null
-        }
+        # Use Import-Clixml instead of JSON - it handles Unicode characters properly
+        $hashtable = Import-Clixml -Path $CacheFilePath
 
-        $obj = $json | ConvertFrom-Json
-        if (-not $obj) {
+        if (-not $hashtable) {
             return $null
-        }
-
-        # Convert PSCustomObject to hashtable for PowerShell 5.1 compatibility
-        $hashtable = @{}
-        $obj.PSObject.Properties | ForEach-Object {
-            $hashtable[$_.Name] = $_.Value
         }
 
         return $hashtable
@@ -302,8 +293,8 @@ function Get-LocalizedCounterName
         "Hyper-V Legacy Network Adapter" = "Älterer Hyper-V-Netzwerkadapter"
         "Bytes Received/sec" = "Empfangene Bytes/s"
         "Bytes Sent/sec" = "Gesendete Bytes/s"
-        "Packets Received/sec" = "Empfangene Pakete/s"
-        "Packets Sent/sec" = "Gesendete Pakete/s"
+        "Packets Received/sec" = "Empfangene Pakete/s"  # For synthetic adapters
+        "Packets Sent/sec" = "Gesendete Pakete/s"      # For synthetic adapters
     }
 
     # Use direct mapping instead of registry lookup
@@ -1509,6 +1500,38 @@ elseif ($QueryName -eq 'FindCounters') {
     }
     catch {
         Write-Host "Error getting counter sets: $($_.Exception.Message)" -ForegroundColor Red
+    }
+
+    exit
+}
+elseif ($QueryName -eq 'DeleteCache') {
+    # Delete existing cache files to force rebuild with new encoding
+    Write-Host "=== Deleting Cache Files ===" -ForegroundColor Yellow
+
+    $englishCacheFile = Get-CacheFilePath "english"
+    $localizedCacheFile = Get-CacheFilePath "localized"
+
+    try {
+        if (Test-Path $englishCacheFile) {
+            Remove-Item $englishCacheFile -Force
+            Write-Host "Deleted English cache: $englishCacheFile" -ForegroundColor Green
+        }
+        else {
+            Write-Host "English cache file does not exist: $englishCacheFile" -ForegroundColor Gray
+        }
+
+        if (Test-Path $localizedCacheFile) {
+            Remove-Item $localizedCacheFile -Force
+            Write-Host "Deleted localized cache: $localizedCacheFile" -ForegroundColor Green
+        }
+        else {
+            Write-Host "Localized cache file does not exist: $localizedCacheFile" -ForegroundColor Gray
+        }
+
+        Write-Host "Cache deletion complete! Next script run will rebuild caches with proper encoding." -ForegroundColor Yellow
+    }
+    catch {
+        Write-Host "Error deleting cache files: $($_.Exception.Message)" -ForegroundColor Red
     }
 
     exit
