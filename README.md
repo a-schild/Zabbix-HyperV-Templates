@@ -59,6 +59,8 @@ Remove-Item -Path $exportPath
    
 * Put the file hyper-v.conf in C:\Program files\Zabbix Agent 2\zabbix_agentd.d
   Adjust the paths according to the previous step if needed
+  __Set UnsafeUserParameters=1 as the performance counters names have \\ in it
+
 
 * Restart zabbix agent.
 
