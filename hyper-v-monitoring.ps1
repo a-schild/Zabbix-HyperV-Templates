@@ -299,6 +299,7 @@ function Get-LocalizedCounterName
 
         # Network Counters
         "Hyper-V Virtual Network Adapter" = "Virtueller Hyper-V-Netzwerkadapter"
+        "Hyper-V Legacy Network Adapter" = "Älterer Hyper-V-Netzwerkadapter"
         "Bytes Received/sec" = "Empfangene Bytes/s"
         "Bytes Sent/sec" = "Gesendete Bytes/s"
         "Packets Received/sec" = "Empfangene Pakete/s"
@@ -1195,9 +1196,10 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
     try {
         # Try multiple network counter categories using localized resolution (like original script)
         $networkCategories = @(
-            "Älterer Hyper-V-Netzwerkadapter",          # Legacy network adapter
-            (Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"), # Synthetic network adapter
+            (Get-LocalizedCounterName "Hyper-V Legacy Network Adapter"),    # Legacy network adapter (preferred)
+            (Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"),   # Synthetic network adapter
             "Virtuelle Hyper-V-Netzwerkkarte - vRSS",   # Specific vRSS category
+            "Hyper-V Legacy Network Adapter",           # English legacy fallback
             "Hyper-V Virtual Network Adapter"           # English fallback
         )
 
