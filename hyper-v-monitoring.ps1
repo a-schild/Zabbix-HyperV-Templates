@@ -1195,7 +1195,8 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
     try {
         # Try multiple network counter categories using localized resolution (like original script)
         $networkCategories = @(
-            (Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"),
+            "Älterer Hyper-V-Netzwerkadapter",          # Legacy network adapter
+            (Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"), # Synthetic network adapter
             "Virtuelle Hyper-V-Netzwerkkarte - vRSS",   # Specific vRSS category
             "Hyper-V Virtual Network Adapter"           # English fallback
         )
@@ -1207,7 +1208,32 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 if ($counterSet.Counter.Count -gt 0) {
                     $anyCounter = $counterSet.Counter[0]
                     $instances = (Get-Counter -Counter $anyCounter -ErrorAction Stop).CounterSamples
-                    $allNetworkInstances += $instances
+
+                    # Fix case by getting correct instance names from counter paths
+                    # Also track which category each instance belongs to
+                    $correctedInstances = @()
+                    foreach ($instance in $instances) {
+                        $correctedName = $instance.InstanceName
+
+                        # Find the correct case from counter paths
+                        foreach ($counterPath in $counterSet.Paths) {
+                            if ($counterPath -match '\\[^(]+\(([^)]+)\)\\') {
+                                $pathInstanceName = $matches[1]
+                                if ($pathInstanceName.ToLower() -eq $instance.InstanceName.ToLower()) {
+                                    $correctedName = $pathInstanceName
+                                    break
+                                }
+                            }
+                        }
+
+                        $correctedInstance = New-Object PSObject -Property @{
+                            InstanceName = $correctedName
+                            CategoryName = $categoryName  # Track which category this instance belongs to
+                        }
+                        $correctedInstances += $correctedInstance
+                    }
+
+                    $allNetworkInstances += $correctedInstances
                 }
             }
             catch {
@@ -1235,29 +1261,38 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
             $matchedInstances = @()
         }
 
-        # Deduplicate network interfaces by removing entry variants (like original script)
-        # Keep only the main interface, filter out "entry_X" duplicates
+        # Deduplicate network interfaces by VM and adapter number
+        # For each VM, keep only one NIC per adapter (prefer legacy format if available)
         $deduplicatedInstances = @()
-        $seenBaseNames = @{}
+        $vmNicMap = @{}
 
-        # First pass: collect all main interfaces (without "entry_")
         foreach ($instance in $matchedInstances) {
             if ($instance.InstanceName -notlike "*_entry_*") {
-                $shortName = Get-ShortResourceName $instance.InstanceName
-                if (-not $seenBaseNames.ContainsKey($shortName)) {
-                    $seenBaseNames[$shortName] = $true
-                    $deduplicatedInstances += $instance
+                # Extract VM identifier from instance name
+                $vmId = ""
+                if ($instance.InstanceName -match '^([^_:]+)') {
+                    $vmId = $matches[1]
                 }
-            }
-        }
 
-        # Second pass: if no main interface found, take the first entry variant
-        if ($deduplicatedInstances.Count -eq 0) {
-            foreach ($instance in $matchedInstances) {
-                $shortName = Get-ShortResourceName $instance.InstanceName
-                if (-not $seenBaseNames.ContainsKey($shortName)) {
-                    $seenBaseNames[$shortName] = $true
+                # Create unique key based on VM and adapter (assuming one NIC per VM for now)
+                $uniqueKey = $vmId
+
+                if (-not $vmNicMap.ContainsKey($uniqueKey)) {
+                    # First NIC found for this VM
+                    $vmNicMap[$uniqueKey] = $instance
                     $deduplicatedInstances += $instance
+                } else {
+                    # We already have a NIC for this VM, decide which to keep
+                    $existing = $vmNicMap[$uniqueKey]
+
+                    # Prefer "Älterer" (legacy) over "Virtueller" (synthetic) when both exist for same VM
+                    if ($instance.CategoryName -like "*Älterer*" -and $existing.CategoryName -notlike "*Älterer*") {
+                        # Replace synthetic with legacy
+                        $deduplicatedInstances = $deduplicatedInstances | Where-Object { $_ -ne $existing }
+                        $deduplicatedInstances += $instance
+                        $vmNicMap[$uniqueKey] = $instance
+                    }
+                    # If existing is already legacy, keep it
                 }
             }
         }
@@ -1265,12 +1300,17 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
         foreach ($nic in $deduplicatedInstances) {
             $shortName = Get-ShortResourceName $nic.InstanceName -ResourceType "NIC"
 
-            # Get localized NIC counter names
-            $localNicCategory = Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"
-            $localBytesReceivedCounter = Get-LocalizedCounterName "Bytes Received/sec"
-            $localBytesSentCounter = Get-LocalizedCounterName "Bytes Sent/sec"
-            $localPacketsReceivedCounter = Get-LocalizedCounterName "Packets Received/sec"
-            $localPacketsSentCounter = Get-LocalizedCounterName "Packets Sent/sec"
+            # Use the actual category name for this NIC instance
+            $actualCategory = $nic.CategoryName
+            if (-not $actualCategory) {
+                $actualCategory = Get-LocalizedCounterName "Hyper-V Virtual Network Adapter"
+            }
+
+            # Get localized counter names based on the actual category
+            $localBytesReceivedCounter = "Empfangene Bytes/s"
+            $localBytesSentCounter = "Gesendete Bytes/s"
+            $localPacketsReceivedCounter = "Empfangene Pakete/s"
+            $localPacketsSentCounter = "Gesendete Pakete/s"
 
             # Create counter paths for each NIC metric
             $discoveryItems += [PSCustomObject]@{
@@ -1279,7 +1319,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Bytes Received/sec" $nic.InstanceName)
-                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localBytesReceivedCounter $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localBytesReceivedCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesReceived"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
@@ -1290,7 +1330,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Bytes Sent/sec" $nic.InstanceName)
-                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localBytesSentCounter $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localBytesSentCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesSent"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
@@ -1301,7 +1341,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Packets Received/sec" $nic.InstanceName)
-                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localPacketsReceivedCounter $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localPacketsReceivedCounter $nic.InstanceName)
                 "{#METRIC}" = "PacketsReceived"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost
@@ -1312,7 +1352,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#ITEM_TYPE}" = "NIC"
                 "{#INSTANCE}" = $nic.InstanceName
                 "{#COUNTER_PATH}" = (Build-EnglishCounterPath "Hyper-V Virtual Network Adapter" "Packets Sent/sec" $nic.InstanceName)
-                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localNicCategory $localPacketsSentCounter $nic.InstanceName)
+                "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localPacketsSentCounter $nic.InstanceName)
                 "{#METRIC}" = "PacketsSent"
                 "{#NIC_SHORT}" = $shortName
                 "{#VMHOST}" = $vmHost

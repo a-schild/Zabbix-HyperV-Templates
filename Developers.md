@@ -10,3 +10,4 @@
   Adjust the paths according to the previous step if needed
   __Set UnsafeUserParameters=1 as the performance counters names have \\ in it
 
+- `.\hyper-v-monitoring.ps1 RebuildCache`
