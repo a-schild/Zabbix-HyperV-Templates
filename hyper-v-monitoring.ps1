@@ -1035,6 +1035,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadBytesCounter $disk.InstanceName)
                     "{#METRIC}" = "ReadBytes"
                     "{#DISK_SHORT}" = $shortName
+                    "{#DISK_PATH}" = $disk.DiskPath
                     "{#VMHOST}" = $vmHost
                 }
                 $discoveryItems += [PSCustomObject]@{
@@ -1046,6 +1047,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteBytesCounter $disk.InstanceName)
                     "{#METRIC}" = "WriteBytes"
                     "{#DISK_SHORT}" = $shortName
+                    "{#DISK_PATH}" = $disk.DiskPath
                     "{#VMHOST}" = $vmHost
                 }
                 $discoveryItems += [PSCustomObject]@{
@@ -1057,6 +1059,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadOpsCounter $disk.InstanceName)
                     "{#METRIC}" = "ReadOps"
                     "{#DISK_SHORT}" = $shortName
+                    "{#DISK_PATH}" = $disk.DiskPath
                     "{#VMHOST}" = $vmHost
                 }
                 $discoveryItems += [PSCustomObject]@{
@@ -1068,6 +1071,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                     "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteOpsCounter $disk.InstanceName)
                     "{#METRIC}" = "WriteOps"
                     "{#DISK_SHORT}" = $shortName
+                    "{#DISK_PATH}" = $disk.DiskPath
                     "{#VMHOST}" = $vmHost
                 }
             }
@@ -1076,6 +1080,22 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
             $allStorageInstances = Get-StorageCounterInstances
 
             if ($allStorageInstances.Count -gt 0) {
+                # Get VM disk information for disk path mapping
+                $vmDiskPaths = @{}
+                try {
+                    $vm = Get-VM -Name $originalVMName -ErrorAction Stop
+                    $vmDisks = Get-VMHardDiskDrive -VM $vm -ErrorAction Stop
+                    foreach ($vmDisk in $vmDisks) {
+                        $diskFileName = Split-Path $vmDisk.Path -Leaf
+                        $diskFileNameNoExt = [System.IO.Path]::GetFileNameWithoutExtension($diskFileName)
+                        $vmDiskPaths[$diskFileName] = $vmDisk.Path
+                        $vmDiskPaths[$diskFileNameNoExt] = $vmDisk.Path
+                    }
+                }
+                catch {
+                    # Continue without disk path mapping if VM info is not available
+                }
+
                 # Try matching with both original and safe VM names
                 $baseVMName = $originalVMName -replace '_.*$', ''  # Remove _SV03-HV suffix
                 $baseSafeVMName = $safeVMName -replace '_.*$', ''
@@ -1105,6 +1125,15 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
 
                 foreach ($disk in $deduplicatedInstances) {
                     $shortName = Get-ShortResourceName $disk.InstanceName
+
+                    # Try to resolve disk path from instance name
+                    $diskPath = "Unknown"
+                    foreach ($key in $vmDiskPaths.Keys) {
+                        if ($disk.InstanceName -like "*$key*") {
+                            $diskPath = $vmDiskPaths[$key]
+                            break
+                        }
+                    }
 
                     # Get localized disk counter names
                     $localDiskCategory = Get-LocalizedCounterName "Hyper-V Virtual Storage Device"
@@ -1140,6 +1169,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadBytesCounter $disk.InstanceName)
                         "{#METRIC}" = "ReadBytes"
                         "{#DISK_SHORT}" = $shortName
+                        "{#DISK_PATH}" = $diskPath
                         "{#VMHOST}" = $vmHost
                     }
                     $discoveryItems += [PSCustomObject]@{
@@ -1151,6 +1181,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteBytesCounter $disk.InstanceName)
                         "{#METRIC}" = "WriteBytes"
                         "{#DISK_SHORT}" = $shortName
+                        "{#DISK_PATH}" = $diskPath
                         "{#VMHOST}" = $vmHost
                     }
                     $discoveryItems += [PSCustomObject]@{
@@ -1162,6 +1193,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localReadOpsCounter $disk.InstanceName)
                         "{#METRIC}" = "ReadOps"
                         "{#DISK_SHORT}" = $shortName
+                        "{#DISK_PATH}" = $diskPath
                         "{#VMHOST}" = $vmHost
                     }
                     $discoveryItems += [PSCustomObject]@{
@@ -1173,6 +1205,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $localDiskCategory $localWriteOpsCounter $disk.InstanceName)
                         "{#METRIC}" = "WriteOps"
                         "{#DISK_SHORT}" = $shortName
+                        "{#DISK_PATH}" = $diskPath
                         "{#VMHOST}" = $vmHost
                     }
                 }
