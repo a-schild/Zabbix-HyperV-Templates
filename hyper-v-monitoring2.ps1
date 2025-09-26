@@ -146,6 +146,19 @@ function Get-VMDiscoveryData {
             throw "Hyper-V PowerShell module not available"
         }
 
+        # Get hypervisor host information
+        Write-DebugInfo "Getting hypervisor host information"
+        $hostName = $env:COMPUTERNAME
+        $hostFQDN = "Unknown"
+        try {
+            $hostFQDN = [System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
+            Write-DebugInfo "Host Name: $hostName"
+            Write-DebugInfo "Host FQDN: $hostFQDN"
+        } catch {
+            Write-DebugInfo "Error getting host FQDN: $($_.Exception.Message)"
+            $hostFQDN = $hostName
+        }
+
         # Get all VMs on the Hyper-V host
         Write-DebugInfo "Querying VMs using Get-VM"
         $vms = Get-VM | Sort-Object Name
@@ -326,6 +339,8 @@ function Get-VMDiscoveryData {
                 "{#VM.DVD.INFO}" = ($dvdInfo | ConvertTo-Json -Compress)
                 "{#VM.INTEGRATION.INFO}" = ($integrationInfo | ConvertTo-Json -Compress)
                 "{#VM.CHECKPOINT.INFO}" = ($checkpointInfo | ConvertTo-Json -Compress)
+                "{#VMHOST.NAME}" = $hostName
+                "{#VMHOST.FQDN}" = $hostFQDN
             }
             
             $discoveryData += $vmData

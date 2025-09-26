@@ -52,6 +52,72 @@ zabbix_export:
           tags:
             - tag: Application
               value: 'HyperV Host'
+        - uuid: 839d9e234a0243c8820a94f76f119fb8
+          name: 'Hyper-V VM count'
+          type: DEPENDENT
+          key: hyperv.vms.count
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.TOTAL.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 63f736e67dd04603b33e764c88521b97
+          name: 'Hyper-V VM status off'
+          type: DEPENDENT
+          key: hyperv.vms.count.off
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.OFF.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 8168913491ae4b1799b1ef6ad4b8b882
+          name: 'Hyper-V VM status other'
+          type: DEPENDENT
+          key: hyperv.vms.count.other
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.OTHER.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 24e0212d7a754e46bfdf399514d57854
+          name: 'Hyper-V VM status paused'
+          type: DEPENDENT
+          key: hyperv.vms.count.paused
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.PAUSED.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 76def2b788f749f09d5dff525f9734b8
+          name: 'Hyper-V VM status running'
+          type: DEPENDENT
+          key: hyperv.vms.count.running
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.RUNNING.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 826a3cb5388044168078f3096a59d12f
+          name: 'Hyper-V VM status saved'
+          type: DEPENDENT
+          key: hyperv.vms.count.saved
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.SAVED.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
         - uuid: e821d78e692d4fe9a5aee8efcf835ad0
           name: 'HyperV Logical CPU Guest Runtime %'
           type: ZABBIX_ACTIVE
@@ -322,7 +388,7 @@ zabbix_export:
               trends: '0'
               timeout: 30s
               tags:
-                - tag: Application
+                - tag: application
                   value: 'HyperV Host'
               trigger_prototypes:
                 - uuid: 6fdae3fd74264b19b417697178c45aa4
@@ -344,7 +410,7 @@ zabbix_export:
               description: 'Status of VM'
               timeout: 30s
               tags:
-                - tag: Application
+                - tag: application
                   value: 'HyperV Host'
               trigger_prototypes:
                 - uuid: 1c710786e45b4c7d810955fa3a0d6417
@@ -366,7 +432,44 @@ zabbix_export:
                 - name: 'Hyper-V Host [{#VMHOST}]'
               templates:
                 - name: 'Template Windows HyperV VM Guest 2'
+              tags:
+                - tag: target
+                  value: hyperv
+                - tag: target
+                  value: hyperv-vm
           timeout: 30s
+        - uuid: de4954b68aaf4c7cb219a0f393377777
+          name: 'Hyper-V VM Disk Discovery'
+          type: DEPENDENT
+          key: hyperv.discover.vms.data
+          delay: '0'
+          host_prototypes:
+            - uuid: 10df6bc5f7444f30bfa5dfd5ab34781a
+              host: '{#VM.ID} {#VMHOST.FQDN}'
+              name: '{#VM.NAME} on {#VMHOST.FQDN}'
+              group_links:
+                - group:
+                    name: 'HyperV VM'
+              group_prototypes:
+                - name: 'VMs on {#VMHOST.FQDN}'
+              templates:
+                - name: 'Template Windows HyperV VM Guest 2'
+              macros:
+                - macro: '{$VM.ID}'
+                  value: '{#VM.ID}'
+                  description: 'Unique ID of VM'
+                - macro: '{$VMHOST.HOST}'
+                  value: '{#VMHOST.FQDN}'
+                  description: 'Located on this Hyper-V host'
+              tags:
+                - tag: hyperv-host
+                  value: '{#VMHOST.FQDN}'
+                - tag: target
+                  value: hyperv
+                - tag: target
+                  value: hyperv-vm
+          master_item:
+            key: hyperv.discovery.vms
       tags:
         - tag: target
           value: hyperv
@@ -528,6 +631,43 @@ zabbix_export:
             host: 'Template Windows HyperV Host 2'
             key: 'perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical]'
         - sortorder: '1'
+          color: '274482'
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows HyperV Host 2'
+            key: hyperv.vms.count
+        - sortorder: '2'
+          color: '000000'
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows HyperV Host 2'
+            key: hyperv.vms.count.off
+        - sortorder: '3'
+          color: F63100
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows HyperV Host 2'
+            key: hyperv.vms.count.other
+        - sortorder: '4'
+          color: FFBF00
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows HyperV Host 2'
+            key: hyperv.vms.count.paused
+        - sortorder: '5'
+          drawtype: BOLD_LINE
+          color: 00FF00
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows HyperV Host 2'
+            key: hyperv.vms.count.running
+        - sortorder: '6'
+          color: FC6EA3
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows HyperV Host 2'
+            key: hyperv.vms.count.saved
+        - sortorder: '7'
           drawtype: BOLD_LINE
           color: 00C800
           item:
