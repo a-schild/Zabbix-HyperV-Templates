@@ -830,16 +830,12 @@ if ($QueryName -eq '' -or $QueryName -eq 'DiscoverVMs') {
         $colItems = Get-VM -ErrorAction Stop
     }
     catch {
-        write-host "{"
-        write-host ' "data":[]'
-        write-host "}"
+        write-host "[]"
         Write-Warning "Error accessing Hyper-V VMs: $($_.Exception.Message)"
         exit 1
     }
 
-    write-host "{"
-    write-host " `"data`":["
-    write-host
+    write-host "["
 
     $n = $colItems.Count
 
@@ -856,8 +852,7 @@ if ($QueryName -eq '' -or $QueryName -eq 'DiscoverVMs') {
         $n--
     }
 
-    write-host " ]"
-    write-host "}"
+    write-host "]"
     write-host
     exit
 }
@@ -905,9 +900,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
     }
     catch {
         # Suppress warning messages that break JSON output
-        write-host "{"
-        write-host ' "data":[]'
-        write-host "}"
+        write-host "[]"
         exit
     }
 
@@ -1400,8 +1393,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
     }
 
     # Output JSON format
-    write-host "{"
-    write-host ' "data":['
+    write-host "["
 
     $n = $discoveryItems.Count
     foreach ($item in $discoveryItems) {
@@ -1425,8 +1417,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
         $n--
     }
 
-    write-host " ]"
-    write-host "}"
+    write-host "]"
     write-host
     exit
 }
