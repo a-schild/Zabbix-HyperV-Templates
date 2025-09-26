@@ -25,7 +25,8 @@ param(
 	[Parameter(Mandatory=$False)]
 	[string]$QueryName = "",
 	[string]$VMName,
-	[string]$CounterPath
+	[string]$CounterPath,
+	[string]$VHDPath
 )
 
 # Make sure to output the json names correctly encoded
@@ -810,6 +811,166 @@ function Get-PerformanceCounterValue
     }
 }
 
+function Get-VHDUsage
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$VHDPath
+    )
+
+    try {
+        # Check if the VHD/VHDX file exists
+        if (-not (Test-Path $VHDPath)) {
+            return "ZBX_NOTSUPPORTED: VHD file not found: $VHDPath"
+        }
+
+        # Get VHD information
+        $vhd = Get-VHD -Path $VHDPath -ErrorAction Stop
+
+        # Calculate usage percentage
+        $usagePercent = 0
+        if ($vhd.Size -gt 0) {
+            $usagePercent = ($vhd.FileSize / $vhd.Size) * 100
+        }
+
+        # Create result object with detailed information
+        $result = @{
+            VHDPath = $VHDPath
+            VHDType = $vhd.VhdType
+            VHDFormat = $vhd.VhdFormat
+            MaxSizeGB = [math]::Round($vhd.Size / 1GB, 2)
+            CurrentSizeGB = [math]::Round($vhd.FileSize / 1GB, 2)
+            UsagePercent = [math]::Round($usagePercent, 2)
+            MaxSizeBytes = $vhd.Size
+            CurrentSizeBytes = $vhd.FileSize
+            AttachedToVM = $vhd.Attached
+            ParentPath = $vhd.ParentPath
+        }
+
+        return $result | ConvertTo-Json -Compress
+    }
+    catch {
+        # Handle specific error cases
+        $errorMsg = $_.Exception.Message
+        if ($errorMsg -like "*Access*denied*" -or $errorMsg -like "*Zugriff*verweigert*") {
+            return "ZBX_NOTSUPPORTED: Access denied to VHD file: $VHDPath"
+        }
+        elseif ($errorMsg -like "*not found*" -or $errorMsg -like "*nicht gefunden*") {
+            return "ZBX_NOTSUPPORTED: VHD file not found: $VHDPath"
+        }
+        elseif ($errorMsg -like "*invalid*format*" -or $errorMsg -like "*ungültiges*Format*") {
+            return "ZBX_NOTSUPPORTED: Invalid VHD file format: $VHDPath"
+        }
+        else {
+            # Generic error with first 100 characters of error message
+            $shortError = $errorMsg.Substring(0, [Math]::Min(100, $errorMsg.Length))
+            return "ZBX_NOTSUPPORTED: VHD access error: $shortError"
+        }
+    }
+}
+
+function Get-VMDisks
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [string]$VMName
+    )
+
+    try {
+        # Handle both safe and original VM names
+        $originalVMName = $VMName
+        $allVMs = Get-VM | Select-Object -ExpandProperty Name
+
+        # First try exact match
+        if ($allVMs -contains $VMName) {
+            $originalVMName = $VMName
+        } else {
+            # Try to find original VM by comparing sanitized versions
+            foreach ($vm in $allVMs) {
+                if ((Sanitize-VMName $vm) -eq $VMName) {
+                    $originalVMName = $vm
+                    break
+                }
+            }
+        }
+
+        # Get the VM and its hard drives
+        $vm = Get-VM -Name $originalVMName -ErrorAction Stop
+        $vmDisks = Get-VMHardDiskDrive -VM $vm -ErrorAction Stop
+
+        if ($vmDisks.Count -eq 0) {
+            return "[]"
+        }
+
+        # Create discovery items for each disk
+        $discoveryItems = @()
+
+        foreach ($disk in $vmDisks) {
+            $diskPath = $disk.Path
+            $diskFileName = Split-Path $diskPath -Leaf
+            $diskFileNameNoExt = [System.IO.Path]::GetFileNameWithoutExtension($diskFileName)
+            $shortName = Get-ShortResourceName $diskFileName
+
+            # Get disk size and type information if possible
+            $diskSizeGB = "Unknown"
+            $diskUsagePercent = "Unknown"
+            $vhdType = "Unknown"
+            $vhdFormat = "Unknown"
+            try {
+                if (Test-Path $diskPath) {
+                    $vhdInfo = Get-VHD -Path $diskPath -ErrorAction SilentlyContinue
+                    if ($vhdInfo) {
+                        $diskSizeGB = [math]::Round($vhdInfo.Size / 1GB, 2)
+                        if ($vhdInfo.Size -gt 0) {
+                            $diskUsagePercent = [math]::Round(($vhdInfo.FileSize / $vhdInfo.Size) * 100, 2)
+                        }
+                        $vhdType = $vhdInfo.VhdType  # Fixed, Dynamic, or Differencing
+                        $vhdFormat = $vhdInfo.VhdFormat  # VHD or VHDX
+                    }
+                }
+            }
+            catch {
+                # Continue without size info if VHD access fails
+            }
+
+            $discoveryItems += [PSCustomObject]@{
+                "{#VMNAME}" = $originalVMName
+                "{#VMNAME_SAFE}" = (Sanitize-VMName $originalVMName)
+                "{#DISK_PATH}" = $diskPath
+                "{#DISK_SHORT}" = $shortName
+                "{#DISK_FILENAME}" = $diskFileName
+                "{#DISK_NAME_NO_EXT}" = $diskFileNameNoExt
+                "{#CONTROLLER_TYPE}" = $disk.ControllerType
+                "{#CONTROLLER_NUMBER}" = $disk.ControllerNumber
+                "{#CONTROLLER_LOCATION}" = $disk.ControllerLocation
+                "{#DISK_SIZE_GB}" = $diskSizeGB
+                "{#DISK_USAGE_PERCENT}" = $diskUsagePercent
+                "{#VHD_TYPE}" = $vhdType
+                "{#VHD_FORMAT}" = $vhdFormat
+                "{#VMHOST}" = $hostname
+            }
+        }
+
+        # Convert to JSON array format (Zabbix 7.0+ format)
+        return ($discoveryItems | ConvertTo-Json -Compress)
+    }
+    catch {
+        # Handle specific error cases
+        $errorMsg = $_.Exception.Message
+        if ($errorMsg -like "*not found*" -or $errorMsg -like "*nicht gefunden*") {
+            return "[]"  # VM not found, return empty array
+        }
+        elseif ($errorMsg -like "*access*denied*" -or $errorMsg -like "*Zugriff*verweigert*") {
+            return "[]"  # Access denied, return empty array
+        }
+        else {
+            return "[]"  # Generic error, return empty array
+        }
+    }
+}
+
 try {
     $hostname = Get-WmiObject win32_computersystem | Select-Object -ExpandProperty name
 }
@@ -818,7 +979,7 @@ catch {
 }
 
 # Initialize counter cache only if needed (not for simple counter value queries)
-if ($QueryName -ne 'GetCounterValue' -and $QueryName -ne 'GetVMStatus' -and $QueryName -ne 'GetVMReplication') {
+if ($QueryName -ne 'GetCounterValue' -and $QueryName -ne 'GetVMStatus' -and $QueryName -ne 'GetVMReplication' -and $QueryName -ne 'GetVHDUsage' -and $QueryName -ne 'GetVMDisks') {
     Initialize-EnglishCounterCache
 }
 
@@ -952,6 +1113,22 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 }
 
                 foreach ($cpuInstance in $cpuResults) {
+                    # Extract CPU core index from instance name
+                    # Instance names are typically like "VMName:Hv VP 0", "VMName:Hv VP 1", etc.
+                    $cpuCore = "0"  # Default to 0
+                    if ($cpuInstance.InstanceName -match ':.*?(\d+)\s*$') {
+                        $cpuCore = $matches[1]
+                    }
+                    elseif ($cpuInstance.InstanceName -match 'VP\s+(\d+)') {
+                        $cpuCore = $matches[1]
+                    }
+                    elseif ($cpuInstance.InstanceName -match 'CPU\s+(\d+)') {
+                        $cpuCore = $matches[1]
+                    }
+                    elseif ($cpuInstance.InstanceName -match '(\d+)$') {
+                        $cpuCore = $matches[1]
+                    }
+
                     $discoveryItems += [PSCustomObject]@{
                         "{#VMNAME}" = $originalVMName
                         "{#VMNAME_SAFE}" = $safeVMName
@@ -960,6 +1137,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                         "{#COUNTER_PATH}" = "\Hyper-V Hypervisor Virtual Processor($($cpuInstance.InstanceName))\% Total Run Time"
                         "{#COUNTER_PATH_LOCAL}" = "\$localCategoryName($($cpuInstance.InstanceName))\$localCounterName"
                         "{#METRIC}" = "TotalRunTime"
+                        "{#CPU.CORE}" = $cpuCore
                         "{#VMHOST}" = $vmHost
                     }
                 }
@@ -1507,6 +1685,18 @@ elseif ($QueryName -eq 'GetVMReplication' -and $VMName) {
     }
     exit
 }
+elseif ($QueryName -eq 'GetVHDUsage' -and $VHDPath) {
+    # Get VHD/VHDX disk usage information
+    $result = Get-VHDUsage -VHDPath $VHDPath
+    write-host $result
+    exit
+}
+elseif ($QueryName -eq 'GetVMDisks' -and $VMName) {
+    # Get all disks for a specific VM (for LLD discovery)
+    $result = Get-VMDisks -VMName $VMName
+    write-host $result
+    exit
+}
 elseif ($QueryName -eq 'FindCounters') {
     # Find the actual Hyper-V counter names available on this system
     Write-Host "=== Finding Available Hyper-V Counters ===" -ForegroundColor Yellow
@@ -1747,5 +1937,7 @@ else {
     Write-Host "  .\hyper-v-monitoring.ps1 GetCounterValue -CounterPath '\path\to\counter' # Get counter value" -ForegroundColor Gray
     Write-Host "  .\hyper-v-monitoring.ps1 GetVMStatus VMName                          # Get VM status" -ForegroundColor Gray
     Write-Host "  .\hyper-v-monitoring.ps1 GetVMReplication VMName                     # Get replication status" -ForegroundColor Gray
+    Write-Host "  .\hyper-v-monitoring.ps1 GetVHDUsage -VHDPath 'C:\path\to\disk.vhdx' # Get VHD disk usage" -ForegroundColor Gray
+    Write-Host "  .\hyper-v-monitoring.ps1 GetVMDisks VMName                           # Get all disks for VM (LLD)" -ForegroundColor Gray
     exit 1
 }

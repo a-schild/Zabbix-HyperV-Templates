@@ -17,6 +17,11 @@ zabbix_export:
         - name: Templates
         - name: Windows
       items:
+        - uuid: 4f64fea3b76c4d6fa818eab8e96a97e4
+          name: 'HyperV CPU usage [{HOST.NAME}]'
+          key: 'hyperv.cpu.usage2[{HOST.NAME},*]'
+          value_type: FLOAT
+          units: '%'
         - uuid: 823f8e1df92a4276af7188394af21a38
           name: 'Hyper-V VM Counters Master Data'
           key: 'hyperv.vm.counters[{HOST.HOST}]'
@@ -36,13 +41,23 @@ zabbix_export:
           delay: '0'
           description: 'Discovers CPU performance counters for this Hyper-V VM'
           item_prototypes:
+            - uuid: a104f4165a5246eebfc4f5676149a661
+              name: 'Hyper-V CPU Usage2 {#CPU.CORE}'
+              type: DEPENDENT
+              key: 'hyperv.cpu.usage2[{#VMNAME},*]'
+              delay: '0'
+              master_item:
+                key: 'hyperv.vm.cpu.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}",*]'
             - uuid: 2ff9d70a0f41427e831760badda86ed8
-              name: 'Hyper-V CPU Usage - {#VMNAME} - {#INSTANCE}'
-              key: 'hyperv.vm.cpu.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
+              name: 'Hyper-V CPU Usage {#CPU.CORE}'
+              key: 'hyperv.vm.cpu.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}",*]'
               value_type: FLOAT
               trends: '0'
               units: '%'
-              description: 'CPU usage for virtual processor {#VMNAME} {#INSTANCE}'
+              description: |
+                CPU usage for virtual processor {#VMNAME} {#INSTANCE}
+                Core: {#CPU.CORE}
+              timeout: 30s
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
@@ -63,7 +78,7 @@ zabbix_export:
           preprocessing:
             - type: JSONPATH
               parameters:
-                - '$.data[?(@["{#ITEM_TYPE}"]=="CPU")]'
+                - '$[?(@["{#ITEM_TYPE}"]=="CPU")]'
             - type: JAVASCRIPT
               parameters:
                 - |
@@ -83,9 +98,14 @@ zabbix_export:
           description: 'Discovers Disk performance counters for this Hyper-V VM'
           item_prototypes:
             - uuid: 16ea378f7218481ba6435b61dedc617e
-              name: 'Hyper-V Disk Usage - {#VMNAME} - {#DISK_SHORT} - {#METRIC}'
+              name: 'Hyper-V Disk Usage {#DISK_SHORT} - {#METRIC}'
               key: 'hyperv.vm.disk.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
               value_type: FLOAT
+              description: |
+                Disk for {#VMNAME} {#INSTANCE}
+                Name: {#DISK_SHORT}
+                Full path: {#DISK_PATH}
+              timeout: 30s
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
@@ -93,6 +113,8 @@ zabbix_export:
               path: '$["{#COUNTER_PATH_LOCAL}"]'
             - lld_macro: '{#COUNTER_PATH}'
               path: '$["{#COUNTER_PATH}"]'
+            - lld_macro: '{#DISK_PATH}'
+              path: '$["{#DISK_PATH}"]'
             - lld_macro: '{#DISK_SHORT}'
               path: '$["{#DISK_SHORT}"]'
             - lld_macro: '{#INSTANCE}'
@@ -108,7 +130,7 @@ zabbix_export:
           preprocessing:
             - type: JSONPATH
               parameters:
-                - '$.data[?(@["{#ITEM_TYPE}"]=="DISK")]'
+                - '$[?(@["{#ITEM_TYPE}"]=="DISK")]'
             - type: JAVASCRIPT
               parameters:
                 - |
@@ -128,9 +150,14 @@ zabbix_export:
           description: 'Discovers network performance counters for this Hyper-V VM'
           item_prototypes:
             - uuid: 3d83dfedd67e4f609f66c1e6666cd0b7
-              name: 'Hyper-V NIC Usage - {#VMNAME} - {#NIC_SHORT} - {#METRIC}'
+              name: 'Hyper-V NIC Usage {#NIC_SHORT} - {#METRIC}'
               key: 'hyperv.vm.nic.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
               value_type: FLOAT
+              description: |
+                Network interface for {#VMNAME} {#INSTANCE}
+                Name: {#NIC_SHORT}
+                Type: {#NIC_TYPE}
+              timeout: 30s
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
@@ -153,7 +180,7 @@ zabbix_export:
           preprocessing:
             - type: JSONPATH
               parameters:
-                - '$.data[?(@["{#ITEM_TYPE}"]=="NIC")]'
+                - '$[?(@["{#ITEM_TYPE}"]=="NIC")]'
             - type: JAVASCRIPT
               parameters:
                 - |
@@ -165,6 +192,19 @@ zabbix_export:
                     }
                   }
                   return JSON.stringify(data);
+      graphs:
+        - uuid: 771f7eda045f4a8791ee7b989bb38bab
+          name: 'Hyper-V VM cpu load {HOST.NAME}'
+          width: '900'
+          height: '200'
+          ymin_type_1: FIXED
+          ymax_type_1: FIXED
+          graph_items:
+            - color: 1A7C11
+              calc_fnc: ALL
+              item:
+                host: 'Template Windows HyperV VM Guest 2025'
+                key: 'hyperv.cpu.usage2[{HOST.NAME},*]'
       tags:
         - tag: class
           value: software
