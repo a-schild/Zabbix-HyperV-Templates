@@ -1305,6 +1305,12 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
             $localPacketsReceivedCounter = "Empfangene Pakete/s"
             $localPacketsSentCounter = "Gesendete Pakete/s"
 
+            # Determine NIC type based on category name
+            $nicType = "SYNTHETIC"  # Default to synthetic
+            if ($actualCategory -like "*Legacy*" -or $actualCategory -like "*Älterer*") {
+                $nicType = "LEGACY"
+            }
+
             # Create counter paths for each NIC metric
             $discoveryItems += [PSCustomObject]@{
                 "{#VMNAME}" = $originalVMName
@@ -1315,6 +1321,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localBytesReceivedCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesReceived"
                 "{#NIC_SHORT}" = $shortName
+                "{#NIC_TYPE}" = $nicType
                 "{#VMHOST}" = $vmHost
             }
             $discoveryItems += [PSCustomObject]@{
@@ -1326,6 +1333,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localBytesSentCounter $nic.InstanceName)
                 "{#METRIC}" = "BytesSent"
                 "{#NIC_SHORT}" = $shortName
+                "{#NIC_TYPE}" = $nicType
                 "{#VMHOST}" = $vmHost
             }
             $discoveryItems += [PSCustomObject]@{
@@ -1337,6 +1345,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localPacketsReceivedCounter $nic.InstanceName)
                 "{#METRIC}" = "PacketsReceived"
                 "{#NIC_SHORT}" = $shortName
+                "{#NIC_TYPE}" = $nicType
                 "{#VMHOST}" = $vmHost
             }
             $discoveryItems += [PSCustomObject]@{
@@ -1348,6 +1357,7 @@ elseif ($QueryName -eq 'DiscoverVMCounters' -and $VMName) {
                 "{#COUNTER_PATH_LOCAL}" = (Build-LocalizedCounterPath $actualCategory $localPacketsSentCounter $nic.InstanceName)
                 "{#METRIC}" = "PacketsSent"
                 "{#NIC_SHORT}" = $shortName
+                "{#NIC_TYPE}" = $nicType
                 "{#VMHOST}" = $vmHost
             }
         }
