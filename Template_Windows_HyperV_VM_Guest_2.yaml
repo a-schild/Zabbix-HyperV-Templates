@@ -9,21 +9,27 @@ zabbix_export:
       name: Windows
   templates:
     - uuid: 553c9735a18645849c38ebda859ace9c
-      template: 'Template Windows HyperV VM Guest 2025'
-      name: 'Template Windows HyperV VM Guest 2025'
-      description: 'Child template, to create new Hyper-V VM monitoring from the Template Windows HyperV Host 2025 template'
+      template: 'Template Windows HyperV VM Guest 2'
+      name: 'Template Windows HyperV VM Guest 2'
+      description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template'
       groups:
         - name: 'HyperV VM'
         - name: Templates
         - name: Windows
       items:
-        - uuid: 4f64fea3b76c4d6fa818eab8e96a97e4
-          name: 'HyperV CPU usage [{HOST.NAME}]'
-          key: 'hyperv.cpu.usage2[{HOST.NAME},*]'
-          value_type: FLOAT
-          units: '%'
+        - uuid: 60a505b652f24034b5b0d1903a85ea8e
+          name: 'Hyper-V VM disk master data'
+          key: 'hyperv.discover.disks[{#VMNAME_SAFE}]'
+          delay: 5m
+          value_type: TEXT
+          trends: '0'
+          description: |
+            Master item containing all counter discovery data for dependent items
+            
+            Needs to be passive agent, as the request must be processed by the Hyper-V server itself and not the VM
+          timeout: 30s
         - uuid: 823f8e1df92a4276af7188394af21a38
-          name: 'Hyper-V VM Counters Master Data'
+          name: 'Hyper-V VM counters master data'
           key: 'hyperv.vm.counters[{HOST.HOST}]'
           delay: 5m
           value_type: TEXT
@@ -34,6 +40,32 @@ zabbix_export:
             Needs to be passive agent, as the request must be processed by the Hyper-V server itself and not the VM
           timeout: 30s
       discovery_rules:
+        - uuid: 7f9dcb476f0d42e29a5ec14f2de1482b
+          name: 'Discover VM disks'
+          type: DEPENDENT
+          key: 'hyperv.disk.details[{#VMNAME_SAFE}]'
+          delay: '0'
+          item_prototypes:
+            - uuid: a7a0b0c1b40b4957bf7bc078725ef3e7
+              name: 'Disk usage {#DISK_FILENAME}'
+              type: DEPENDENT
+              key: 'hyperv.disk.usage[{#DISK_FILENAME}]'
+              delay: '0'
+              units: '%'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["{#DISK_USAGE_PERCENT}"]'
+              master_item:
+                key: 'hyperv.diskusage[{#DISK_PATH}]'
+            - uuid: 07676898d41b426b86eae937ee035684
+              name: 'Disk data {#DISK_FILENAME}'
+              key: 'hyperv.diskusage[{#DISK_PATH}]'
+              delay: 5m
+              value_type: TEXT
+              trends: '0'
+          master_item:
+            key: 'hyperv.discover.disks[{#VMNAME_SAFE}]'
         - uuid: 9693f27950fe4ecf9aec95e6bd4f10d0
           name: 'Hyper-V VM CPU Discovery'
           type: DEPENDENT
@@ -97,15 +129,53 @@ zabbix_export:
           delay: '0'
           description: 'Discovers Disk performance counters for this Hyper-V VM'
           item_prototypes:
-            - uuid: 16ea378f7218481ba6435b61dedc617e
-              name: 'Hyper-V Disk Usage {#DISK_SHORT} - {#METRIC}'
-              key: 'hyperv.vm.disk.usage["{#VMNAME_SAFE}","{#COUNTER_PATH_LOCAL}"]'
-              value_type: FLOAT
+            - uuid: 09a7f56ddaa94b98a9312c152aba3444
+              name: 'Hyper-V Disk {#DISK_SHORT}'
+              key: 'hyperv.diskusage["{#DISK_PATH}"]'
+              delay: 5m
+              value_type: TEXT
+              trends: '0'
               description: |
                 Disk for {#VMNAME} {#INSTANCE}
                 Name: {#DISK_SHORT}
                 Full path: {#DISK_PATH}
               timeout: 30s
+            - uuid: 4a664d7053b7468e867479165f11d11e
+              name: 'Hyper-V Disk {#DISK_SHORT} current size'
+              type: DEPENDENT
+              key: 'hyperv.disk[{#DISK_SHORT},current_size]'
+              delay: '0'
+              units: GB
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[CurrentSizeGB]'
+              master_item:
+                key: 'hyperv.diskusage["{#DISK_PATH}"]'
+            - uuid: 26530c0b79894a4a9504e8a9e7f5529a
+              name: 'Hyper-V Disk {#DISK_SHORT} max size'
+              type: DEPENDENT
+              key: 'hyperv.disk[{#DISK_SHORT},max_size]'
+              delay: '0'
+              units: GB
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[MaxSizeGB]'
+              master_item:
+                key: 'hyperv.diskusage["{#DISK_PATH}"]'
+            - uuid: a6f855e66c884abea0e2170c8861ac84
+              name: 'Hyper-V Disk {#DISK_SHORT} usage'
+              type: DEPENDENT
+              key: 'hyperv.disk[{#DISK_SHORT},usage]'
+              delay: '0'
+              units: '%'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[UsagePercent]'
+              master_item:
+                key: 'hyperv.diskusage["{#DISK_PATH}"]'
           master_item:
             key: 'hyperv.vm.counters[{HOST.HOST}]'
           lld_macro_paths:
@@ -192,19 +262,6 @@ zabbix_export:
                     }
                   }
                   return JSON.stringify(data);
-      graphs:
-        - uuid: 771f7eda045f4a8791ee7b989bb38bab
-          name: 'Hyper-V VM cpu load {HOST.NAME}'
-          width: '900'
-          height: '200'
-          ymin_type_1: FIXED
-          ymax_type_1: FIXED
-          graph_items:
-            - color: 1A7C11
-              calc_fnc: ALL
-              item:
-                host: 'Template Windows HyperV VM Guest 2025'
-                key: 'hyperv.cpu.usage2[{HOST.NAME},*]'
       tags:
         - tag: class
           value: software
