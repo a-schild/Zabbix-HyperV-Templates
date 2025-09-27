@@ -799,12 +799,12 @@ function Get-VMDetailsById {
                 "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
                 "{#VM.CHECKPOINT.COUNT}" = $checkpoints.Count.ToString()
             }
-            "networks" = if ($networkLLD.Count -gt 0) { $networkLLD } else { @() }
-            "disks" = if ($diskLLD.Count -gt 0) { $diskLLD } else { @() }
+            "networks" = @($networkLLD)
+            "disks" = @($diskLLD)
         }
 
         Write-DebugInfo "VM details discovery completed for $($vm.Name)"
-        return $vmDetails | ConvertTo-Json -Depth 10
+        return $vmDetails | ConvertTo-Json -Depth 10 -Compress:$false
 
     } catch {
         Write-DebugInfo "Error in VM details discovery: $($_.Exception.Message)"
