@@ -3,8 +3,13 @@
 
 param(
     [string]$DiscoveryType = "vms",
+    [string]$VmId = "",
     [switch]$Debug = $false
 )
+
+# Make sure to output the json names correctly encoded
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 
 function Write-DebugInfo {
     param($Message)
@@ -589,6 +594,230 @@ function Get-HyperVHostInfo {
     }
 }
 
+function Get-VMDetailsById {
+    param([string]$VmId)
+
+    try {
+        Write-DebugInfo "Starting VM details discovery for VM ID: $VmId"
+
+        if ([string]::IsNullOrEmpty($VmId)) {
+            Write-DebugInfo "VM ID parameter is required for vmdetails discovery type"
+            throw "VM ID parameter is required"
+        }
+
+        # Try to find the VM by ID
+        $vm = $null
+        try {
+            $vm = Get-VM -Id $VmId -ErrorAction Stop
+            Write-DebugInfo "Found VM: $($vm.Name) with ID: $VmId"
+        } catch {
+            Write-DebugInfo "VM with ID $VmId not found: $($_.Exception.Message)"
+            throw "VM with ID $VmId not found"
+        }
+
+        # Get VM configuration details
+        Write-DebugInfo "Getting VM configuration details for $($vm.Name)"
+        $vmSettings = Get-VMMemory -VM $vm -ErrorAction Stop
+        $vmProcessor = Get-VMProcessor -VM $vm -ErrorAction Stop
+        $vmNetworkAdapters = Get-VMNetworkAdapter -VM $vm -ErrorAction Stop
+        $vmHardDisks = Get-VMHardDiskDrive -VM $vm -ErrorAction Stop
+        $vmDvdDrives = Get-VMDvdDrive -VM $vm -ErrorAction Stop
+        $vmIntegrationServices = Get-VMIntegrationService -VM $vm -ErrorAction Stop
+        $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
+
+        # Build network adapter LLD data
+        Write-DebugInfo "Building network adapter LLD data for $($vm.Name)"
+        Write-DebugInfo "Found $($vmNetworkAdapters.Count) network adapters"
+        $networkLLD = @()
+        foreach ($adapter in $vmNetworkAdapters) {
+            try {
+                Write-DebugInfo "  Processing adapter: $($adapter.Name)"
+
+                # Basic adapter information that should always be available
+                $adapterData = @{
+                    "{#VM.NAME}" = $vm.Name
+                    "{#VM.ID}" = $vm.Id.ToString()
+                    "{#ADAPTER.NAME}" = if ($adapter.Name) { $adapter.Name } else { "Unknown" }
+                    "{#ADAPTER.NAME.TRANSLATED}" = if ($adapter.Name) { ConvertToEnglish -Value $adapter.Name } else { "Unknown" }
+                    "{#ADAPTER.ID}" = if ($adapter.Id) { $adapter.Id } else { "Unknown" }
+                    "{#ADAPTER.SWITCH}" = if ($adapter.SwitchName) { $adapter.SwitchName } else { "Not Connected" }
+                    "{#ADAPTER.MAC}" = if ($adapter.MacAddress) { $adapter.MacAddress } else { "Unknown" }
+                    "{#ADAPTER.CONNECTED}" = if ($adapter.Connected -ne $null) { $adapter.Connected.ToString() } else { "Unknown" }
+                }
+
+                # VLAN settings - handle safely
+                try {
+                    if ($adapter.VlanSetting -and $adapter.VlanSetting.AccessVlanId) {
+                        $adapterData["{#ADAPTER.VLAN}"] = $adapter.VlanSetting.AccessVlanId.ToString()
+                    } else {
+                        $adapterData["{#ADAPTER.VLAN}"] = "0"
+                    }
+                } catch {
+                    $adapterData["{#ADAPTER.VLAN}"] = "0"
+                }
+
+                # Optional properties - add only if they exist
+                if ($adapter.PSObject.Properties["DynamicMacAddressEnabled"]) {
+                    $adapterData["{#ADAPTER.DYNAMIC.MAC}"] = $adapter.DynamicMacAddressEnabled.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["MacAddressSpoofing"]) {
+                    $adapterData["{#ADAPTER.MAC.SPOOFING}"] = $adapter.MacAddressSpoofing.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["DhcpGuard"]) {
+                    $adapterData["{#ADAPTER.DHCP.GUARD}"] = $adapter.DhcpGuard.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["PortMirroringMode"]) {
+                    $adapterData["{#ADAPTER.PORT.MIRRORING}"] = $adapter.PortMirroringMode.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["IeeePriorityTag"]) {
+                    $adapterData["{#ADAPTER.IEEE.PRIORITY}"] = $adapter.IeeePriorityTag.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["VmqWeight"]) {
+                    $adapterData["{#ADAPTER.VM.QUEUE}"] = $adapter.VmqWeight.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["IPsecOffloadMaximumSecurityAssociation"]) {
+                    $adapterData["{#ADAPTER.IP.SEC.OFFLOAD}"] = $adapter.IPsecOffloadMaximumSecurityAssociation.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["IovWeight"]) {
+                    $adapterData["{#ADAPTER.SR.IOV}"] = $adapter.IovWeight.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["PacketDirectNumProcs"]) {
+                    $adapterData["{#ADAPTER.PACKET.DIRECT}"] = $adapter.PacketDirectNumProcs.ToString()
+                }
+
+                # Add adapter type/generation info if available
+                if ($adapter.PSObject.Properties["IsLegacy"]) {
+                    $adapterData["{#ADAPTER.IS.LEGACY}"] = $adapter.IsLegacy.ToString()
+                }
+
+                if ($adapter.PSObject.Properties["AdapterType"]) {
+                    $adapterData["{#ADAPTER.TYPE}"] = $adapter.AdapterType.ToString()
+                }
+
+                $networkLLD += $adapterData
+                Write-DebugInfo "    Successfully processed adapter: $($adapter.Name)"
+
+            } catch {
+                Write-DebugInfo "  Error processing adapter $($adapter.Name): $($_.Exception.Message)"
+                # Add basic info even if there's an error
+                $networkLLD += @{
+                    "{#VM.NAME}" = $vm.Name
+                    "{#VM.ID}" = $vm.Id.ToString()
+                    "{#ADAPTER.NAME}" = if ($adapter.Name) { $adapter.Name } else { "Error" }
+                    "{#ADAPTER.NAME.TRANSLATED}" = "Error"
+                    "{#ADAPTER.ID}" = "Error"
+                    "{#ADAPTER.SWITCH}" = "Error"
+                    "{#ADAPTER.MAC}" = "Error"
+                    "{#ADAPTER.CONNECTED}" = "Error"
+                    "{#ADAPTER.VLAN}" = "0"
+                }
+            }
+        }
+
+        # Build disk LLD data
+        Write-DebugInfo "Building disk LLD data for $($vm.Name)"
+        $diskLLD = @()
+        foreach ($disk in $vmHardDisks) {
+            try {
+                Write-DebugInfo "  Processing disk: $($disk.Path)"
+                $vhdInfo = $null
+                if ($disk.Path) {
+                    try {
+                        $vhdInfo = Get-VHD -Path $disk.Path -ErrorAction SilentlyContinue
+                    } catch {
+                        Write-DebugInfo "    Error getting VHD info: $($_.Exception.Message)"
+                    }
+                }
+
+                $diskLLD += @{
+                    "{#VM.NAME}" = $vm.Name
+                    "{#VM.ID}" = $vm.Id.ToString()
+                    "{#DISK.CONTROLLER}" = $disk.ControllerType.ToString()
+                    "{#DISK.NUMBER}" = $disk.ControllerNumber.ToString()
+                    "{#DISK.LOCATION}" = $disk.ControllerLocation.ToString()
+                    "{#DISK.PATH}" = $disk.Path
+                    "{#DISK.ID}" = "$($vm.Name)_$($disk.ControllerType)_$($disk.ControllerNumber)_$($disk.ControllerLocation)"
+                    "{#DISK.VHD.TYPE}" = if ($vhdInfo) { $vhdInfo.VhdType.ToString() } else { "Unknown" }
+                    "{#DISK.VHD.FORMAT}" = if ($vhdInfo) { $vhdInfo.VhdFormat.ToString() } else { "Unknown" }
+                    "{#DISK.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.Size / 1GB, 2).ToString() } else { "0" }
+                    "{#DISK.FILE.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.FileSize / 1GB, 2).ToString() } else { "0" }
+                    "{#DISK.FRAGMENTATION}" = if ($vhdInfo) { $vhdInfo.FragmentationPercentage.ToString() } else { "0" }
+                    "{#DISK.ALIGNMENT}" = if ($vhdInfo) { $vhdInfo.Alignment.ToString() } else { "0" }
+                    "{#DISK.BLOCK.SIZE}" = if ($vhdInfo) { $vhdInfo.BlockSize.ToString() } else { "0" }
+                    "{#DISK.LOGICAL.SECTOR.SIZE}" = if ($vhdInfo) { $vhdInfo.LogicalSectorSize.ToString() } else { "0" }
+                    "{#DISK.PHYSICAL.SECTOR.SIZE}" = if ($vhdInfo) { $vhdInfo.PhysicalSectorSize.ToString() } else { "0" }
+                    "{#DISK.MINIMUM.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.MinimumSize / 1GB, 2).ToString() } else { "0" }
+                }
+            } catch {
+                Write-DebugInfo "  Error processing disk: $($_.Exception.Message)"
+            }
+        }
+
+        # Build VM details response with all LLD data
+        $vmDetails = @{
+            "vm_info" = @{
+                "{#VM.NAME}" = $vm.Name
+                "{#VM.ID}" = $vm.Id.ToString()
+                "{#VM.STATE}" = $vm.State.ToString()
+                "{#VM.STATE.VALUE}" = [int]$vm.State
+                "{#VM.STATUS}" = $vm.Status.ToString()
+                "{#VM.STATUS.TRANSLATED}" = ConvertToEnglish -Value $vm.Status.ToString()
+                "{#VM.GENERATION}" = $vm.Generation.ToString()
+                "{#VM.VERSION}" = $vm.Version.ToString()
+                "{#VM.UPTIME}" = if ($vm.Uptime) { $vm.Uptime.TotalSeconds.ToString() } else { "0" }
+                "{#VM.MEMORY.STARTUP.MB}" = $vmSettings.Startup
+                "{#VM.MEMORY.MINIMUM.MB}" = $vmSettings.Minimum
+                "{#VM.MEMORY.MAXIMUM.MB}" = $vmSettings.Maximum
+                "{#VM.MEMORY.DYNAMIC}" = $vmSettings.DynamicMemoryEnabled.ToString()
+                "{#VM.MEMORY.BUFFER}" = $vmSettings.Buffer.ToString()
+                "{#VM.MEMORY.PRIORITY}" = $vmSettings.Priority.ToString()
+                "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
+                "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
+                "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()
+                "{#VM.CPU.WEIGHT}" = $vmProcessor.RelativeWeight.ToString()
+                "{#VM.AUTOSTART.ACTION}" = $vm.AutomaticStartAction.ToString()
+                "{#VM.AUTOSTART.ACTION.VALUE}" = [int]$vm.AutomaticStartAction
+                "{#VM.AUTOSTART.DELAY}" = $vm.AutomaticStartDelay.ToString()
+                "{#VM.AUTOSTOP.ACTION}" = $vm.AutomaticStopAction.ToString()
+                "{#VM.AUTOSTOP.ACTION.VALUE}" = [int]$vm.AutomaticStopAction
+                "{#VM.CHECKPOINT.TYPE}" = $vm.CheckpointType.ToString()
+                "{#VM.CHECKPOINT.TYPE.VALUE}" = [int]$vm.CheckpointType
+                "{#VM.SMART.PAGING.PATH}" = $vm.SmartPagingFilePath
+                "{#VM.CONFIG.PATH}" = $vm.ConfigurationLocation
+                "{#VM.SNAPSHOT.PATH}" = $vm.SnapshotFileLocation
+                "{#VM.NOTES}" = $vm.Notes
+                "{#VM.NETWORK.COUNT}" = $vmNetworkAdapters.Count.ToString()
+                "{#VM.DISK.COUNT}" = $vmHardDisks.Count.ToString()
+                "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
+                "{#VM.CHECKPOINT.COUNT}" = $checkpoints.Count.ToString()
+            }
+            "networks" = if ($networkLLD.Count -gt 0) { $networkLLD } else { @() }
+            "disks" = if ($diskLLD.Count -gt 0) { $diskLLD } else { @() }
+        }
+
+        Write-DebugInfo "VM details discovery completed for $($vm.Name)"
+        return $vmDetails | ConvertTo-Json -Depth 10
+
+    } catch {
+        Write-DebugInfo "Error in VM details discovery: $($_.Exception.Message)"
+        Write-DebugInfo "Stack trace: $($_.ScriptStackTrace)"
+        # Return empty structure in case of error
+        return @{
+            "vm_info" = @{}
+            "networks" = @()
+            "disks" = @()
+        } | ConvertTo-Json -Depth 5
+    }
+}
+
 # Main execution based on discovery type
 try {
     switch ($DiscoveryType.ToLower()) {
@@ -596,6 +825,7 @@ try {
         "networks" { Get-VMNetworkDiscovery }
         "disks" { Get-VMDiskDiscovery }
         "host" { Get-HyperVHostInfo }
+        "vmdetails" { Get-VMDetailsById -VmId $VmId }
         default { Get-VMDiscoveryData }
     }
 } finally {
