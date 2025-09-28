@@ -20,13 +20,26 @@ zabbix_export:
         - uuid: 60a505b652f24034b5b0d1903a85ea8e
           name: 'Hyper-V VM disk master data'
           key: 'hyperv.discover.disks[{#VMNAME_SAFE}]'
-          delay: 5m
+          delay: 59m
           value_type: TEXT
           trends: '0'
           description: |
             Master item containing all counter discovery data for dependent items
             
             Needs to be passive agent, as the request must be processed by the Hyper-V server itself and not the VM
+          timeout: 30s
+        - uuid: 77b70fa1ac3b41259978c203f4ac34f0
+          name: 'Hyper-V VM master data'
+          key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          delay: 10m
+          value_type: TEXT
+          trends: '0'
+          description: |
+            Fetch details of VM {$VM.ID}
+            Used for LLD
+            Contains VM details as well as disks and nic informations
+            
+            Needs to be Zabbix agent in passive mode, since the request is sent to the Hyper-V server
           timeout: 30s
         - uuid: 823f8e1df92a4276af7188394af21a38
           name: 'Hyper-V VM counters master data'
@@ -40,6 +53,78 @@ zabbix_export:
             Needs to be passive agent, as the request must be processed by the Hyper-V server itself and not the VM
           timeout: 30s
       discovery_rules:
+        - uuid: 25c88644de4841ef9a1d3c9af160789d
+          name: 'Disc discovery'
+          type: DEPENDENT
+          key: hyperv.discovery.vmdisks
+          delay: '0'
+          item_prototypes:
+            - uuid: 5dfe8acd7e2743059b08fad24c5b8c4f
+              name: 'Disk {#DISK.ID} max size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disc[{#DISK.ID},maxsize]'
+              delay: '0'
+              description: '{#DISK.PATH}'
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: f09400bc46514839b340071d5a71bf3e
+              name: 'Disk {#DISK.ID} current size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disc[{#DISK.ID},size]'
+              delay: '0'
+              description: '{#DISK.PATH}'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["{#DISK.SIZE}"]'
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          graph_prototypes:
+            - uuid: 19fdfcc72b234112a80b751e5d3d1352
+              name: 'Disk size {#DISK.ID}'
+              ymin_type_1: FIXED
+              ymax_type_1: ITEM
+              ymax_item_1:
+                host: 'Template Windows HyperV VM Guest 2'
+                key: 'hyperv.vm.disc[{#DISK.ID},maxsize]'
+              graph_items:
+                - drawtype: BOLD_LINE
+                  color: FF0080
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'hyperv.vm.disc[{#DISK.ID},maxsize]'
+                - sortorder: '1'
+                  color: 00FF00
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'hyperv.vm.disc[{#DISK.ID},size]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#DISK.CONTROLLER}'
+              path: '$["{#DISK.CONTROLLER}"]'
+            - lld_macro: '{#DISK.FILE.SIZE.GB}'
+              path: '$["{#DISK.FILE.SIZE.GB}"]'
+            - lld_macro: '{#DISK.FRAGMENTATION}'
+              path: '$["{#DISK.FRAGMENTATION}"]'
+            - lld_macro: '{#DISK.ID}'
+              path: '$["{#DISK.ID}"]'
+            - lld_macro: '{#DISK.MINIMUM.SIZE.GB}'
+              path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
+            - lld_macro: '{#DISK.PATH}'
+              path: '$["{#DISK.PATH}"]'
+            - lld_macro: '{#DISK.SIZE.GB}'
+              path: '$["{#DISK.SIZE.GB}"]'
+            - lld_macro: '{#DISK.VHD.FORMAT}'
+              path: '$["{#DISK.VHD.FORMAT}"]'
+            - lld_macro: '{#DISK.VHD.TYPE}'
+              path: '$["{#DISK.VHD.TYPE}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["disks"]'
         - uuid: 7f9dcb476f0d42e29a5ec14f2de1482b
           name: 'Discover VM disks'
           type: DEPENDENT
@@ -212,6 +297,226 @@ zabbix_export:
                     }
                   }
                   return JSON.stringify(data);
+        - uuid: f88de644e4f34b72be0b4ad9ed31d27e
+          name: 'VM Disks Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.disks.discovery
+          delay: '0'
+          description: 'Discovers VM disks from vmdetails master data'
+          item_prototypes:
+            - uuid: a1b2c3d4e5f64789a0123456789abcde
+              name: 'VM Disk {#DISK.ID} - Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+              delay: '0'
+              units: GB
+              description: 'Current size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["disks"][?(@["{#DISK.ID}"] == "{#DISK.ID}")]["{#DISK.SIZE.GB}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: b2c3d4e5f67849abb0123456789abcdf
+              name: 'VM Disk {#DISK.ID} - File Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
+              delay: '0'
+              units: GB
+              description: 'Actual file size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["disks"][?(@["{#DISK.ID}"] == "{#DISK.ID}")]["{#DISK.FILE.SIZE.GB}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: c3d4e5f678904abca0123456789abce0
+              name: 'VM Disk {#DISK.ID} - Minimum Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
+              delay: '0'
+              units: GB
+              description: 'Minimum size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["disks"][?(@["{#DISK.ID}"] == "{#DISK.ID}")]["{#DISK.MINIMUM.SIZE.GB}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: d4e5f67890ab4cde90123456789abce1
+              name: 'VM Disk {#DISK.ID} - Fragmentation'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
+              delay: '0'
+              units: '%'
+              description: 'Fragmentation percentage of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["disks"][?(@["{#DISK.ID}"] == "{#DISK.ID}")]["{#DISK.FRAGMENTATION}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#DISK.CONTROLLER}'
+              path: '$["{#DISK.CONTROLLER}"]'
+            - lld_macro: '{#DISK.FILE.SIZE.GB}'
+              path: '$["{#DISK.FILE.SIZE.GB}"]'
+            - lld_macro: '{#DISK.FRAGMENTATION}'
+              path: '$["{#DISK.FRAGMENTATION}"]'
+            - lld_macro: '{#DISK.ID}'
+              path: '$["{#DISK.ID}"]'
+            - lld_macro: '{#DISK.LOCATION}'
+              path: '$["{#DISK.LOCATION}"]'
+            - lld_macro: '{#DISK.MINIMUM.SIZE.GB}'
+              path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
+            - lld_macro: '{#DISK.NUMBER}'
+              path: '$["{#DISK.NUMBER}"]'
+            - lld_macro: '{#DISK.PATH}'
+              path: '$["{#DISK.PATH}"]'
+            - lld_macro: '{#DISK.SIZE.GB}'
+              path: '$["{#DISK.SIZE.GB}"]'
+            - lld_macro: '{#DISK.VHD.FORMAT}'
+              path: '$["{#DISK.VHD.FORMAT}"]'
+            - lld_macro: '{#DISK.VHD.TYPE}'
+              path: '$["{#DISK.VHD.TYPE}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["disks"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+        - uuid: 253533ec0932452fae14861f85ae1ad5
+          name: 'VM Network Adapters Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.networks.discovery
+          delay: '0'
+          description: 'Discovers VM network adapters from vmdetails master data'
+          item_prototypes:
+            - uuid: e5f67890abcd4ef0823456789abcdef2
+              name: 'VM Network Adapter {#ADAPTER.NAME} - Connected'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.connected[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: UNSIGNED
+              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["networks"][?(@["{#ADAPTER.ID}"] == "{#ADAPTER.ID}")]["{#ADAPTER.CONNECTED}"]'
+                - type: BOOL_TO_DECIMAL
+                  parameters: []
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: f6789abcdef04123956789abcdef0123
+              name: 'VM Network Adapter {#ADAPTER.NAME} - Switch'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.switch[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'Virtual switch of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["networks"][?(@["{#ADAPTER.ID}"] == "{#ADAPTER.ID}")]["{#ADAPTER.SWITCH}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 07890abcdef04234a6789abcdef01234
+              name: 'VM Network Adapter {#ADAPTER.NAME} - MAC Address'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.mac[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'MAC address of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["networks"][?(@["{#ADAPTER.ID}"] == "{#ADAPTER.ID}")]["{#ADAPTER.MAC}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 18901bcdef014345b789abcdef012345
+              name: 'VM Network Adapter {#ADAPTER.NAME} - VLAN'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.vlan[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: UNSIGNED
+              description: 'VLAN ID of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$["networks"][?(@["{#ADAPTER.ID}"] == "{#ADAPTER.ID}")]["{#ADAPTER.VLAN}"]'
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#ADAPTER.DHCP.GUARD}'
+              path: '$["{#ADAPTER.DHCP.GUARD}"]'
+            - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
+              path: '$["{#ADAPTER.DYNAMIC.MAC}"]'
+            - lld_macro: '{#ADAPTER.ID}'
+              path: '$["{#ADAPTER.ID}"]'
+            - lld_macro: '{#ADAPTER.IEEE.PRIORITY}'
+              path: '$["{#ADAPTER.IEEE.PRIORITY}"]'
+            - lld_macro: '{#ADAPTER.IS.LEGACY}'
+              path: '$["{#ADAPTER.IS.LEGACY}"]'
+            - lld_macro: '{#ADAPTER.MAC}'
+              path: '$["{#ADAPTER.MAC}"]'
+            - lld_macro: '{#ADAPTER.MAC.SPOOFING}'
+              path: '$["{#ADAPTER.MAC.SPOOFING}"]'
+            - lld_macro: '{#ADAPTER.NAME}'
+              path: '$["{#ADAPTER.NAME}"]'
+            - lld_macro: '{#ADAPTER.NAME.TRANSLATED}'
+              path: '$["{#ADAPTER.NAME.TRANSLATED}"]'
+            - lld_macro: '{#ADAPTER.PACKET.DIRECT}'
+              path: '$["{#ADAPTER.PACKET.DIRECT}"]'
+            - lld_macro: '{#ADAPTER.PORT.MIRRORING}'
+              path: '$["{#ADAPTER.PORT.MIRRORING}"]'
+            - lld_macro: '{#ADAPTER.SR.IOV}'
+              path: '$["{#ADAPTER.SR.IOV}"]'
+            - lld_macro: '{#ADAPTER.SWITCH}'
+              path: '$["{#ADAPTER.SWITCH}"]'
+            - lld_macro: '{#ADAPTER.VLAN}'
+              path: '$["{#ADAPTER.VLAN}"]'
+            - lld_macro: '{#ADAPTER.VM.QUEUE}'
+              path: '$["{#ADAPTER.VM.QUEUE}"]'
+            - lld_macro: '{#ADAPTER.CONNECTED}'
+              path: '$["{#ADAPTER.CONNECTED}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["networks"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
         - uuid: f3ca099ae3fd4925a77eaebb5d2eaf29
           name: 'Hyper-V VM NIC Discovery'
           type: DEPENDENT
