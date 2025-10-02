@@ -125,6 +125,48 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$["disks"]'
+        - uuid: caab8361714d48419c8195df9171dee0
+          name: 'Disc discovery2'
+          type: DEPENDENT
+          key: hyperv.discovery.vmdisks2
+          delay: '0'
+          item_prototypes:
+            - uuid: 96ddc44f2ac64210a1095a701260bd06
+              name: 'Disk {#DISK_ID} current size2'
+              type: DEPENDENT
+              key: 'hyperv.discovery.vmdisks22[{#DISK_ID}]'
+              delay: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - 'Disk {#DISK_ID} current size'
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#DISK_CONTROLLER}'
+              path: '$["{#DISK.CONTROLLER}"]'
+            - lld_macro: '{#DISK_FILE.SIZE.GB}'
+              path: '$["{#DISK.FILE.SIZE.GB}"]'
+            - lld_macro: '{#DISK_FRAGMENTATION}'
+              path: '$["{#DISK.FRAGMENTATION}"]'
+            - lld_macro: '{#DISK_ID}'
+              path: '$["{#DISK.ID}"]'
+            - lld_macro: '{#DISK_MINIMUM.SIZE.GB}'
+              path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
+            - lld_macro: '{#DISK_PATH}'
+              path: '$["{#DISK.PATH}"]'
+            - lld_macro: '{#DISK_SIZE.GB}'
+              path: '$["{#DISK.SIZE.GB}"]'
+            - lld_macro: '{#DISK_VHD.FORMAT}'
+              path: '$["{#DISK.VHD.FORMAT}"]'
+            - lld_macro: '{#DISK_VHD.TYPE}'
+              path: '$["{#DISK.VHD.TYPE}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.disks[?(@["{{#DISK.ID}}"] == "{#DISK.ID}")]'
         - uuid: f88de644e4f34b72be0b4ad9ed31d27e
           name: 'VM Disks Discovery'
           type: DEPENDENT
@@ -145,12 +187,12 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
-
+                      
                       // Debug: Return info about what we found
                       if (!data.disks || data.disks.length === 0) {
                         throw "ZBX_UNSUPPORTED: No disks array found";
                       }
-
+                      
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
                         if (disk["{#DISK.ID}"] === diskId) {
@@ -161,7 +203,7 @@ zabbix_export:
                           return fileSize;
                         }
                       }
-
+                      
                       // Debug: Show what disk IDs we found
                       var foundIds = [];
                       for (var i = 0; i < data.disks.length; i++) {
@@ -186,12 +228,29 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
                       for (var i = 0; i < data.disks.length; i++) {
-                        if (data.disks[i]["{#DISK.ID}"] === diskId) {
-                          return data.disks[i]["{#DISK.FRAGMENTATION}"];
+                        var disk = data.disks[i];
+                        if (disk["{#DISK.ID}"] === diskId) {
+                          var fragmentation = disk["{#DISK.FRAGMENTATION}"];
+                          if (fragmentation === undefined || fragmentation === null) {
+                            throw "ZBX_UNSUPPORTED: Field {#DISK.FRAGMENTATION} not found or empty";
+                          }
+                          return fragmentation;
                         }
                       }
-                      return "0";
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
                 - type: DISCARD_UNCHANGED_HEARTBEAT
                   parameters:
                     - 1h
@@ -210,12 +269,29 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
                       for (var i = 0; i < data.disks.length; i++) {
-                        if (data.disks[i]["{#DISK.ID}"] === diskId) {
-                          return data.disks[i]["{#DISK.MINIMUM.SIZE.GB}"];
+                        var disk = data.disks[i];
+                        if (disk["{#DISK.ID}"] === diskId) {
+                          var minSize = disk["{#DISK.MINIMUM.SIZE.GB}"];
+                          if (!minSize) {
+                            throw "ZBX_UNSUPPORTED: Field {#DISK.MINIMUM.SIZE.GB} not found or empty";
+                          }
+                          return minSize;
                         }
                       }
-                      return "0";
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
                 - type: DISCARD_UNCHANGED_HEARTBEAT
                   parameters:
                     - 1h
@@ -234,53 +310,37 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
                       for (var i = 0; i < data.disks.length; i++) {
-                        if (data.disks[i]["{#DISK.ID}"] === diskId) {
-                          return data.disks[i]["{#DISK.SIZE.GB}"];
+                        var disk = data.disks[i];
+                        if (disk["{#DISK.ID}"] === diskId) {
+                          var size = disk["{#DISK.SIZE.GB}"];
+                          if (!size) {
+                            throw "ZBX_UNSUPPORTED: Field {#DISK.SIZE.GB} not found or empty";
+                          }
+                          return size;
                         }
                       }
-                      return "0";
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
                 - type: DISCARD_UNCHANGED_HEARTBEAT
                   parameters:
                     - 1h
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: e1f234567890472d9f0123456789abc0
-              name: 'VM Disk {#DISK.ID} - Read Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Read Bytes/sec"]'
-              delay: 1m
-              value_type: FLOAT
-              units: Bps
-              description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: f2345678abcd4f0183456789abc01234
-              name: 'VM Disk {#DISK.ID} - Write Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Write Bytes/sec"]'
-              delay: 1m
-              value_type: FLOAT
-              units: Bps
-              description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 03456789abcd4f018456789abc012345
-              name: 'VM Disk {#DISK.ID} - Read Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Read Operations/sec"]'
-              delay: 1m
-              value_type: FLOAT
-              units: ops
-              description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 14567890abcd4f018567890abc012346
-              name: 'VM Disk {#DISK.ID} - Write Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Write Operations/sec"]'
-              delay: 1m
-              value_type: FLOAT
-              units: ops
-              description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
             - uuid: 25678901abcd4f018678901abc012347
               name: 'VM Disk {#DISK.ID} - Average Read Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Average sec/Read"]'
-              delay: 1m
               value_type: FLOAT
               units: s
               description: 'Average disk read latency for {#DISK.ID} at {#DISK.PATH}'
@@ -288,10 +348,37 @@ zabbix_export:
             - uuid: 36789012abcd4f018789012abc012348
               name: 'VM Disk {#DISK.ID} - Average Write Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Average sec/Write"]'
-              delay: 1m
               value_type: FLOAT
               units: s
               description: 'Average disk write latency for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: e1f234567890472d9f0123456789abc0
+              name: 'VM Disk {#DISK.ID} - Read Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Read Bytes/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 03456789abcd4f018456789abc012345
+              name: 'VM Disk {#DISK.ID} - Read Operations/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Read Operations/sec"]'
+              value_type: FLOAT
+              units: ops
+              description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: f2345678abcd4f0183456789abc01234
+              name: 'VM Disk {#DISK.ID} - Write Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Write Bytes/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 14567890abcd4f018567890abc012346
+              name: 'VM Disk {#DISK.ID} - Write Operations/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Write Operations/sec"]'
+              value_type: FLOAT
+              units: ops
+              description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
           graph_prototypes:
             - uuid: abfaff554baf4f689b9064855f533c8b
@@ -363,29 +450,34 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
-
+                      
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No networks array found";
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
                       }
-
+                      
                       for (var i = 0; i < data.networks.length; i++) {
                         var adapter = data.networks[i];
                         if (adapter["{#ADAPTER.ID}"] === adapterId) {
                           var connected = adapter["{#ADAPTER.CONNECTED}"];
-                          if (!connected) {
-                            throw "ZBX_UNSUPPORTED: Field {#ADAPTER.CONNECTED} not found or empty";
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {#ADAPTER.CONNECTED} not found. Available fields: " + Object.keys(adapter).join(", ");
                           }
                           return connected;
                         }
                       }
-
-                      // Debug: Show what adapter IDs we found
+                      
+                      // Debug: Show what adapter IDs we found and their structure
                       var foundIds = [];
+                      var firstAdapterKeys = [];
                       for (var i = 0; i < data.networks.length; i++) {
-                        foundIds.push(data.networks[i]["{#ADAPTER.ID}"]);
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
                       }
-                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found: " + foundIds.join(", ");
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
                 - type: BOOL_TO_DECIMAL
                   parameters:
                     - ''
@@ -470,7 +562,6 @@ zabbix_export:
             - uuid: 47890123bcde40129456789abc012349
               name: 'VM Network Adapter {#ADAPTER.NAME} - Bytes Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Bytes Received/sec"]'
-              delay: 1m
               value_type: FLOAT
               units: Bps
               description: 'Network receive throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
@@ -478,42 +569,35 @@ zabbix_export:
             - uuid: 58901234cdef41239567890abc01234a
               name: 'VM Network Adapter {#ADAPTER.NAME} - Bytes Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Bytes Sent/sec"]'
-              delay: 1m
               value_type: FLOAT
               units: Bps
               description: 'Network send throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
+            - uuid: 9234567801234567a901234abc01234e
+              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Outbound Errors'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Outbound Errors"]'
+              value_type: FLOAT
+              description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
             - uuid: 69012345def042349678901abc01234b
               name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Received/sec"]'
-              delay: 1m
               value_type: FLOAT
               units: pps
               description: 'Network receive packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
-            - uuid: 70123456ef0143459789012abc01234c
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Sent/sec"]'
-              delay: 1m
-              value_type: FLOAT
-              units: pps
-              description: 'Network send packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
             - uuid: 81234567f01244569890123abc01234d
               name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Received Errors'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Received Errors"]'
-              delay: 1m
               value_type: FLOAT
-              units: ''
               description: 'Network receive errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
-            - uuid: 9234567801234567a901234abc01234e
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Outbound Errors'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Outbound Errors"]'
-              delay: 1m
+            - uuid: 70123456ef0143459789012abc01234c
+              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Sent/sec"]'
               value_type: FLOAT
-              units: ''
-              description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              units: pps
+              description: 'Network send packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
           master_item:
             key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
