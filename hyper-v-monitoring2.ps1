@@ -381,12 +381,21 @@ function Get-VMNetworkDiscovery {
                 foreach ($adapter in $adapters) {
                     try {
                         Write-DebugInfo "    Processing adapter: $($adapter.Name)"
+
+                        # Format adapter ID for performance counter path
+                        # Remove "Microsoft:" prefix and replace \\ with --
+                        $adapterCounter = ""
+                        if ($adapter.Id) {
+                            $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
+                        }
+
                         $discoveryData += @{
                             "{#VM.NAME}" = $vm.Name
                             "{#VM.ID}" = $vm.Id.ToString()
                             "{#ADAPTER.NAME}" = $adapter.Name
                             "{#ADAPTER.NAME.TRANSLATED}" = ConvertToEnglish -Value $adapter.Name
                             "{#ADAPTER.ID}" = $adapter.Id
+                            "{#ADAPTER.COUNTER}" = $adapterCounter
                             "{#ADAPTER.SWITCH}" = $adapter.SwitchName
                             "{#ADAPTER.MAC}" = $adapter.MacAddress
                             "{#ADAPTER.VLAN}" = $adapter.VlanSetting.AccessVlanId.ToString()
@@ -423,6 +432,13 @@ function Get-VMDiskDiscovery {
                 foreach ($disk in $disks) {
                     try {
                         Write-DebugInfo "    Processing disk: $($disk.Path)"
+                        # Extract VHD filename for performance counter path
+                        # Format: Replace \ with - for performance counter instance name
+                        $diskPathCounter = ""
+                        if ($disk.Path) {
+                            $diskPathCounter = $disk.Path -replace '\\', '-'
+                        }
+
                         $discoveryData += @{
                             "{#VM.NAME}" = $vm.Name
                             "{#VM.ID}" = $vm.Id.ToString()
@@ -430,6 +446,7 @@ function Get-VMDiskDiscovery {
                             "{#DISK.NUMBER}" = $disk.ControllerNumber.ToString()
                             "{#DISK.LOCATION}" = $disk.ControllerLocation.ToString()
                             "{#DISK.PATH}" = $disk.Path
+                            "{#DISK.PATH_COUNTER}" = $diskPathCounter
                             "{#DISK.ID}" = "$($vm.Name)_$($disk.ControllerType)_$($disk.ControllerNumber)_$($disk.ControllerLocation)"
                         }
                     } catch {
@@ -633,6 +650,13 @@ function Get-VMDetailsById {
             try {
                 Write-DebugInfo "  Processing adapter: $($adapter.Name)"
 
+                # Format adapter ID for performance counter path
+                # Remove "Microsoft:" prefix and replace \\ with --
+                $adapterCounter = ""
+                if ($adapter.Id) {
+                    $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
+                }
+
                 # Basic adapter information that should always be available
                 $adapterData = @{
                     "{#VM.NAME}" = $vm.Name
@@ -640,6 +664,7 @@ function Get-VMDetailsById {
                     "{#ADAPTER.NAME}" = if ($adapter.Name) { $adapter.Name } else { "Unknown" }
                     "{#ADAPTER.NAME.TRANSLATED}" = if ($adapter.Name) { ConvertToEnglish -Value $adapter.Name } else { "Unknown" }
                     "{#ADAPTER.ID}" = if ($adapter.Id) { $adapter.Id } else { "Unknown" }
+                    "{#ADAPTER.COUNTER}" = $adapterCounter
                     "{#ADAPTER.SWITCH}" = if ($adapter.SwitchName) { $adapter.SwitchName } else { "Not Connected" }
                     "{#ADAPTER.MAC}" = if ($adapter.MacAddress) { $adapter.MacAddress } else { "Unknown" }
                     "{#ADAPTER.CONNECTED}" = if ($adapter.Connected -ne $null) { $adapter.Connected.ToString() } else { "Unknown" }
@@ -737,6 +762,13 @@ function Get-VMDetailsById {
                     }
                 }
 
+                # Extract VHD filename for performance counter path
+                # Format: Replace \ with - for performance counter instance name
+                $diskPathCounter = ""
+                if ($disk.Path) {
+                    $diskPathCounter = $disk.Path -replace '\\', '-'
+                }
+
                 $diskLLD += @{
                     "{#VM.NAME}" = $vm.Name
                     "{#VM.ID}" = $vm.Id.ToString()
@@ -744,6 +776,7 @@ function Get-VMDetailsById {
                     "{#DISK.NUMBER}" = $disk.ControllerNumber.ToString()
                     "{#DISK.LOCATION}" = $disk.ControllerLocation.ToString()
                     "{#DISK.PATH}" = $disk.Path
+                    "{#DISK.PATH_COUNTER}" = $diskPathCounter
                     "{#DISK.ID}" = "$($vm.Name)_$($disk.ControllerType)_$($disk.ControllerNumber)_$($disk.ControllerLocation)"
                     "{#DISK.VHD.TYPE}" = if ($vhdInfo) { $vhdInfo.VhdType.ToString() } else { "Unknown" }
                     "{#DISK.VHD.FORMAT}" = if ($vhdInfo) { $vhdInfo.VhdFormat.ToString() } else { "Unknown" }

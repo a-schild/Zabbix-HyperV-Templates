@@ -58,6 +58,7 @@ zabbix_export:
           type: DEPENDENT
           key: hyperv.discovery.vmdisks
           delay: '0'
+          status: DISABLED
           item_prototypes:
             - uuid: 5dfe8acd7e2743059b08fad24c5b8c4f
               name: 'Disk {#DISK.ID} max size'
@@ -130,6 +131,7 @@ zabbix_export:
           type: DEPENDENT
           key: hyperv.discovery.vmdisks2
           delay: '0'
+          status: DISABLED
           item_prototypes:
             - uuid: 96ddc44f2ac64210a1095a701260bd06
               name: 'Disk {#DISK_ID} current size2'
@@ -195,7 +197,7 @@ zabbix_export:
                       
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
-                        if (disk["{#DISK.ID}"] === diskId) {
+                        if (disk["{{#DISK.ID}}"] === diskId) {
                           var fileSize = disk["{#DISK.FILE.SIZE.GB}"];
                           if (!fileSize) {
                             throw "ZBX_UNSUPPORTED: Field {#DISK.FILE.SIZE.GB} not found or empty";
@@ -209,7 +211,7 @@ zabbix_export:
                       for (var i = 0; i < data.disks.length; i++) {
                         foundIds.push(data.disks[i]["{#DISK.ID}"]);
                       }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
                 - type: DISCARD_UNCHANGED_HEARTBEAT
                   parameters:
                     - 1h
@@ -318,7 +320,7 @@ zabbix_export:
                       
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
-                        if (disk["{#DISK.ID}"] === diskId) {
+                        if (disk["{{#DISK.ID}}"] === diskId) {
                           var size = disk["{#DISK.SIZE.GB}"];
                           if (!size) {
                             throw "ZBX_UNSUPPORTED: Field {#DISK.SIZE.GB} not found or empty";
@@ -338,49 +340,254 @@ zabbix_export:
                     - 1h
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: 25678901abcd4f018678901abc012347
-              name: 'VM Disk {#DISK.ID} - Average Read Latency'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Average sec/Read"]'
-              value_type: FLOAT
-              units: s
-              description: 'Average disk read latency for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
             - uuid: 36789012abcd4f018789012abc012348
               name: 'VM Disk {#DISK.ID} - Average Write Latency'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Average sec/Write"]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
               value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
               units: s
               description: 'Average disk write latency for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
+            - uuid: 9cf62d67d8d747929da2e9cce796d966
+              name: 'VM Disk {#DISK.ID} - Byte Quota Replenishment Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Byte Quota Replenishment Rate"]'
+              value_type: FLOAT
+              description: 'Byte Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: e15ccda5219a4584bbc142f441dc1a59
+              name: 'VM Disk {#DISK.ID} - Error Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
+              value_type: FLOAT
+              description: 'Error Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 0024b57796ba443eaf2e96c1f9517c35
+              name: 'VM Disk {#DISK.ID} - Flush Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
+              value_type: FLOAT
+              description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 32aee40dd4b748da85efc088efbe58d7
+              name: 'VM Disk {#DISK.ID} - Io Quota Replenishment Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
+              value_type: FLOAT
+              description: 'Io Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: cffaaddc2de34fcc8c61bdcb07af71cd
+              name: 'VM Disk {#DISK.ID} - Latency'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"]'
+              value_type: FLOAT
+              description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 25678901abcd4f018678901abc012347
+              name: 'VM Disk {#DISK.ID} - Lower Latency'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
+              value_type: FLOAT
+              units: s
+              description: 'Lower Latency for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 5aa9ba08dcb9470fa66f6c137ef6a301
+              name: 'VM Disk {#DISK.ID} - Lower Queue Length'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Queue Length"]'
+              value_type: FLOAT
+              units: s
+              description: 'Lower Queue Length for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: be5ed5f2658d46f4b8bb5ad79c93c7cc
+              name: 'VM Disk {#DISK.ID} - Maximum Adapter Worker Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Adapter Worker Count"]'
+              value_type: FLOAT
+              description: 'Maximum Adapter Worker Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: cb22af897eaf4ea9a878fe2a34f4e190
+              name: 'VM Disk {#DISK.ID} - Maximum Bandwidth'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Bandwidth"]'
+              value_type: FLOAT
+              description: 'Maximum Bandwidth for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 4e662b9c9ac14cb1a79177c58120ef66
+              name: 'VM Disk {#DISK.ID} - Maximum IO Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
+              value_type: FLOAT
+              description: 'Maximum IO Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 33085294c6b649dbbb3ccb7deced1f6b
+              name: 'VM Disk {#DISK.ID} - Minimum IO Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
+              value_type: FLOAT
+              description: 'Minimum IO Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 5851d1ef4a7748ffb53ee514c9afffe4
+              name: 'VM Disk {#DISK.ID} - Normalized Throughput'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
+              value_type: FLOAT
+              units: s
+              description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
+              name: 'VM Disk {#DISK.ID} - Queue Length'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Queue Length"]'
+              value_type: FLOAT
+              units: s
+              description: 'Queue Length for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
             - uuid: e1f234567890472d9f0123456789abc0
               name: 'VM Disk {#DISK.ID} - Read Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Read Bytes/sec"]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
+            - uuid: 1913a23214b54c4c8c1fbc3b04367a4a
+              name: 'VM Disk {#DISK.ID} - Read Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
+              value_type: FLOAT
+              description: 'Read Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
             - uuid: 03456789abcd4f018456789abc012345
               name: 'VM Disk {#DISK.ID} - Read Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Read Operations/sec"]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec"]'
               value_type: FLOAT
               units: ops
               description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
+            - uuid: bc0d3ed4e9c94cf992201a8dfb557805
+              name: 'VM Disk {#DISK.ID} - Throughput'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
+              value_type: FLOAT
+              description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
             - uuid: f2345678abcd4f0183456789abc01234
               name: 'VM Disk {#DISK.ID} - Write Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Write Bytes/sec"]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
+            - uuid: 5417373178af40a4a86da68f8accc1bf
+              name: 'VM Disk {#DISK.ID} - Write Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
+              value_type: FLOAT
+              description: 'Write Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
             - uuid: 14567890abcd4f018567890abc012346
               name: 'VM Disk {#DISK.ID} - Write Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.ID})\Write Operations/sec"]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec"]'
               value_type: FLOAT
               units: ops
               description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
           graph_prototypes:
+            - uuid: b813a689babe4e49a9bec2ad8f5b258b
+              name: 'Disk counters {#DISK.ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: FF0080
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
+                - sortorder: '1'
+                  color: BF00FF
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
+                - sortorder: '2'
+                  color: 0080FF
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
+                - sortorder: '3'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
+            - uuid: ee9ac9a8ec434dc1983cc1039dd78113
+              name: 'Disk IO rate {#DISK.ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
+                - sortorder: '2'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
+            - uuid: 22e079999e9149f989280d7c30fba97b
+              name: 'Disk latency {#DISK_ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"]'
+                - sortorder: '2'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
+            - uuid: d3ed810673934007ab32f21f265537c1
+              name: 'Disk Read/Write {#DISK.ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec"]'
+                - sortorder: '1'
+                  color: '274482'
+                  yaxisside: RIGHT
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
+                - sortorder: '2'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec"]'
+                - sortorder: '3'
+                  color: 2774A4
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec"]'
+                - sortorder: '4'
+                  color: A54F10
+                  yaxisside: RIGHT
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
+                - sortorder: '5'
+                  color: FC6EA3
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec"]'
             - uuid: abfaff554baf4f689b9064855f533c8b
               name: 'Disk {#DISK.ID}'
               ymin_type_1: FIXED
@@ -419,6 +626,8 @@ zabbix_export:
               path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
             - lld_macro: '{#DISK.NUMBER}'
               path: '$["{#DISK.NUMBER}"]'
+            - lld_macro: '{#DISK.PATH_COUNTER}'
+              path: '$["{#DISK.PATH_COUNTER}"]'
             - lld_macro: '{#DISK.PATH}'
               path: '$["{#DISK.PATH}"]'
             - lld_macro: '{#DISK.SIZE.GB}'
@@ -559,26 +768,6 @@ zabbix_export:
                     - 1h
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: 47890123bcde40129456789abc012349
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Bytes Received/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Bytes Received/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Network receive throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 58901234cdef41239567890abc01234a
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Bytes Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Bytes Sent/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Network send throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 9234567801234567a901234abc01234e
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Outbound Errors'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Outbound Errors"]'
-              value_type: FLOAT
-              description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
             - uuid: 69012345def042349678901abc01234b
               name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Received/sec"]'
@@ -599,11 +788,138 @@ zabbix_export:
               units: pps
               description: 'Network send packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
+            - uuid: 5f4cb2167042457b837dbe55575d1059
+              name: 'VM Network Adapter {#ADAPTER.ID} - Broadcast Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Broadcast Packets Received/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Broadcast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: b5e977aeaf954c9bb847933993797057
+              name: 'VM Network Adapter {#ADAPTER.ID} - Broadcast Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Broadcast Packets Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Broadcast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 2a63b6e5f87d4a1884a3698a980ccae3
+              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Bytes/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Bytes/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 47890123bcde40129456789abc012349
+              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Bytes Received/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Network receive throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 0e12399441ef4a14a5f934667bf73efc
+              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Bytes Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: ee916f90d15d4c39bc558fbfddbc7eea
+              name: 'VM Network Adapter {#ADAPTER.ID} - Directed Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Directed Packets Received/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Directed Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 750d0709df7647a4870f55b02d008b57
+              name: 'VM Network Adapter {#ADAPTER.ID} - Directed Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Directed Packets Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 6acea1c4f88545a4aae8738a53d2d361
+              name: 'VM Network Adapter {#ADAPTER.ID} - Dropped Packets Incoming/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Dropped Packets Incoming/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Dropped Packets Incoming/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 20b58667c42a47d19336808e8b56e96a
+              name: 'VM Network Adapter {#ADAPTER.ID} - Dropped Packets Outgoing/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Dropped Packets Outgoing/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Dropped Packets Outgoing/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: d3549d8bc1c04fe68d7b76a9b6dbea64
+              name: 'VM Network Adapter {#ADAPTER.ID} - IPsec offload Bytes Receive/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\IPsec offload Bytes Receive/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'IPsec offload Bytes Receive/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 85d28674b6ba4d7082de4677496de8b5
+              name: 'VM Network Adapter {#ADAPTER.ID} - IPsec offload Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\IPsec offload Bytes Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'IPsec offload Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: a89de1b7ad224e899ab49fe401cf9e8a
+              name: 'VM Network Adapter {#ADAPTER.ID} - Multicast Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Multicast Packets Received/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Multicast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 4939735e553e4c54a96a642481bedda6
+              name: 'VM Network Adapter {#ADAPTER.ID} - Multicast Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Multicast Packets Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Multicast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 4c48cc320f38443eb9fac841fd7ca1b5
+              name: 'VM Network Adapter {#ADAPTER.ID} - Packets/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Packets/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Packets/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 77ff3ce1f925440fadc4f1a41fc1260f
+              name: 'VM Network Adapter {#ADAPTER.ID} - Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Packets Received/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 833035242ba542f2b5a9eebf40ad32c5
+              name: 'VM Network Adapter {#ADAPTER.ID} - Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Packets Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 58901234cdef41239567890abc01234a
+              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Sent/sec"]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Network send throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 9234567801234567a901234abc01234e
+              name: 'VM Network Adapter {#ADAPTER.ID} - Packets Outbound Errors'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER_NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors"]'
+              value_type: FLOAT
+              description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
           master_item:
             key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
           lld_macro_paths:
             - lld_macro: '{#ADAPTER.CONNECTED}'
               path: '$["{#ADAPTER.CONNECTED}"]'
+            - lld_macro: '{#ADAPTER.COUNTER}'
+              path: '$["{#ADAPTER.COUNTER}"]'
             - lld_macro: '{#ADAPTER.DHCP.GUARD}'
               path: '$["{#ADAPTER.DHCP.GUARD}"]'
             - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
@@ -634,6 +950,8 @@ zabbix_export:
               path: '$["{#ADAPTER.VLAN}"]'
             - lld_macro: '{#ADAPTER.VM.QUEUE}'
               path: '$["{#ADAPTER.VM.QUEUE}"]'
+            - lld_macro: '{#VM.NAME}'
+              path: '$["{#VM.NAME}"]'
           preprocessing:
             - type: JSONPATH
               parameters:
