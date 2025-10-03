@@ -272,7 +272,7 @@ zabbix_export:
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
                       var diskIdMacro = "{"+"#"+"DISK.ID}";
-                      var diskFileMacro= "{"+"#DISK.SIZE.MINIMUM.GB}";
+                      var diskFileMacro= "{"+"#DISK.MINIMUM.SIZE.GB}";
                       
                       
                       // Debug: Return info about what we found
@@ -668,7 +668,7 @@ zabbix_export:
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.CONNECTED";
+                      var searchKey= "{"+"#ADAPTER.CONNECTED}";
                       
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {
@@ -717,7 +717,7 @@ zabbix_export:
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.MAC";
+                      var searchKey= "{"+"#ADAPTER.MAC}";
                       
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {
@@ -763,7 +763,7 @@ zabbix_export:
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.SWITCH";
+                      var searchKey= "{"+"#ADAPTER.SWITCH}";
                       
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {
@@ -807,7 +807,7 @@ zabbix_export:
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.VLAN";
+                      var searchKey= "{"+"#ADAPTER.VLAN}";
                       
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {
