@@ -52,6 +52,16 @@ zabbix_export:
           tags:
             - tag: Application
               value: 'HyperV Host'
+        - uuid: c686fcfab6c54262a934156cb48504a9
+          name: 'Hyper-V Host free memory'
+          type: CALCULATED
+          key: hyperv.host.memory.free
+          params: 'last(//vm.memory.size[total]) - last(//vm.memory.size[used])'
+          triggers:
+            - uuid: c632f7273c504452a0fdb9b4d51630f3
+              expression: 'last(/Template Windows HyperV Host 2/hyperv.host.memory.free)<100'
+              name: 'Hyper-V Host out of memory'
+              priority: HIGH
         - uuid: 839d9e234a0243c8820a94f76f119fb8
           name: 'Hyper-V VM count'
           type: DEPENDENT
@@ -458,7 +468,7 @@ zabbix_export:
                 - macro: '{$VM.ID}'
                   value: '{#VM.ID}'
                   description: 'Unique ID of VM'
-                - macro: '{$VMHOST.HOST}'
+                - macro: '{$VMHOST.FQDN}'
                   value: '{#VMHOST.FQDN}'
                   description: 'Located on this Hyper-V host'
               tags:
@@ -470,6 +480,10 @@ zabbix_export:
                   value: hyperv-vm
           master_item:
             key: hyperv.discovery.vms
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 2h
       tags:
         - tag: target
           value: hyperv
