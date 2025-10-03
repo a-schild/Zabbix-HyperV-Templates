@@ -389,11 +389,25 @@ function Get-VMNetworkDiscovery {
                             $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
                         }
 
+                        # Create shortname for easy identification
+                        # Format: NIC_ABC123 where ABC123 are last 6 chars of MAC address
+                        # If MAC is 0 or empty, use last part of adapter ID after last \\
+                        $shortName = "NIC"
+                        if ($adapter.MacAddress -and $adapter.MacAddress -ne "000000000000" -and $adapter.MacAddress.Length -ge 6) {
+                            $macSuffix = $adapter.MacAddress.Substring($adapter.MacAddress.Length - 6)
+                            $shortName = "NIC_$macSuffix"
+                        } elseif ($adapter.Id) {
+                            $idParts = $adapter.Id -split '\\'
+                            $lastPart = $idParts[-1]
+                            $shortName = "NIC_$lastPart"
+                        }
+
                         $discoveryData += @{
                             "{#VM.NAME}" = $vm.Name
                             "{#VM.ID}" = $vm.Id.ToString()
                             "{#ADAPTER.NAME}" = $adapter.Name
                             "{#ADAPTER.NAME.TRANSLATED}" = ConvertToEnglish -Value $adapter.Name
+                            "{#ADAPTER.SHORTNAME}" = $shortName
                             "{#ADAPTER.ID}" = $adapter.Id
                             "{#ADAPTER.COUNTER}" = $adapterCounter
                             "{#ADAPTER.SWITCH}" = $adapter.SwitchName
@@ -657,12 +671,26 @@ function Get-VMDetailsById {
                     $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
                 }
 
+                # Create shortname for easy identification
+                # Format: NIC_ABC123 where ABC123 are last 6 chars of MAC address
+                # If MAC is 0 or empty, use last part of adapter ID after last \\
+                $shortName = "NIC"
+                if ($adapter.MacAddress -and $adapter.MacAddress -ne "000000000000" -and $adapter.MacAddress.Length -ge 6) {
+                    $macSuffix = $adapter.MacAddress.Substring($adapter.MacAddress.Length - 6)
+                    $shortName = "NIC_$macSuffix"
+                } elseif ($adapter.Id) {
+                    $idParts = $adapter.Id -split '\\'
+                    $lastPart = $idParts[-1]
+                    $shortName = "NIC_$lastPart"
+                }
+
                 # Basic adapter information that should always be available
                 $adapterData = @{
                     "{#VM.NAME}" = $vm.Name
                     "{#VM.ID}" = $vm.Id.ToString()
                     "{#ADAPTER.NAME}" = if ($adapter.Name) { $adapter.Name } else { "Unknown" }
                     "{#ADAPTER.NAME.TRANSLATED}" = if ($adapter.Name) { ConvertToEnglish -Value $adapter.Name } else { "Unknown" }
+                    "{#ADAPTER.SHORTNAME}" = $shortName
                     "{#ADAPTER.ID}" = if ($adapter.Id) { $adapter.Id } else { "Unknown" }
                     "{#ADAPTER.COUNTER}" = $adapterCounter
                     "{#ADAPTER.SWITCH}" = if ($adapter.SwitchName) { $adapter.SwitchName } else { "Not Connected" }

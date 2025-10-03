@@ -176,7 +176,7 @@ zabbix_export:
           delay: '0'
           description: 'Discovers VM disks from vmdetails master data'
           item_prototypes:
-            - uuid: b2c3d4e5f67849abb0123456789abcdf
+            - uuid: 6b82378db618441697310230272ad120
               name: 'VM Disk {#DISK.ID} - File Size'
               type: DEPENDENT
               key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
@@ -189,6 +189,9 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileSizeMacro= "{"+"#DISK.FILE.SIZE.GB}";
+                      
                       
                       // Debug: Return info about what we found
                       if (!data.disks || data.disks.length === 0) {
@@ -197,10 +200,10 @@ zabbix_export:
                       
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
-                        if (disk["{{#DISK.ID}}"] === diskId) {
-                          var fileSize = disk["{#DISK.FILE.SIZE.GB}"];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileSizeMacro];
                           if (!fileSize) {
-                            throw "ZBX_UNSUPPORTED: Field {#DISK.FILE.SIZE.GB} not found or empty";
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileSizeMacro+" not found or empty";
                           }
                           return fileSize;
                         }
@@ -209,12 +212,9 @@ zabbix_export:
                       // Debug: Show what disk IDs we found
                       var foundIds = [];
                       for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                        foundIds.push(data.disks[i][diskIdMacro ]);
                       }
                       throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: d4e5f67890ab4cde90123456789abce1
@@ -230,6 +230,9 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.FRAGMENTATION}";
+                      
                       
                       // Debug: Return info about what we found
                       if (!data.disks || data.disks.length === 0) {
@@ -238,24 +241,21 @@ zabbix_export:
                       
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
-                        if (disk["{#DISK.ID}"] === diskId) {
-                          var fragmentation = disk["{#DISK.FRAGMENTATION}"];
-                          if (fragmentation === undefined || fragmentation === null) {
-                            throw "ZBX_UNSUPPORTED: Field {#DISK.FRAGMENTATION} not found or empty";
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
                           }
-                          return fragmentation;
+                          return fileSize;
                         }
                       }
                       
                       // Debug: Show what disk IDs we found
                       var foundIds = [];
                       for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                        foundIds.push(data.disks[i][diskIdMacro ]);
                       }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: c3d4e5f678904abca0123456789abce0
@@ -271,6 +271,9 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.SIZE.MINIMUM.GB}";
+                      
                       
                       // Debug: Return info about what we found
                       if (!data.disks || data.disks.length === 0) {
@@ -279,24 +282,21 @@ zabbix_export:
                       
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
-                        if (disk["{#DISK.ID}"] === diskId) {
-                          var minSize = disk["{#DISK.MINIMUM.SIZE.GB}"];
-                          if (!minSize) {
-                            throw "ZBX_UNSUPPORTED: Field {#DISK.MINIMUM.SIZE.GB} not found or empty";
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
                           }
-                          return minSize;
+                          return fileSize;
                         }
                       }
                       
                       // Debug: Show what disk IDs we found
                       var foundIds = [];
                       for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                        foundIds.push(data.disks[i][diskIdMacro ]);
                       }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: a1b2c3d4e5f64789a0123456789abcde
@@ -312,6 +312,9 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.SIZE.GB}";
+                      
                       
                       // Debug: Return info about what we found
                       if (!data.disks || data.disks.length === 0) {
@@ -320,24 +323,21 @@ zabbix_export:
                       
                       for (var i = 0; i < data.disks.length; i++) {
                         var disk = data.disks[i];
-                        if (disk["{{#DISK.ID}}"] === diskId) {
-                          var size = disk["{#DISK.SIZE.GB}"];
-                          if (!size) {
-                            throw "ZBX_UNSUPPORTED: Field {#DISK.SIZE.GB} not found or empty";
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
                           }
-                          return size;
+                          return fileSize;
                         }
                       }
                       
                       // Debug: Show what disk IDs we found
                       var foundIds = [];
                       for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i]["{#DISK.ID}"]);
+                        foundIds.push(data.disks[i][diskIdMacro ]);
                       }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 36789012abcd4f018789012abc012348
@@ -589,14 +589,9 @@ zabbix_export:
                     host: 'Template Windows HyperV VM Guest 2'
                     key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec"]'
             - uuid: abfaff554baf4f689b9064855f533c8b
-              name: 'Disk {#DISK.ID}'
+              name: 'Disk {#DISK.ID} size'
               ymin_type_1: FIXED
               graph_items:
-                - color: 1A7C11
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows HyperV VM Guest 2'
-                    key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
                 - sortorder: '1'
                   color: '274482'
                   calc_fnc: ALL
@@ -609,6 +604,19 @@ zabbix_export:
                   item:
                     host: 'Template Windows HyperV VM Guest 2'
                     key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+                - sortorder: '3'
+                  color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
+                - sortorder: '4'
+                  color: FF8000
+                  yaxisside: RIGHT
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows HyperV VM Guest 2'
+                    key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
           master_item:
             key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
           lld_macro_paths:
@@ -648,7 +656,7 @@ zabbix_export:
           description: 'Discovers VM network adapters from vmdetails master data'
           item_prototypes:
             - uuid: e5f67890abcd4ef0823456789abcdef2
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Connected'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Connected'
               type: DEPENDENT
               key: 'hyperv.vm.network.connected[{#ADAPTER.ID}]'
               delay: '0'
@@ -659,6 +667,8 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.CONNECTED";
                       
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {
@@ -667,10 +677,10 @@ zabbix_export:
                       
                       for (var i = 0; i < data.networks.length; i++) {
                         var adapter = data.networks[i];
-                        if (adapter["{#ADAPTER.ID}"] === adapterId) {
-                          var connected = adapter["{#ADAPTER.CONNECTED}"];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
                           if (connected === undefined || connected === null) {
-                            throw "ZBX_UNSUPPORTED: Field {#ADAPTER.CONNECTED} not found. Available fields: " + Object.keys(adapter).join(", ");
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
                           }
                           return connected;
                         }
@@ -690,13 +700,10 @@ zabbix_export:
                 - type: BOOL_TO_DECIMAL
                   parameters:
                     - ''
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 07890abcdef04234a6789abcdef01234
-              name: 'VM Network Adapter {#ADAPTER.NAME} - MAC Address'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - MAC Address'
               type: DEPENDENT
               key: 'hyperv.vm.network.mac[{#ADAPTER.ID}]'
               delay: '0'
@@ -709,19 +716,40 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.MAC";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
                       for (var i = 0; i < data.networks.length; i++) {
-                        if (data.networks[i]["{#ADAPTER.ID}"] === adapterId) {
-                          return data.networks[i]["{#ADAPTER.MAC}"];
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
                         }
                       }
-                      return "";
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: f6789abcdef04123956789abcdef0123
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Switch'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Switch'
               type: DEPENDENT
               key: 'hyperv.vm.network.switch[{#ADAPTER.ID}]'
               delay: '0'
@@ -734,19 +762,40 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.SWITCH";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
                       for (var i = 0; i < data.networks.length; i++) {
-                        if (data.networks[i]["{#ADAPTER.ID}"] === adapterId) {
-                          return data.networks[i]["{#ADAPTER.SWITCH}"];
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
                         }
                       }
-                      return "";
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 18901bcdef014345b789abcdef012345
-              name: 'VM Network Adapter {#ADAPTER.NAME} - VLAN'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - VLAN'
               type: DEPENDENT
               key: 'hyperv.vm.network.vlan[{#ADAPTER.ID}]'
               delay: '0'
@@ -757,159 +806,180 @@ zabbix_export:
                     - |
                       var data = JSON.parse(value);
                       var adapterId = "{#ADAPTER.ID}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
                       for (var i = 0; i < data.networks.length; i++) {
-                        if (data.networks[i]["{#ADAPTER.ID}"] === adapterId) {
-                          return data.networks[i]["{#ADAPTER.VLAN}"];
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
                         }
                       }
-                      return "0";
-                - type: DISCARD_UNCHANGED_HEARTBEAT
-                  parameters:
-                    - 1h
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 69012345def042349678901abc01234b
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Received/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Received/sec"]'
               value_type: FLOAT
               units: pps
               description: 'Network receive packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 81234567f01244569890123abc01234d
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Received Errors'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets Received Errors'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Received Errors"]'
               value_type: FLOAT
               description: 'Network receive errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 70123456ef0143459789012abc01234c
-              name: 'VM Network Adapter {#ADAPTER.NAME} - Packets Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.NAME})\Packets Sent/sec"]'
               value_type: FLOAT
               units: pps
               description: 'Network send packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 5f4cb2167042457b837dbe55575d1059
-              name: 'VM Network Adapter {#ADAPTER.ID} - Broadcast Packets Received/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Broadcast Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Broadcast Packets Received/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Broadcast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: b5e977aeaf954c9bb847933993797057
-              name: 'VM Network Adapter {#ADAPTER.ID} - Broadcast Packets Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Broadcast Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Broadcast Packets Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Broadcast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 2a63b6e5f87d4a1884a3698a980ccae3
-              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Bytes/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Bytes/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Bytes/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 47890123bcde40129456789abc012349
-              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes Received/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Bytes Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Bytes Received/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Network receive throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 0e12399441ef4a14a5f934667bf73efc
-              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Bytes Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Bytes Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: ee916f90d15d4c39bc558fbfddbc7eea
-              name: 'VM Network Adapter {#ADAPTER.ID} - Directed Packets Received/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Directed Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Directed Packets Received/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Directed Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 750d0709df7647a4870f55b02d008b57
-              name: 'VM Network Adapter {#ADAPTER.ID} - Directed Packets Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Directed Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Directed Packets Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 6acea1c4f88545a4aae8738a53d2d361
-              name: 'VM Network Adapter {#ADAPTER.ID} - Dropped Packets Incoming/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Dropped Packets Incoming/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Dropped Packets Incoming/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Dropped Packets Incoming/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 20b58667c42a47d19336808e8b56e96a
-              name: 'VM Network Adapter {#ADAPTER.ID} - Dropped Packets Outgoing/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Dropped Packets Outgoing/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Dropped Packets Outgoing/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Dropped Packets Outgoing/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: d3549d8bc1c04fe68d7b76a9b6dbea64
-              name: 'VM Network Adapter {#ADAPTER.ID} - IPsec offload Bytes Receive/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - IPsec offload Bytes Receive/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\IPsec offload Bytes Receive/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'IPsec offload Bytes Receive/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 85d28674b6ba4d7082de4677496de8b5
-              name: 'VM Network Adapter {#ADAPTER.ID} - IPsec offload Bytes Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - IPsec offload Bytes Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\IPsec offload Bytes Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'IPsec offload Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: a89de1b7ad224e899ab49fe401cf9e8a
-              name: 'VM Network Adapter {#ADAPTER.ID} - Multicast Packets Received/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Multicast Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Multicast Packets Received/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Multicast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 4939735e553e4c54a96a642481bedda6
-              name: 'VM Network Adapter {#ADAPTER.ID} - Multicast Packets Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Multicast Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Multicast Packets Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Multicast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 4c48cc320f38443eb9fac841fd7ca1b5
-              name: 'VM Network Adapter {#ADAPTER.ID} - Packets/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Packets/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Packets/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 77ff3ce1f925440fadc4f1a41fc1260f
-              name: 'VM Network Adapter {#ADAPTER.ID} - Packets Received/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Packets Received/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 833035242ba542f2b5a9eebf40ad32c5
-              name: 'VM Network Adapter {#ADAPTER.ID} - Packets Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\Packets Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 58901234cdef41239567890abc01234a
-              name: 'VM Network Adapter {#ADAPTER.ID} - Bytes Sent/sec'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Bytes Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Sent/sec"]'
               value_type: FLOAT
               units: Bps
               description: 'Network send throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 9234567801234567a901234abc01234e
-              name: 'VM Network Adapter {#ADAPTER.ID} - Packets Outbound Errors'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER_NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors"]'
+              name: 'Network adapter {#ADAPTER.SHORTNAME} - Packets Outbound Errors'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors"]'
               value_type: FLOAT
               description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
@@ -942,6 +1012,8 @@ zabbix_export:
               path: '$["{#ADAPTER.PACKET.DIRECT}"]'
             - lld_macro: '{#ADAPTER.PORT.MIRRORING}'
               path: '$["{#ADAPTER.PORT.MIRRORING}"]'
+            - lld_macro: '{#ADAPTER.SHORTNAME}'
+              path: '$["{#ADAPTER.SHORTNAME}"]'
             - lld_macro: '{#ADAPTER.SR.IOV}'
               path: '$["{#ADAPTER.SR.IOV}"]'
             - lld_macro: '{#ADAPTER.SWITCH}'
