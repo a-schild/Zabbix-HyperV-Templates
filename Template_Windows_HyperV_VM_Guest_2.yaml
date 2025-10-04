@@ -522,46 +522,41 @@ zabbix_export:
               type: DEPENDENT
               key: 'hyperv.vm.network.connected[{#ADAPTER.ID}]'
               delay: '0'
+              value_type: CHAR
+              trends: '0'
               description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               preprocessing:
                 - type: JAVASCRIPT
                   parameters:
                     - |
                       var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID}";
-                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.CONNECTED}";
+                      var diskId = "{#ADAPTER.ID.JS}";
+                      var diskIdMacro = "{"+"#"+"ADAPTER.ID}";
+                      var diskFileMacro= "{"+"#ADAPTER.CONNECTED}";
+                      
                       
                       // Debug: Return info about what we found
-                      if (!data.networks || data.networks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
                       }
                       
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        if (adapter[adapterIdMacro] === adapterId) {
-                          var connected = adapter[searchKey];
-                          if (connected === undefined || connected === null) {
-                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
                           }
-                          return connected;
+                          return fileSize;
                         }
                       }
                       
-                      // Debug: Show what adapter IDs we found and their structure
+                      // Debug: Show what disk IDs we found
                       var foundIds = [];
-                      var firstAdapterKeys = [];
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
-                        if (i === 0) {
-                          firstAdapterKeys = Object.keys(adapter);
-                        }
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
                       }
-                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
-                - type: BOOL_TO_DECIMAL
-                  parameters:
-                    - ''
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 07890abcdef04234a6789abcdef01234
@@ -577,7 +572,7 @@ zabbix_export:
                   parameters:
                     - |
                       var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID}";
+                      var adapterId = "{#ADAPTER.ID.JS}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
                       var searchKey= "{"+"#ADAPTER.MAC}";
                       
@@ -602,7 +597,7 @@ zabbix_export:
                       var firstAdapterKeys = [];
                       for (var i = 0; i < data.networks.length; i++) {
                         var adapter = data.networks[i];
-                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
                         if (i === 0) {
                           firstAdapterKeys = Object.keys(adapter);
                         }
@@ -623,7 +618,7 @@ zabbix_export:
                   parameters:
                     - |
                       var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID}";
+                      var adapterId = "{#ADAPTER.ID.JS}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
                       var searchKey= "{"+"#ADAPTER.SWITCH}";
                       
@@ -648,7 +643,7 @@ zabbix_export:
                       var firstAdapterKeys = [];
                       for (var i = 0; i < data.networks.length; i++) {
                         var adapter = data.networks[i];
-                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
                         if (i === 0) {
                           firstAdapterKeys = Object.keys(adapter);
                         }
@@ -667,7 +662,7 @@ zabbix_export:
                   parameters:
                     - |
                       var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID}";
+                      var adapterId = "{#ADAPTER.ID.JS}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
                       var searchKey= "{"+"#ADAPTER.VLAN}";
                       
@@ -692,7 +687,7 @@ zabbix_export:
                       var firstAdapterKeys = [];
                       for (var i = 0; i < data.networks.length; i++) {
                         var adapter = data.networks[i];
-                        foundIds.push(adapter["{#ADAPTER.ID}"] || "undefined");
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
                         if (i === 0) {
                           firstAdapterKeys = Object.keys(adapter);
                         }
@@ -856,6 +851,8 @@ zabbix_export:
               path: '$["{#ADAPTER.DHCP.GUARD}"]'
             - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
               path: '$["{#ADAPTER.DYNAMIC.MAC}"]'
+            - lld_macro: '{#ADAPTER.ID.JS}'
+              path: '$["{#ADAPTER.ID.JS}"]'
             - lld_macro: '{#ADAPTER.ID}'
               path: '$["{#ADAPTER.ID}"]'
             - lld_macro: '{#ADAPTER.IEEE.PRIORITY}'
