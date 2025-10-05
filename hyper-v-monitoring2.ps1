@@ -409,7 +409,7 @@ function Get-VMNetworkDiscovery {
                             "{#ADAPTER.NAME.TRANSLATED}" = ConvertToEnglish -Value $adapter.Name
                             "{#ADAPTER.SHORTNAME}" = $shortName
                             "{#ADAPTER.ID}" = $adapter.Id
-                            "{#ADAPTER.ID.JS}" = if ($adapter.Id) { $adapter.Id -replace '\\', '\\\\' } else { "" }
+                            "{#ADAPTER.ID.JS}" = if ($adapter.Id) { $adapter.Id -replace '\\', '\\' } else { "" }
                             "{#ADAPTER.COUNTER}" = $adapterCounter
                             "{#ADAPTER.SWITCH}" = $adapter.SwitchName
                             "{#ADAPTER.MAC}" = $adapter.MacAddress
@@ -693,7 +693,7 @@ function Get-VMDetailsById {
                     "{#ADAPTER.NAME.TRANSLATED}" = if ($adapter.Name) { ConvertToEnglish -Value $adapter.Name } else { "Unknown" }
                     "{#ADAPTER.SHORTNAME}" = $shortName
                     "{#ADAPTER.ID}" = if ($adapter.Id) { $adapter.Id } else { "Unknown" }
-                    "{#ADAPTER.ID.JS}" = if ($adapter.Id) { $adapter.Id -replace '\\', '\\\\' } else { "Unknown" }
+                    "{#ADAPTER.ID.JS}" = if ($adapter.Id) { $adapter.Id -replace '\\', '\\' } else { "Unknown" }
                     "{#ADAPTER.COUNTER}" = $adapterCounter
                     "{#ADAPTER.SWITCH}" = if ($adapter.SwitchName) { $adapter.SwitchName } else { "Not Connected" }
                     "{#ADAPTER.MAC}" = if ($adapter.MacAddress) { $adapter.MacAddress } else { "Unknown" }
