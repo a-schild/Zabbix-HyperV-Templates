@@ -1,1056 +1,733 @@
 zabbix_export:
   version: '7.0'
   template_groups:
-    - uuid: 0b4d87047ee14edb98a87b309ee5a803
-      name: 'HyperV VM'
     - uuid: 7df96b18c230490a9a0a9e2307226338
       name: Templates
-    - uuid: aea23489ce3a49b6806ebb28e0cda430
-      name: Windows
+  host_groups:
+    - uuid: 0b4d87047ee14edb98a87b309ee5a803
+      name: 'HyperV VM'
   templates:
-    - uuid: 553c9735a18645849c38ebda859ace9c
-      template: 'Template Windows Hyper-V VM Guest 2'
-      name: 'Template Windows Hyper-V VM Guest 2'
-      description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template'
+    - uuid: b24fe1d11add4b02b46f2e9d87024533
+      template: 'Template Windows Hyper-V Host 2'
+      name: 'Template Windows Hyper-V Host 2'
+      description: |
+        Detect Hyper-V VMs via LLD and create hosts to monitor
+        Needs the Template Windows HyperV VM Guest 2 too
+        
+        See https://github.com/a-schild/Zabbix-HyperV-Templates
       groups:
-        - name: 'HyperV VM'
         - name: Templates
-        - name: Windows
       items:
-        - uuid: 77b70fa1ac3b41259978c203f4ac34f0
-          name: 'Hyper-V VM master data'
-          key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-          delay: 10m
+        - uuid: c74fd58576294ff2a56db97704c963b1
+          name: 'Hyper-V host data'
+          type: ZABBIX_ACTIVE
+          key: hyperv.discovery.host
+          delay: 59m
           value_type: TEXT
           trends: '0'
           description: |
-            Fetch details of VM {$VM.ID}
-            Used for LLD
-            Contains VM details as well as disks and nic informations
+            Retrieves the general Hyper-V host infos
             
-            Needs to be Zabbix agent in passive mode, since the request is sent to the Hyper-V server
+            We need 30 seconds to retrieve all VM configs.
+            
+            We do it once every 59 minutes (not every 60m to have drifting times)
           timeout: 30s
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: e9961c8a8ef1464eb38e31a679118107
+          name: 'Hyper-V VMS master data'
+          type: ZABBIX_ACTIVE
+          key: hyperv.discovery.vms
+          delay: 29m
+          value_type: TEXT
+          trends: '0'
+          description: |
+            Retrieves the general Hyper-V VM list and configs
+            We need 30 seconds to retrieve all VM configs
+            
+            
+            We do it once every 29 minutes (not every 60m to have drifting times)
+          timeout: 30s
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: c686fcfab6c54262a934156cb48504a9
+          name: 'Hyper-V Host free memory'
+          type: CALCULATED
+          key: hyperv.host.memory.free
+          params: 'last(//vm.memory.size[total]) - last(//vm.memory.size[used])'
+          triggers:
+            - uuid: c632f7273c504452a0fdb9b4d51630f3
+              expression: 'last(/Template Windows Hyper-V Host 2/hyperv.host.memory.free)<100'
+              name: 'Hyper-V Host out of memory'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: HIGH
+        - uuid: 839d9e234a0243c8820a94f76f119fb8
+          name: 'Hyper-V VM count'
+          type: DEPENDENT
+          key: hyperv.vms.count
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.TOTAL.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 63f736e67dd04603b33e764c88521b97
+          name: 'Hyper-V VM status off'
+          type: DEPENDENT
+          key: hyperv.vms.count.off
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.OFF.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 8168913491ae4b1799b1ef6ad4b8b882
+          name: 'Hyper-V VM status other'
+          type: DEPENDENT
+          key: hyperv.vms.count.other
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.OTHER.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 24e0212d7a754e46bfdf399514d57854
+          name: 'Hyper-V VM status paused'
+          type: DEPENDENT
+          key: hyperv.vms.count.paused
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.PAUSED.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 76def2b788f749f09d5dff525f9734b8
+          name: 'Hyper-V VM status running'
+          type: DEPENDENT
+          key: hyperv.vms.count.running
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.RUNNING.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 826a3cb5388044168078f3096a59d12f
+          name: 'Hyper-V VM status saved'
+          type: DEPENDENT
+          key: hyperv.vms.count.saved
+          delay: '0'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["{#HOST.VM.SAVED.COUNT}"]'
+          master_item:
+            key: hyperv.discovery.host
+        - uuid: 6367908986344057a2b47cbb8ddd87fb
+          name: 'Hyper-V Average memory pressure'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 339d4fae480f4438ab07b02f8eab55fa
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])>=80 and last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])<100'
+              name: 'Hyper-V Host Memory pressure 80-100%'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+            - uuid: 46ec6d4317484e3d8e1f5a35386e6d2e
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])>=100'
+              name: 'Hyper-V Host Memory pressure 100%'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: HIGH
+            - uuid: 3c20f00e923d4a909545b5714de6121d
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])<80'
+              name: 'Hyper-V Host Memory pressure <80%'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              status: DISABLED
+              priority: INFO
+        - uuid: e821d78e692d4fe9a5aee8efcf835ad0
+          name: 'Hyper-V Logical CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 3db3c5f3b51f44489a30a71a64449567
+          name: 'Hyper-V Logical CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 90656d91814849d4ab23e279cfddad97
+          name: 'Hyper-V Logical CPU Idle Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the processor in an idle state.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 8560faf355c746418b64f9c5fa0ee77d
+              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<=20 and avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)>0'
+              name: 'Hyper-V CPU load over 80%'
+              opdata: 'Load ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+            - uuid: e052005af8a2464ca987be3591c4dcaf
+              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<= 0'
+              name: 'Hyper-V Host CPU load 100%'
+              opdata: 'Load ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: HIGH
+            - uuid: 6b51bc6076134fb98c824704119dbfd1
+              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<10'
+              name: 'Hyper-V Host Idle CPU < 10%'
+              opdata: 'Idle ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+        - uuid: 13c65c374ac64ce5af0188b22fed248a
+          name: 'Hyper-V Root Virtual CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: f8f7a8a647fd405399143575cb213e7c
+          name: 'Hyper-V Root Virtual CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 66a1b3f2df2245cfb1a89a53665befbc
+          name: 'Hyper-V Root Virtual CPU Remote Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor running on a remote node.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 859e1fec865b4ea49ec79e2e72af3efc
+          name: 'Hyper-V Root Virtual CPU Total Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: a7513c5d39744daba9b941c59c209ced
+          name: 'Hyper-V Virtual CPU Guest Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 9c031ed643344bdb8687030a69a3cd20
+          name: 'Hyper-V Virtual CPU Hypervisor Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: d644d39b088441ffb33779e9d2fb279f
+          name: 'Hyper-V Virtual CPU Remote Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor running on a remote node.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: e8fe4b95de3b4a45a40a517451059c5d
+          name: 'Hyper-V Virtual CPU Total Runtime %'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time]'
+          history: 30d
+          value_type: FLOAT
+          units: '%'
+          description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 2cbdcd352aeb4250a23ee445591ec561
+          name: 'Hyper-V Number of Logical CPUs'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor\Logical Processors]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 20d1afa4d39c4bdcaaa28621eb7bab82
+          name: 'Hyper-V Monitored Notifications'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor\Monitored Notifications]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 9caf2f2f25d14cc1a7cf236f716000a2
+          name: 'Hyper-V Number of Partitions (VMs)'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor\Partitions]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: c3edec645a3148f985b70bd4d9f68bda
+          name: 'Hyper-V Total Pages'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor\Total Pages]'
+          delay: 5m
+          history: 2w
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 3b05e4584cc04fc5b243e226e71fad0d
+          name: 'Hyper-V Number of Virtual CPUs'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Hypervisor\Virtual Processors]'
+          delay: 5m
+          history: 2w
+          trends: 90d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 26df9a03fd1f4078a664cbdae694942a
+          name: 'Hyper-V VMs Critical'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical]'
+          history: 30d
+          trends: 90d
+          description: 'The number of critical VMs on a host.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: e1c7915d6d5f46ebae96edf40ed0ad8e
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical])>0'
+              name: 'Hyper-V host has critical VMs'
+              opdata: 'Critical ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: HIGH
+              description: 'The number of VMs running in a critical state.'
+        - uuid: b93e5aa60b4745199c581bb379eded21
+          name: 'Hyper-V VMs OK'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Ok]'
+          history: 30d
+          trends: 90d
+          description: 'The number of OK VM''s on a host.'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: 563e8236f913450ca49bb0e83796077a
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Ok])=0'
+              name: 'Hyper-V host has 0 VMs in OK state'
+              priority: WARNING
+              description: 'Number of VMs in an OK state.'
+        - uuid: cb82c72cc0ad4ff58c83e09e5850c93c
+          name: 'Hyper-V Virtual Switch B/s Received'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Received/sec]'
+          history: 30d
+          value_type: FLOAT
+          units: Bits/sec
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '8'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: 24f9473f101e4d3eb64b52939aa66b1c
+          name: 'Hyper-V Virtual Switch B/s Sent'
+          type: ZABBIX_ACTIVE
+          key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]'
+          history: 30d
+          value_type: FLOAT
+          units: Bits/sec
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '8'
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+        - uuid: ea9570dda2934b228ecb9490513d88d6
+          name: 'Hyper-V Service State'
+          type: ZABBIX_ACTIVE
+          key: 'service.info[vmms]'
+          delay: 5m
+          history: 30d
+          tags:
+            - tag: Application
+              value: 'HyperV Host'
+          triggers:
+            - uuid: f659c1c0060b4b2984b773891142c5a3
+              expression: 'last(/Template Windows Hyper-V Host 2/service.info[vmms])<>0'
+              name: 'Hyper-V service state'
+              opdata: 'Service state ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: HIGH
       discovery_rules:
-        - uuid: f88de644e4f34b72be0b4ad9ed31d27e
-          name: 'VM Disks Discovery'
-          type: DEPENDENT
-          key: hyperv.vm.disks.discovery
-          delay: '0'
-          description: 'Discovers VM disks from vmdetails master data'
+        - uuid: 0bb424a20f1741278efdf0c8c26788ee
+          name: 'Hyper-V VM Discovery'
+          key: hyperv.discover.vms
+          delay: 1h
+          lifetime: 15d
+          enabled_lifetime_type: DISABLE_NEVER
+          description: |
+            HyperV Guest VM Discovery
+            Requires PowerShell script installed on HyperV Host.
           item_prototypes:
-            - uuid: 6b82378db618441697310230272ad120
-              name: 'Disk {#DISK.ID} - File Size'
-              type: DEPENDENT
-              key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
-              delay: '0'
-              units: GB
-              description: 'Actual file size of disk {#DISK.ID} at {#DISK.PATH}'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var diskId = "{#DISK.ID}";
-                      var diskIdMacro = "{"+"#"+"DISK.ID}";
-                      var diskFileSizeMacro= "{"+"#DISK.FILE.SIZE.GB}";
-                      
-                      
-                      // Debug: Return info about what we found
-                      if (!data.disks || data.disks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No disks array found";
-                      }
-                      
-                      for (var i = 0; i < data.disks.length; i++) {
-                        var disk = data.disks[i];
-                        if (disk[diskIdMacro] === diskId) {
-                          var fileSize = disk[diskFileSizeMacro];
-                          if (!fileSize) {
-                            throw "ZBX_UNSUPPORTED: Field "+diskFileSizeMacro+" not found or empty";
-                          }
-                          return fileSize;
-                        }
-                      }
-                      
-                      // Debug: Show what disk IDs we found
-                      var foundIds = [];
-                      for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i][diskIdMacro ]);
-                      }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: d4e5f67890ab4cde90123456789abce1
-              name: 'Disk {#DISK.ID} - Fragmentation'
-              type: DEPENDENT
-              key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
-              delay: '0'
-              units: '%'
-              description: 'Fragmentation percentage of disk {#DISK.ID} at {#DISK.PATH}'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var diskId = "{#DISK.ID}";
-                      var diskIdMacro = "{"+"#"+"DISK.ID}";
-                      var diskFileMacro= "{"+"#DISK.FRAGMENTATION}";
-                      
-                      
-                      // Debug: Return info about what we found
-                      if (!data.disks || data.disks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No disks array found";
-                      }
-                      
-                      for (var i = 0; i < data.disks.length; i++) {
-                        var disk = data.disks[i];
-                        if (disk[diskIdMacro] === diskId) {
-                          var fileSize = disk[diskFileMacro];
-                          if (!fileSize) {
-                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
-                          }
-                          return fileSize;
-                        }
-                      }
-                      
-                      // Debug: Show what disk IDs we found
-                      var foundIds = [];
-                      for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i][diskIdMacro ]);
-                      }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: c3d4e5f678904abca0123456789abce0
-              name: 'Disk {#DISK.ID} - Minimum Size'
-              type: DEPENDENT
-              key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
-              delay: '0'
-              units: GB
-              description: 'Minimum size of disk {#DISK.ID} at {#DISK.PATH}'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var diskId = "{#DISK.ID}";
-                      var diskIdMacro = "{"+"#"+"DISK.ID}";
-                      var diskFileMacro= "{"+"#DISK.MINIMUM.SIZE.GB}";
-                      
-                      
-                      // Debug: Return info about what we found
-                      if (!data.disks || data.disks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No disks array found";
-                      }
-                      
-                      for (var i = 0; i < data.disks.length; i++) {
-                        var disk = data.disks[i];
-                        if (disk[diskIdMacro] === diskId) {
-                          var fileSize = disk[diskFileMacro];
-                          if (!fileSize) {
-                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
-                          }
-                          return fileSize;
-                        }
-                      }
-                      
-                      // Debug: Show what disk IDs we found
-                      var foundIds = [];
-                      for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i][diskIdMacro ]);
-                      }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: d0a43283e4f54f9db7db44323da04be9
-              name: 'Disk {#DISK.ID} - Size Free'
-              type: CALCULATED
-              key: 'hyperv.vm.disk.size.free[{#DISK.ID}]'
-              units: GB
-              params: 'last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
-              description: 'Compare disk size and dynamical growing {#DISK.ID}]'
-            - uuid: a1b2c3d4e5f64789a0123456789abcde
-              name: 'Disk {#DISK.ID} - Size'
-              type: DEPENDENT
-              key: 'hyperv.vm.disk.size[{#DISK.ID}]'
-              delay: '0'
-              units: GB
-              description: 'Current size of disk {#DISK.ID} at {#DISK.PATH}'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var diskId = "{#DISK.ID}";
-                      var diskIdMacro = "{"+"#"+"DISK.ID}";
-                      var diskFileMacro= "{"+"#DISK.SIZE.GB}";
-                      
-                      
-                      // Debug: Return info about what we found
-                      if (!data.disks || data.disks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No disks array found";
-                      }
-                      
-                      for (var i = 0; i < data.disks.length; i++) {
-                        var disk = data.disks[i];
-                        if (disk[diskIdMacro] === diskId) {
-                          var fileSize = disk[diskFileMacro];
-                          if (!fileSize) {
-                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
-                          }
-                          return fileSize;
-                        }
-                      }
-                      
-                      // Debug: Show what disk IDs we found
-                      var foundIds = [];
-                      for (var i = 0; i < data.disks.length; i++) {
-                        foundIds.push(data.disks[i][diskIdMacro ]);
-                      }
-                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: eb58e4dceda34b3eaf0cd61c47f9f645
-              name: 'Disk {#DISK.ID}] - Size used'
-              type: CALCULATED
-              key: 'hyperv.vm.disk.usedsize[{#DISK.ID}]'
-              units: '%'
-              params: '100*(last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}]))/last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
-            - uuid: 36789012abcd4f018789012abc012348
-              name: 'Disk {#DISK.ID} - Average Write Latency'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
-              value_type: FLOAT
-              status: DISABLED
-              discover: NO_DISCOVER
-              units: s
-              description: 'Average disk write latency for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 9cf62d67d8d747929da2e9cce796d966
-              name: 'Disk {#DISK.ID} - Byte Quota Replenishment Rate'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Byte Quota Replenishment Rate"]'
-              value_type: FLOAT
-              description: 'Byte Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: e15ccda5219a4584bbc142f441dc1a59
-              name: 'Disk {#DISK.ID} - Error Count'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
-              value_type: FLOAT
-              description: 'Error Count for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 0024b57796ba443eaf2e96c1f9517c35
-              name: 'Disk {#DISK.ID} - Flush Count'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
-              value_type: FLOAT
-              description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 32aee40dd4b748da85efc088efbe58d7
-              name: 'Disk {#DISK.ID} - Io Quota Replenishment Rate'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
-              value_type: FLOAT
-              status: DISABLED
-              discover: NO_DISCOVER
-              description: 'Io Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: cffaaddc2de34fcc8c61bdcb07af71cd
-              name: 'Disk {#DISK.ID} - Latency'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"]'
-              value_type: FLOAT
-              description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-              trigger_prototypes:
-                - uuid: de980912c1d848e6878cd08942c1948f
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])<0.01'
-                  name: 'Disk {#DISK.ID} latency ok < 10ms'
-                  opdata: 'last(/Template Windows HyperV VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])'
-                  priority: INFO
-                - uuid: 1a9d660132a440af8b2052f6e5bfbcd8
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])>0.015'
-                  name: 'Disk {#DISK.ID} latency warning > 15ms'
-                  opdata: 'last(/Template Windows HyperV VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])'
-                  priority: WARNING
-                  dependencies:
-                    - name: 'Disk {#DISK.ID} latency warning > 25ms'
-                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])>0.025'
-                - uuid: ac4a41a939ac4eee8d7077bbd4f46e52
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])>0.025'
-                  name: 'Disk {#DISK.ID} latency warning > 25ms'
-                  opdata: 'last(/Template Windows HyperV VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"])'
-                  priority: AVERAGE
-            - uuid: 25678901abcd4f018678901abc012347
-              name: 'Disk {#DISK.ID} - Lower Latency'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
-              value_type: FLOAT
-              units: s
-              description: 'Lower Latency for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 5aa9ba08dcb9470fa66f6c137ef6a301
-              name: 'Disk {#DISK.ID} - Lower Queue Length'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Queue Length"]'
-              value_type: FLOAT
-              units: s
-              description: 'Lower Queue Length for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: be5ed5f2658d46f4b8bb5ad79c93c7cc
-              name: 'Disk {#DISK.ID} - Maximum Adapter Worker Count'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Adapter Worker Count"]'
-              value_type: FLOAT
-              description: 'Maximum Adapter Worker Count for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: cb22af897eaf4ea9a878fe2a34f4e190
-              name: 'Disk {#DISK.ID} - Maximum Bandwidth'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Bandwidth"]'
-              value_type: FLOAT
-              description: 'Maximum Bandwidth for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 4e662b9c9ac14cb1a79177c58120ef66
-              name: 'Disk {#DISK.ID} - Maximum IO Rate'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
-              value_type: FLOAT
-              status: DISABLED
-              discover: NO_DISCOVER
-              description: 'Maximum IO Rate for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 33085294c6b649dbbb3ccb7deced1f6b
-              name: 'Disk {#DISK.ID} - Minimum IO Rate'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
-              value_type: FLOAT
-              status: DISABLED
-              discover: NO_DISCOVER
-              description: 'Minimum IO Rate for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 5851d1ef4a7748ffb53ee514c9afffe4
-              name: 'Disk {#DISK.ID} - Normalized Throughput'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
-              value_type: FLOAT
-              description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
-              name: 'Disk {#DISK.ID} - Queue Length'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Queue Length"]'
-              value_type: FLOAT
-              description: 'Queue Length for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: e1f234567890472d9f0123456789abc0
-              name: 'Disk {#DISK.ID} - Read Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 1913a23214b54c4c8c1fbc3b04367a4a
-              name: 'Disk {#DISK.ID} - Read Count'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
-              value_type: FLOAT
-              description: 'Read Count for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 03456789abcd4f018456789abc012345
-              name: 'Disk {#DISK.ID} - Read Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec"]'
-              value_type: FLOAT
-              units: ops
-              description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: bc0d3ed4e9c94cf992201a8dfb557805
-              name: 'Disk {#DISK.ID} - Throughput'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
-              value_type: FLOAT
-              description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: f2345678abcd4f0183456789abc01234
-              name: 'Disk {#DISK.ID} - Write Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 5417373178af40a4a86da68f8accc1bf
-              name: 'Disk {#DISK.ID} - Write Count'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
-              value_type: FLOAT
-              description: 'Write Count for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-            - uuid: 14567890abcd4f018567890abc012346
-              name: 'Disk {#DISK.ID} - Write Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec"]'
-              value_type: FLOAT
-              units: ops
-              description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
-              timeout: 30s
-          graph_prototypes:
-            - uuid: b813a689babe4e49a9bec2ad8f5b258b
-              name: 'Disk counters {#DISK.ID}'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: FF0080
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
-                - sortorder: '1'
-                  color: BF00FF
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
-                - sortorder: '2'
-                  color: 0080FF
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
-                - sortorder: '3'
-                  color: '274482'
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
-            - uuid: ee9ac9a8ec434dc1983cc1039dd78113
-              name: 'Disk IO rate {#DISK.ID}'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: 1A7C11
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
-                - sortorder: '1'
-                  color: '274482'
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
-                - sortorder: '2'
-                  color: F63100
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
-              discover: NO_DISCOVER
-            - uuid: 22e079999e9149f989280d7c30fba97b
-              name: 'Disk latency {#DISK_ID}'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: 1A7C11
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
-                - sortorder: '1'
-                  color: '274482'
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency"]'
-                - sortorder: '2'
-                  color: F63100
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
-            - uuid: d3ed810673934007ab32f21f265537c1
-              name: 'Disk Read/Write {#DISK.ID}'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: 1A7C11
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec"]'
-                - sortorder: '1'
-                  color: '274482'
-                  yaxisside: RIGHT
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
-                - sortorder: '2'
-                  color: F63100
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec"]'
-                - sortorder: '3'
-                  color: 2774A4
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec"]'
-                - sortorder: '4'
-                  color: A54F10
-                  yaxisside: RIGHT
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
-                - sortorder: '5'
-                  color: FC6EA3
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec"]'
-            - uuid: abfaff554baf4f689b9064855f533c8b
-              name: 'Disk {#DISK.ID} size'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: '274482'
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
-                - sortorder: '1'
-                  color: 1A7C11
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
-                - sortorder: '2'
-                  color: A54F10
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.usedsize[{#DISK.ID}]'
-                - sortorder: '3'
-                  color: FF8000
-                  yaxisside: RIGHT
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
-                - sortorder: '4'
-                  drawtype: FILLED_REGION
-                  color: 00FF00
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.size.free[{#DISK.ID}]'
-                - sortorder: '5'
-                  drawtype: FILLED_REGION
-                  color: D2D2D2
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.size[{#DISK.ID}]'
-          master_item:
-            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-          lld_macro_paths:
-            - lld_macro: '{#DISK.CONTROLLER}'
-              path: '$["{#DISK.CONTROLLER}"]'
-            - lld_macro: '{#DISK.FILE.SIZE.GB}'
-              path: '$["{#DISK.FILE.SIZE.GB}"]'
-            - lld_macro: '{#DISK.FRAGMENTATION}'
-              path: '$["{#DISK.FRAGMENTATION}"]'
-            - lld_macro: '{#DISK.ID}'
-              path: '$["{#DISK.ID}"]'
-            - lld_macro: '{#DISK.LOCATION}'
-              path: '$["{#DISK.LOCATION}"]'
-            - lld_macro: '{#DISK.MINIMUM.SIZE.GB}'
-              path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
-            - lld_macro: '{#DISK.NUMBER}'
-              path: '$["{#DISK.NUMBER}"]'
-            - lld_macro: '{#DISK.PATH_COUNTER}'
-              path: '$["{#DISK.PATH_COUNTER}"]'
-            - lld_macro: '{#DISK.PATH}'
-              path: '$["{#DISK.PATH}"]'
-            - lld_macro: '{#DISK.SIZE.GB}'
-              path: '$["{#DISK.SIZE.GB}"]'
-            - lld_macro: '{#DISK.VHD.FORMAT}'
-              path: '$["{#DISK.VHD.FORMAT}"]'
-            - lld_macro: '{#DISK.VHD.TYPE}'
-              path: '$["{#DISK.VHD.TYPE}"]'
-          preprocessing:
-            - type: JSONPATH
-              parameters:
-                - '$["disks"]'
-        - uuid: 253533ec0932452fae14861f85ae1ad5
-          name: 'VM Network Adapters Discovery'
-          type: DEPENDENT
-          key: hyperv.vm.networks.discovery
-          delay: '0'
-          description: 'Discovers VM network adapters from vmdetails master data'
-          item_prototypes:
-            - uuid: e5f67890abcd4ef0823456789abcdef2
-              name: '{#ADAPTER.SHORTNAME} - Connected'
-              type: DEPENDENT
-              key: 'hyperv.vm.network.connected[{#ADAPTER.ID}]'
-              delay: '0'
-              value_type: CHAR
-              trends: '0'
-              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID.JS}";
-                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.CONNECTED}";
-                      
-                      // Debug: Return info about what we found
-                      if (!data.networks || data.networks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
-                      }
-                      
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        if (adapter[adapterIdMacro] === adapterId) {
-                          var connected = adapter[searchKey];
-                          if (connected === undefined || connected === null) {
-                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
-                          }
-                          return connected;
-                        }
-                      }
-                      
-                      // Debug: Show what adapter IDs we found and their structure
-                      var foundIds = [];
-                      var firstAdapterKeys = [];
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        foundIds.push(adapter[adapterIdMacro] || "undefined");
-                        if (i === 0) {
-                          firstAdapterKeys = Object.keys(adapter);
-                        }
-                      }
-                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: 07890abcdef04234a6789abcdef01234
-              name: '{#ADAPTER.SHORTNAME} - MAC Address'
-              type: DEPENDENT
-              key: 'hyperv.vm.network.mac[{#ADAPTER.ID}]'
-              delay: '0'
+            - uuid: 23ad2a0c2494465d96a19403bfe74edc
+              name: 'Replication {#VMNAME}'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.vm.replication[{#VMNAME_SAFE}]'
+              delay: 10m
+              history: 90d
               value_type: TEXT
               trends: '0'
-              description: 'MAC address of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID.JS}";
-                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.MAC}";
-                      
-                      // Debug: Return info about what we found
-                      if (!data.networks || data.networks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
-                      }
-                      
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        if (adapter[adapterIdMacro] === adapterId) {
-                          var connected = adapter[searchKey];
-                          if (connected === undefined || connected === null) {
-                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
-                          }
-                          return connected;
-                        }
-                      }
-                      
-                      // Debug: Show what adapter IDs we found and their structure
-                      var foundIds = [];
-                      var firstAdapterKeys = [];
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        foundIds.push(adapter[adapterIdMacro] || "undefined");
-                        if (i === 0) {
-                          firstAdapterKeys = Object.keys(adapter);
-                        }
-                      }
-                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: f6789abcdef04123956789abcdef0123
-              name: '{#ADAPTER.SHORTNAME} - Connected switch'
-              type: DEPENDENT
-              key: 'hyperv.vm.network.switch[{#ADAPTER.ID}]'
-              delay: '0'
-              value_type: TEXT
-              trends: '0'
-              description: 'Virtual switch of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID.JS}";
-                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.SWITCH}";
-                      
-                      // Debug: Return info about what we found
-                      if (!data.networks || data.networks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
-                      }
-                      
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        if (adapter[adapterIdMacro] === adapterId) {
-                          var connected = adapter[searchKey];
-                          if (connected === undefined || connected === null) {
-                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
-                          }
-                          return connected;
-                        }
-                      }
-                      
-                      // Debug: Show what adapter IDs we found and their structure
-                      var foundIds = [];
-                      var firstAdapterKeys = [];
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        foundIds.push(adapter[adapterIdMacro] || "undefined");
-                        if (i === 0) {
-                          firstAdapterKeys = Object.keys(adapter);
-                        }
-                      }
-                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: 18901bcdef014345b789abcdef012345
-              name: '{#ADAPTER.SHORTNAME} - VLAN'
-              type: DEPENDENT
-              key: 'hyperv.vm.network.vlan[{#ADAPTER.ID}]'
-              delay: '0'
-              description: 'VLAN ID of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var data = JSON.parse(value);
-                      var adapterId = "{#ADAPTER.ID.JS}";
-                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
-                      var searchKey= "{"+"#ADAPTER.VLAN}";
-                      
-                      // Debug: Return info about what we found
-                      if (!data.networks || data.networks.length === 0) {
-                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
-                      }
-                      
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        if (adapter[adapterIdMacro] === adapterId) {
-                          var connected = adapter[searchKey];
-                          if (connected === undefined || connected === null) {
-                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
-                          }
-                          return connected;
-                        }
-                      }
-                      
-                      // Debug: Show what adapter IDs we found and their structure
-                      var foundIds = [];
-                      var firstAdapterKeys = [];
-                      for (var i = 0; i < data.networks.length; i++) {
-                        var adapter = data.networks[i];
-                        foundIds.push(adapter[adapterIdMacro] || "undefined");
-                        if (i === 0) {
-                          firstAdapterKeys = Object.keys(adapter);
-                        }
-                      }
-                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
-              master_item:
-                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: 5f4cb2167042457b837dbe55575d1059
-              name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Received/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Received/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Broadcast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
-            - uuid: b5e977aeaf954c9bb847933993797057
-              name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Sent/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Broadcast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 2a63b6e5f87d4a1884a3698a980ccae3
-              name: '{#ADAPTER.SHORTNAME} - Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Bytes/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 47890123bcde40129456789abc012349
-              name: '{#ADAPTER.SHORTNAME} - Bytes Received/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Received/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Network receive throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 58901234cdef41239567890abc01234a
-              name: '{#ADAPTER.SHORTNAME} - Bytes Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Sent/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Network send throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: ee916f90d15d4c39bc558fbfddbc7eea
-              name: '{#ADAPTER.SHORTNAME} - Directed Packets Received/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Received/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Directed Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 750d0709df7647a4870f55b02d008b57
-              name: '{#ADAPTER.SHORTNAME} - Directed Packets Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Sent/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 6acea1c4f88545a4aae8738a53d2d361
-              name: '{#ADAPTER.SHORTNAME} - Dropped Packets Incoming/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Dropped Packets Incoming/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 20b58667c42a47d19336808e8b56e96a
-              name: '{#ADAPTER.SHORTNAME} - Dropped Packets Outgoing/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Dropped Packets Outgoing/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: d3549d8bc1c04fe68d7b76a9b6dbea64
-              name: '{#ADAPTER.SHORTNAME} - IPsec offload Bytes Receive/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\IPsec offload Bytes Receive/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'IPsec offload Bytes Receive/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 85d28674b6ba4d7082de4677496de8b5
-              name: '{#ADAPTER.SHORTNAME} - IPsec offload Bytes Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\IPsec offload Bytes Sent/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'IPsec offload Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: a89de1b7ad224e899ab49fe401cf9e8a
-              name: '{#ADAPTER.SHORTNAME} - Multicast Packets Received/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Received/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Multicast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 4939735e553e4c54a96a642481bedda6
-              name: '{#ADAPTER.SHORTNAME} - Multicast Packets Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Sent/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Multicast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: fb869b95a8484ca5933049cc13e9005e
-              name: '{#ADAPTER.SHORTNAME} - Output Queue Length'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length"]'
-              value_type: FLOAT
-              description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
+              tags:
+                - tag: application
+                  value: 'HyperV Host'
               trigger_prototypes:
-                - uuid: 59299a37d4e446139053fcc1d345e89e
-                  expression: 'avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length"],5m)=0'
-                  name: 'Network adapter {#ADAPTER.SHORTNAME} output queue length ok'
-                  opdata: 'avg(/Template Windows HyperV VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\OutputQueue Length"]'
-                  priority: INFO
-                - uuid: b7c647f585804b5bab9733ec80b170f6
-                  expression: 'avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length"],5m)>1 and avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length"],5m)<2'
-                  name: 'Network adapter {#ADAPTER.SHORTNAME} output queue length warning (1-2)'
-                  opdata: 'avg(/Template Windows HyperV VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\OutputQueue Length"]'
-                  priority: WARNING
-                - uuid: 3b0a30a62ced459daef63eea5aade902
-                  expression: 'avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length"],5m)>2'
-                  name: 'Network adapter {#ADAPTER.SHORTNAME} output queue length warning (>2)'
-                  opdata: 'avg(/Template Windows HyperV VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER)\OutputQueue Length"]'
+                - uuid: 6fdae3fd74264b19b417697178c45aa4
+                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.replication[{#VMNAME_SAFE}],,"regexp","Critical")=1'
+                  name: 'Replication state {#VMNAME} critical'
                   priority: HIGH
-            - uuid: 4c48cc320f38443eb9fac841fd7ca1b5
-              name: '{#ADAPTER.SHORTNAME} - Packets/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Packets/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+                - uuid: bae3bc3117314e7ba4299e1f1ee1e2ff
+                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.replication[{#VMNAME_SAFE}],,"regexp","Warning")=1'
+                  name: 'Replication state {#VMNAME} warning'
+                  priority: WARNING
+            - uuid: 900cba1fd9434476ba87508bcdd4e959
+              name: 'VM status {#VMNAME}'
+              type: ZABBIX_ACTIVE
+              key: 'hyperv.vm.status[{#VMNAME_SAFE}]'
+              delay: 5m
+              history: 90d
+              value_type: TEXT
+              trends: '0'
+              description: 'Status of VM'
               timeout: 30s
-            - uuid: 9234567801234567a901234abc01234e
-              name: '{#ADAPTER.SHORTNAME} - Packets Outbound Errors'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors"]'
-              value_type: FLOAT
-              description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 77ff3ce1f925440fadc4f1a41fc1260f
-              name: '{#ADAPTER.SHORTNAME} - Packets Received/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received/sec"]'
-              value_type: FLOAT
-              units: Bps
-              description: 'Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 81234567f01244569890123abc01234d
-              name: '{#ADAPTER.SHORTNAME} - Packets Received Errors'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received Errors"]'
-              value_type: FLOAT
-              description: 'Network receive errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-            - uuid: 70123456ef0143459789012abc01234c
-              name: '{#ADAPTER.SHORTNAME} - Packets Sent/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Sent/sec"]'
-              value_type: FLOAT
-              units: pps
-              description: 'Network send packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
-              timeout: 30s
-          graph_prototypes:
-            - uuid: 5c75e34811304f89adbd61b737921a8e
-              name: '{#ADAPTER.SHORTNAME} traffic'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: A54F10
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes/sec"]'
-                - sortorder: '1'
-                  drawtype: BOLD_LINE
-                  color: 80CBC4
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Received/sec"]'
-                - sortorder: '2'
-                  drawtype: BOLD_LINE
-                  color: AED581
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Sent/sec"]'
-            - uuid: cc8b4211f7614a7a897d2345f7cf0d0d
-              name: '{#ADAPTER.SHORTNAME} traffic packets'
-              ymin_type_1: FIXED
-              graph_items:
-                - color: B2EBF2
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Received/sec"]'
-                - sortorder: '1'
-                  color: 4DD0E1
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Sent/sec"]'
-                - sortorder: '2'
-                  color: 66BB6A
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Received/sec"]'
-                - sortorder: '3'
-                  color: 2774A4
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Sent/sec"]'
-                - sortorder: '4'
-                  color: A54F10
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec"]'
-                - sortorder: '5'
-                  color: FF8000
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec"]'
-                - sortorder: '6'
-                  color: 6C59DC
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Received/sec"]'
-                - sortorder: '7'
-                  color: AC8C14
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Sent/sec"]'
-                - sortorder: '8'
-                  color: 611F27
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets/sec"]'
-                - sortorder: '9'
-                  color: FF0000
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors"]'
-                - sortorder: '10'
-                  color: 5CCD18
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received/sec"]'
-                - sortorder: '11'
-                  color: BB2A02
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received Errors"]'
-                - sortorder: '12'
-                  color: 5A2B57
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Sent/sec"]'
+              tags:
+                - tag: application
+                  value: 'HyperV Host'
+              trigger_prototypes:
+                - uuid: 1c710786e45b4c7d810955fa3a0d6417
+                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.status[{#VMNAME_SAFE}],1s,"like","Saved")=1'
+                  name: '{#VMNAME} in saved state'
+                  priority: HIGH
+                - uuid: 1c651d66ab8f4d4bb813b14795acd96f
+                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.status[{#VMNAME_SAFE}],1s,"like","Off")=1'
+                  name: '{#VMNAME} is Off'
+                  status: DISABLED
+                  priority: INFO
+          host_prototypes:
+            - uuid: 7cea3780685d4c87942d7676269e8cb8
+              host: '{#VMNAME_SAFE}_{#VMHOST}'
+              name: '{#VMNAME}_{#VMHOST}'
+              group_links:
+                - group:
+                    name: 'HyperV VM'
+              group_prototypes:
+                - name: 'Hyper-V Host [{#VMHOST}]'
+              templates:
+                - name: 'Template Windows Hyper-V VM Guest 2'
+              tags:
+                - tag: target
+                  value: hyper-v
+                - tag: target
+                  value: hyper-v-vm
+          timeout: 30s
+        - uuid: de4954b68aaf4c7cb219a0f393377777
+          name: 'Hyper-V VM Disk Discovery'
+          type: DEPENDENT
+          key: hyperv.discover.vms.data
+          delay: '0'
+          host_prototypes:
+            - uuid: 10df6bc5f7444f30bfa5dfd5ab34781a
+              host: '{#VM.ID} {#VMHOST.FQDN}'
+              name: '{#VM.NAME} on {#VMHOST.FQDN}'
+              group_links:
+                - group:
+                    name: 'HyperV VM'
+              group_prototypes:
+                - name: 'VMs on {#VMHOST.FQDN}'
+              templates:
+                - name: 'Template Windows Hyper-V VM Guest 2'
+              macros:
+                - macro: '{$VM.ID}'
+                  value: '{#VM.ID}'
+                  description: 'Unique ID of VM'
+                - macro: '{$VMHOST.FQDN}'
+                  value: '{#VMHOST.FQDN}'
+                  description: 'Located on this Hyper-V host'
+              tags:
+                - tag: hyper-v-host
+                  value: '{#VMHOST.FQDN}'
+                - tag: target
+                  value: hyper-v
+                - tag: target
+                  value: hyper-v-vm
           master_item:
-            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-          lld_macro_paths:
-            - lld_macro: '{#ADAPTER.CONNECTED}'
-              path: '$["{#ADAPTER.CONNECTED}"]'
-            - lld_macro: '{#ADAPTER.COUNTER}'
-              path: '$["{#ADAPTER.COUNTER}"]'
-            - lld_macro: '{#ADAPTER.DHCP.GUARD}'
-              path: '$["{#ADAPTER.DHCP.GUARD}"]'
-            - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
-              path: '$["{#ADAPTER.DYNAMIC.MAC}"]'
-            - lld_macro: '{#ADAPTER.ID.JS}'
-              path: '$["{#ADAPTER.ID.JS}"]'
-            - lld_macro: '{#ADAPTER.ID}'
-              path: '$["{#ADAPTER.ID}"]'
-            - lld_macro: '{#ADAPTER.IEEE.PRIORITY}'
-              path: '$["{#ADAPTER.IEEE.PRIORITY}"]'
-            - lld_macro: '{#ADAPTER.IS.LEGACY}'
-              path: '$["{#ADAPTER.IS.LEGACY}"]'
-            - lld_macro: '{#ADAPTER.MAC.SPOOFING}'
-              path: '$["{#ADAPTER.MAC.SPOOFING}"]'
-            - lld_macro: '{#ADAPTER.MAC}'
-              path: '$["{#ADAPTER.MAC}"]'
-            - lld_macro: '{#ADAPTER.NAME.TRANSLATED}'
-              path: '$["{#ADAPTER.NAME.TRANSLATED}"]'
-            - lld_macro: '{#ADAPTER.NAME}'
-              path: '$["{#ADAPTER.NAME}"]'
-            - lld_macro: '{#ADAPTER.PACKET.DIRECT}'
-              path: '$["{#ADAPTER.PACKET.DIRECT}"]'
-            - lld_macro: '{#ADAPTER.PORT.MIRRORING}'
-              path: '$["{#ADAPTER.PORT.MIRRORING}"]'
-            - lld_macro: '{#ADAPTER.SHORTNAME}'
-              path: '$["{#ADAPTER.SHORTNAME}"]'
-            - lld_macro: '{#ADAPTER.SR.IOV}'
-              path: '$["{#ADAPTER.SR.IOV}"]'
-            - lld_macro: '{#ADAPTER.SWITCH}'
-              path: '$["{#ADAPTER.SWITCH}"]'
-            - lld_macro: '{#ADAPTER.VLAN}'
-              path: '$["{#ADAPTER.VLAN}"]'
-            - lld_macro: '{#ADAPTER.VM.QUEUE}'
-              path: '$["{#ADAPTER.VM.QUEUE}"]'
-            - lld_macro: '{#VM.NAME}'
-              path: '$["{#VM.NAME}"]'
+            key: hyperv.discovery.vms
           preprocessing:
-            - type: JSONPATH
+            - type: DISCARD_UNCHANGED_HEARTBEAT
               parameters:
-                - '$["networks"]'
+                - 2h
       tags:
-        - tag: class
-          value: software
         - tag: target
-          value: hyper-v
+          value: hyper-v-host
         - tag: target
-          value: hyper-v-vm
+          value: hyperv
+      dashboards:
+        - uuid: 53891ef2820347ecad4a9d16ab1062a0
+          name: 'Hyper-V Host'
+          pages:
+            - widgets:
+                - type: graph
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        name: 'Hyper-V CPUs, VMs & Notifications'
+                    - type: STRING
+                      name: reference
+                      value: TQIAT
+                - type: graph
+                  'y': '5'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        name: 'Hyper-V Network'
+                    - type: STRING
+                      name: reference
+                      value: TYHUD
+                - type: graph
+                  'y': '10'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        name: 'Hyper-V VM Status'
+                    - type: STRING
+                      name: reference
+                      value: AJBNT
+                - type: graph
+                  x: '36'
+                  width: '35'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        name: 'Hyper-V CPU Total'
+                    - type: STRING
+                      name: reference
+                      value: LJGAN
+                - type: graph
+                  x: '36'
+                  'y': '5'
+                  width: '35'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        name: 'Hyper-V Total Pages'
+                    - type: STRING
+                      name: reference
+                      value: VCNGI
+  triggers:
+    - uuid: f6a36d3b6d4346ada278f9bf868355e0
+      expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor\Virtual Processors])/last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor\Logical Processors])>5'
+      name: 'Hyper-V Virtual to Logical CPU Ratio > 5:1'
+      opdata: 'Ratio ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+      priority: WARNING
+  graphs:
+    - uuid: 62aa40ada1274dad8586149bef71a839
+      name: 'Hyper-V CPUs, VMs & Notifications'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 0000EE
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor\Logical Processors]'
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: 33FFFF
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor\Virtual Processors]'
+        - sortorder: '2'
+          drawtype: BOLD_LINE
+          color: DD0000
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor\Partitions]'
+        - sortorder: '3'
+          drawtype: BOLD_LINE
+          color: 00CC00
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor\Monitored Notifications]'
+    - uuid: 1300642f5ebc4ee5a49454d02adde322
+      name: 'Hyper-V CPU Total'
+      height: '400'
+      show_triggers: 'NO'
+      type: STACKED
+      ymax_type_1: FIXED
+      graph_items:
+        - color: 00CC00
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]'
+        - sortorder: '1'
+          color: DD0000
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]'
+    - uuid: 399eb5c2ccae410f93fbe61ad35e6d55
+      name: 'Hyper-V Network'
+      height: '300'
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: 3333FF
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Received/sec]'
+        - sortorder: '1'
+          drawtype: GRADIENT_LINE
+          color: 00DD00
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]'
+    - uuid: ea96c817763f465dacf0e3763f832b05
+      name: 'Hyper-V Total Pages'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: C80000
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Hypervisor\Total Pages]'
+    - uuid: c169ebf1c2a24285a523b7b53a232373
+      name: 'Hyper-V VM Status'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: C80000
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical]'
+        - sortorder: '1'
+          color: '274482'
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.vms.count
+        - sortorder: '2'
+          color: '000000'
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.vms.count.off
+        - sortorder: '3'
+          color: F63100
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.vms.count.other
+        - sortorder: '4'
+          color: FFBF00
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.vms.count.paused
+        - sortorder: '5'
+          drawtype: BOLD_LINE
+          color: 00FF00
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.vms.count.running
+        - sortorder: '6'
+          color: FC6EA3
+          calc_fnc: ALL
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.vms.count.saved
+        - sortorder: '7'
+          drawtype: BOLD_LINE
+          color: 00C800
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Ok]'

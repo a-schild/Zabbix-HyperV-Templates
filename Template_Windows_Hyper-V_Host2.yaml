@@ -61,7 +61,7 @@ zabbix_export:
             - uuid: c632f7273c504452a0fdb9b4d51630f3
               expression: 'last(/Template Windows Hyper-V Host 2/hyperv.host.memory.free)<100'
               name: 'Hyper-V Host out of memory'
-              opdata: 'last(/Template Windows HyperV Host 2/hyperv.host.memory.free)'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
         - uuid: 839d9e234a0243c8820a94f76f119fb8
           name: 'Hyper-V VM count'
@@ -144,17 +144,18 @@ zabbix_export:
             - uuid: 339d4fae480f4438ab07b02f8eab55fa
               expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])>=80 and last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])<100'
               name: 'Hyper-V Host Memory pressure 80-100%'
-              opdata: 'last(/Template Windows HyperV Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
             - uuid: 46ec6d4317484e3d8e1f5a35386e6d2e
               expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])>=100'
               name: 'Hyper-V Host Memory pressure 100%'
-              opdata: 'last(/Template Windows HyperV Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
             - uuid: 3c20f00e923d4a909545b5714de6121d
               expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])<80'
               name: 'Hyper-V Host Memory pressure <80%'
-              opdata: 'last(/Template Windows HyperV Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])'
+              opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              status: DISABLED
               priority: INFO
         - uuid: e821d78e692d4fe9a5aee8efcf835ad0
           name: 'Hyper-V Logical CPU Guest Runtime %'
@@ -193,16 +194,17 @@ zabbix_export:
             - uuid: 8560faf355c746418b64f9c5fa0ee77d
               expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<=20 and avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)>0'
               name: 'Hyper-V CPU load over 80%'
-              opdata: 'avg(/Template Windows HyperV Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)'
+              opdata: 'Load ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
             - uuid: e052005af8a2464ca987be3591c4dcaf
               expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<= 0'
               name: 'Hyper-V Host CPU load 100%'
-              opdata: 'avg(/Template Windows HyperV Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)'
+              opdata: 'Load ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
             - uuid: 6b51bc6076134fb98c824704119dbfd1
               expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<10'
               name: 'Hyper-V Host Idle CPU < 10%'
+              opdata: 'Idle ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
         - uuid: 13c65c374ac64ce5af0188b22fed248a
           name: 'Hyper-V Root Virtual CPU Guest Runtime %'
@@ -355,7 +357,7 @@ zabbix_export:
             - uuid: e1c7915d6d5f46ebae96edf40ed0ad8e
               expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical])>0'
               name: 'Hyper-V host has critical VMs'
-              opdata: 'last(/Template Windows HyperV Host 2/perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical])'
+              opdata: 'Critical ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
               description: 'The number of VMs running in a critical state.'
         - uuid: b93e5aa60b4745199c581bb379eded21
@@ -415,7 +417,7 @@ zabbix_export:
             - uuid: f659c1c0060b4b2984b773891142c5a3
               expression: 'last(/Template Windows Hyper-V Host 2/service.info[vmms])<>0'
               name: 'Hyper-V service state'
-              opdata: 'last(/Template Windows HyperV Host 2/service.info[vmms])'
+              opdata: 'Service state ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
       discovery_rules:
         - uuid: 0bb424a20f1741278efdf0c8c26788ee
@@ -470,6 +472,7 @@ zabbix_export:
                 - uuid: 1c651d66ab8f4d4bb813b14795acd96f
                   expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.status[{#VMNAME_SAFE}],1s,"like","Off")=1'
                   name: '{#VMNAME} is Off'
+                  status: DISABLED
                   priority: INFO
           host_prototypes:
             - uuid: 7cea3780685d4c87942d7676269e8cb8
@@ -603,6 +606,7 @@ zabbix_export:
     - uuid: f6a36d3b6d4346ada278f9bf868355e0
       expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor\Virtual Processors])/last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor\Logical Processors])>5'
       name: 'Hyper-V Virtual to Logical CPU Ratio > 5:1'
+      opdata: 'Ratio ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
       priority: WARNING
   graphs:
     - uuid: 62aa40ada1274dad8586149bef71a839
