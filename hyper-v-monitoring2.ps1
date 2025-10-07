@@ -383,10 +383,34 @@ function Get-VMNetworkDiscovery {
                         Write-DebugInfo "    Processing adapter: $($adapter.Name)"
 
                         # Format adapter ID for performance counter path
-                        # Remove "Microsoft:" prefix and replace \\ with --
+                        # Check if this is a legacy adapter and format accordingly
                         $adapterCounter = ""
-                        if ($adapter.Id) {
-                            $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
+                        $isLegacy = $false
+                        if ($adapter.PSObject.Properties["IsLegacy"] -and $adapter.IsLegacy) {
+                            $isLegacy = $true
+                            Write-DebugInfo "    Detected legacy adapter: $($adapter.Name)"
+
+                            # For legacy adapters, use format: VMName_AdapterName_VMID--InterfaceIndex
+                            # Extract VM ID (remove curly braces)
+                            $vmIdClean = $vm.Id.ToString() -replace '[{}]', ''
+
+                            # Extract interface index from adapter ID (usually the last part after the last -)
+                            $interfaceIndex = "0"
+                            if ($adapter.Id -match '--(\d+)$') {
+                                $interfaceIndex = $matches[1]
+                            }
+
+                            # Use original adapter name for legacy counter (not translated)
+                            $adapterNameOriginal = $adapter.Name
+
+                            # Build legacy counter format: VMName_AdapterNameOriginal_VMID--InterfaceIndex
+                            $adapterCounter = "$($vm.Name)_$($adapterNameOriginal)_$($vmIdClean)--$interfaceIndex"
+                            Write-DebugInfo "    Legacy counter format: $adapterCounter"
+                        } else {
+                            # Standard adapter processing
+                            if ($adapter.Id) {
+                                $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
+                            }
                         }
 
                         # Create shortname for easy identification
@@ -411,6 +435,7 @@ function Get-VMNetworkDiscovery {
                             "{#ADAPTER.ID}" = $adapter.Id
                             "{#ADAPTER.ID.JS}" = if ($adapter.Id) { $adapter.Id -replace '\\', '\\' } else { "" }
                             "{#ADAPTER.COUNTER}" = $adapterCounter
+                            "{#ADAPTER.IS.LEGACY}" = $isLegacy.ToString()
                             "{#ADAPTER.SWITCH}" = $adapter.SwitchName
                             "{#ADAPTER.MAC}" = $adapter.MacAddress
                             "{#ADAPTER.VLAN}" = $adapter.VlanSetting.AccessVlanId.ToString()
@@ -666,10 +691,34 @@ function Get-VMDetailsById {
                 Write-DebugInfo "  Processing adapter: $($adapter.Name)"
 
                 # Format adapter ID for performance counter path
-                # Remove "Microsoft:" prefix and replace \\ with --
+                # Check if this is a legacy adapter and format accordingly
                 $adapterCounter = ""
-                if ($adapter.Id) {
-                    $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
+                $isLegacy = $false
+                if ($adapter.PSObject.Properties["IsLegacy"] -and $adapter.IsLegacy) {
+                    $isLegacy = $true
+                    Write-DebugInfo "    Detected legacy adapter: $($adapter.Name)"
+
+                    # For legacy adapters, use format: VMName_AdapterName_VMID--InterfaceIndex
+                    # Extract VM ID (remove curly braces)
+                    $vmIdClean = $vm.Id.ToString() -replace '[{}]', ''
+
+                    # Extract interface index from adapter ID (usually the last part after the last -)
+                    $interfaceIndex = "0"
+                    if ($adapter.Id -match '--(\d+)$') {
+                        $interfaceIndex = $matches[1]
+                    }
+
+                    # Use original adapter name for legacy counter (not translated)
+                    $adapterNameOriginal = $adapter.Name
+
+                    # Build legacy counter format: VMName_AdapterNameOriginal_VMID--InterfaceIndex
+                    $adapterCounter = "$($vm.Name)_$($adapterNameOriginal)_$($vmIdClean)--$interfaceIndex"
+                    Write-DebugInfo "    Legacy counter format: $adapterCounter"
+                } else {
+                    # Standard adapter processing
+                    if ($adapter.Id) {
+                        $adapterCounter = $adapter.Id -replace '^Microsoft:', '' -replace '\\', '--'
+                    }
                 }
 
                 # Create shortname for easy identification
@@ -695,6 +744,7 @@ function Get-VMDetailsById {
                     "{#ADAPTER.ID}" = if ($adapter.Id) { $adapter.Id } else { "Unknown" }
                     "{#ADAPTER.ID.JS}" = if ($adapter.Id) { $adapter.Id -replace '\\', '\\' } else { "Unknown" }
                     "{#ADAPTER.COUNTER}" = $adapterCounter
+                    "{#ADAPTER.IS.LEGACY}" = $isLegacy.ToString()
                     "{#ADAPTER.SWITCH}" = if ($adapter.SwitchName) { $adapter.SwitchName } else { "Not Connected" }
                     "{#ADAPTER.MAC}" = if ($adapter.MacAddress) { $adapter.MacAddress } else { "Unknown" }
                     "{#ADAPTER.CONNECTED}" = if ($adapter.Connected -ne $null) { $adapter.Connected.ToString() } else { "Unknown" }
