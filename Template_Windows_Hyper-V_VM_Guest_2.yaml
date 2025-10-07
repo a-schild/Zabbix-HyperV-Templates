@@ -38,6 +38,12 @@ zabbix_export:
           delay: '0'
           description: 'Discovers VM disks from vmdetails master data'
           item_prototypes:
+            - uuid: eb58e4dceda34b3eaf0cd61c47f9f645
+              name: 'Disk {#DISK.ID} - % allocated'
+              type: CALCULATED
+              key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
+              units: '%'
+              params: '100*(last(//hyperv.vm.disk.filesize[{#DISK.ID}]))/last(//hyperv.vm.disk.size[{#DISK.ID}])'
             - uuid: 6b82378db618441697310230272ad120
               name: 'Disk {#DISK.ID} - File Size'
               type: DEPENDENT
@@ -124,17 +130,17 @@ zabbix_export:
                 - uuid: a9f906e6f00e4cb2a291f49452d91303
                   expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=20 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<50'
                   name: 'Disk {#DISK.ID} fragmentation over 20%'
-                  opdata: 'Fragmentation ({ITEM.LASTVALUE1} {ITEM.VALUE1})%'
+                  opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: WARNING
                 - uuid: cd03c4cf160c48d087a64e403da62fa2
                   expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=50 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<80'
                   name: 'Disk {#DISK.ID} fragmentation over 50%'
-                  opdata: 'Fragmentation ({ITEM.LASTVALUE1} {ITEM.VALUE1})%'
+                  opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: AVERAGE
                 - uuid: 39161df6465c4df793a72d7b83217b5b
                   expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=80'
                   name: 'Disk {#DISK.ID} fragmentation over 80%'
-                  opdata: 'Fragmentation ({ITEM.LASTVALUE1} {ITEM.VALUE1})%'
+                  opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: HIGH
             - uuid: c3d4e5f678904abca0123456789abce0
               name: 'Disk {#DISK.ID} - Minimum Size'
@@ -178,9 +184,9 @@ zabbix_export:
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: d0a43283e4f54f9db7db44323da04be9
-              name: 'Disk {#DISK.ID} - Size Free'
+              name: 'Disk {#DISK.ID} - Size not allocated'
               type: CALCULATED
-              key: 'hyperv.vm.disk.size.free[{#DISK.ID}]'
+              key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
               units: GB
               params: 'last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
               description: 'Compare disk size and dynamical growing {#DISK.ID}]'
@@ -225,12 +231,48 @@ zabbix_export:
                       throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: eb58e4dceda34b3eaf0cd61c47f9f645
-              name: 'Disk {#DISK.ID}] - Size used'
-              type: CALCULATED
-              key: 'hyperv.vm.disk.usedsize[{#DISK.ID}]'
-              units: '%'
-              params: '100*(last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}]))/last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
+            - uuid: 56010d91d23c4b539070de7f93492def
+              name: 'Disk {#DISK.ID} - Type'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.type[{#DISK.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: 'Disk type of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.VHD.TYPE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 36789012abcd4f018789012abc012348
               name: 'Disk {#DISK.ID} - Average Write Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
@@ -256,7 +298,7 @@ zabbix_export:
                 - uuid: f645561679d643cfaf34a93f83d731cd
                   expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]) <> min(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"],1d)'
                   name: 'Disk {#DISK.ID} error count increasing'
-                  opdata: 'Error count ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  opdata: 'Error count: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: AVERAGE
                   description: 'Number of disk errors changed in the last 24 hours'
             - uuid: 0024b57796ba443eaf2e96c1f9517c35
@@ -266,7 +308,7 @@ zabbix_export:
               description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 32aee40dd4b748da85efc088efbe58d7
-              name: 'Disk {#DISK.ID} - Io Quota Replenishment Rate'
+              name: 'Disk {#DISK.ID} - IO Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
               value_type: FLOAT
               status: DISABLED
@@ -277,6 +319,7 @@ zabbix_export:
               name: 'Disk {#DISK.ID} - Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
               value_type: FLOAT
+              units: s
               description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
               trigger_prototypes:
@@ -345,6 +388,7 @@ zabbix_export:
               name: 'Disk {#DISK.ID} - Normalized Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
               value_type: FLOAT
+              units: ops
               description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
@@ -377,6 +421,7 @@ zabbix_export:
               name: 'Disk {#DISK.ID} - Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
               value_type: FLOAT
+              units: ops
               description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: f2345678abcd4f0183456789abc01234
@@ -399,6 +444,19 @@ zabbix_export:
               units: ops
               description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
+          trigger_prototypes:
+            - uuid: ae22186d99d24d22b36f31708fffc44a
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=99 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} 100% allocated'
+              opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+              description: 'Disk allocated size'
+            - uuid: 298cb8dd69d3438db995772e56588bdf
+              expression: '(last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=80 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])<99) and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} over 80% allocated'
+              opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+              description: 'Disk allocated'
           graph_prototypes:
             - uuid: b813a689babe4e49a9bec2ad8f5b258b
               name: 'Disk counters {#DISK.ID}'
@@ -518,9 +576,9 @@ zabbix_export:
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.usedsize[{#DISK.ID}]'
+                    key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
                 - sortorder: '3'
-                  color: FF8000
+                  color: FF0000
                   yaxisside: RIGHT
                   calc_fnc: ALL
                   item:
@@ -532,7 +590,7 @@ zabbix_export:
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.size.free[{#DISK.ID}]'
+                    key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
                 - sortorder: '5'
                   drawtype: FILLED_REGION
                   color: D2D2D2
@@ -764,14 +822,14 @@ zabbix_export:
               name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Received/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Broadcast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: b5e977aeaf954c9bb847933993797057
               name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Sent/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Broadcast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 2a63b6e5f87d4a1884a3698a980ccae3
@@ -799,35 +857,35 @@ zabbix_export:
               name: '{#ADAPTER.SHORTNAME} - Directed Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Received/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Directed Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 750d0709df7647a4870f55b02d008b57
               name: '{#ADAPTER.SHORTNAME} - Directed Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Sent/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 6acea1c4f88545a4aae8738a53d2d361
               name: '{#ADAPTER.SHORTNAME} - Dropped Packets Incoming/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Dropped Packets Incoming/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 20b58667c42a47d19336808e8b56e96a
               name: '{#ADAPTER.SHORTNAME} - Dropped Packets Outgoing/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Dropped Packets Outgoing/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: d3549d8bc1c04fe68d7b76a9b6dbea64
               name: '{#ADAPTER.SHORTNAME} - IPsec offload Bytes Receive/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\IPsec offload Bytes Receive/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'IPsec offload Bytes Receive/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 85d28674b6ba4d7082de4677496de8b5
@@ -841,20 +899,22 @@ zabbix_export:
               name: '{#ADAPTER.SHORTNAME} - Multicast Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Received/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Multicast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 4939735e553e4c54a96a642481bedda6
               name: '{#ADAPTER.SHORTNAME} - Multicast Packets Sent/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Sent/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Multicast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: fb869b95a8484ca5933049cc13e9005e
               name: '{#ADAPTER.SHORTNAME} - Output Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length",30]'
               value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
               description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
               trigger_prototypes:
@@ -878,26 +938,32 @@ zabbix_export:
               name: '{#ADAPTER.SHORTNAME} - Packets/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Packets/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 9234567801234567a901234abc01234e
               name: '{#ADAPTER.SHORTNAME} - Packets Outbound Errors'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors",30]'
               value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: pps
               description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 77ff3ce1f925440fadc4f1a41fc1260f
               name: '{#ADAPTER.SHORTNAME} - Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received/sec",30]'
               value_type: FLOAT
-              units: Bps
+              units: pps
               description: 'Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 81234567f01244569890123abc01234d
               name: '{#ADAPTER.SHORTNAME} - Packets Received Errors'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received Errors",30]'
               value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: pps
               description: 'Network receive errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
               timeout: 30s
             - uuid: 70123456ef0143459789012abc01234c
@@ -912,21 +978,13 @@ zabbix_export:
               name: '{#ADAPTER.SHORTNAME} traffic'
               ymin_type_1: FIXED
               graph_items:
-                - color: A54F10
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes/sec",30]'
-                - sortorder: '1'
-                  drawtype: BOLD_LINE
-                  color: 80CBC4
+                - color: 4000FF
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Received/sec",30]'
-                - sortorder: '2'
-                  drawtype: BOLD_LINE
-                  color: AED581
+                - sortorder: '1'
+                  color: 4CAF50
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
@@ -959,59 +1017,31 @@ zabbix_export:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Sent/sec",30]'
                 - sortorder: '4'
-                  color: A54F10
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec",30]'
-                - sortorder: '5'
-                  color: FF8000
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec",30]'
-                - sortorder: '6'
                   color: 6C59DC
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Received/sec",30]'
-                - sortorder: '7'
+                - sortorder: '5'
                   color: AC8C14
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Sent/sec",30]'
-                - sortorder: '8'
-                  color: 611F27
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets/sec",30]'
-                - sortorder: '9'
+                - sortorder: '6'
+                  drawtype: BOLD_LINE
                   color: FF0000
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors",30]'
-                - sortorder: '10'
-                  color: 5CCD18
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec",30]'
+                - sortorder: '7'
+                  drawtype: BOLD_LINE
+                  color: FF8000
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received/sec",30]'
-                - sortorder: '11'
-                  color: BB2A02
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received Errors",30]'
-                - sortorder: '12'
-                  color: 5A2B57
-                  calc_fnc: ALL
-                  item:
-                    host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Sent/sec",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec",30]'
           master_item:
             key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
           lld_macro_paths:
@@ -1066,3 +1096,55 @@ zabbix_export:
           value: hyper-v
         - tag: target
           value: hyper-v-vm
+      dashboards:
+        - uuid: 2f549e6c78ab4c6fb5f31cc5394a0c1a
+          name: VM
+          pages:
+            - widgets:
+                - type: graphprototype
+                  name: 'Disk Read/Writes'
+                  width: '34'
+                  height: '5'
+                  fields:
+                    - type: INTEGER
+                      name: columns
+                      value: '1'
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Disk Read/Write {#DISK.ID}'
+                    - type: STRING
+                      name: reference
+                      value: XBVEB
+                - type: graphprototype
+                  name: 'Network traffic'
+                  'y': '5'
+                  width: '62'
+                  height: '5'
+                  fields:
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: '{#ADAPTER.SHORTNAME} traffic'
+                    - type: STRING
+                      name: reference
+                      value: FQWSH
+                - type: graphprototype
+                  name: 'Disk size'
+                  x: '34'
+                  width: '28'
+                  height: '5'
+                  fields:
+                    - type: INTEGER
+                      name: columns
+                      value: '1'
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Disk {#DISK.ID} size'
+                    - type: STRING
+                      name: reference
+                      value: WLYNQ
