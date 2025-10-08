@@ -522,6 +522,7 @@ function Get-HyperVHostInfo {
             $hostInfo["{#HOST.HYPERV.VERSION}"] = $vmHost.HyperVVersion
             $hostInfo["{#HOST.LOGICAL.PROCESSORS}"] = $vmHost.LogicalProcessorCount.ToString()
             $hostInfo["{#HOST.MEMORY.CAPACITY.GB}"] = [math]::Round($vmHost.MemoryCapacity / 1GB, 2).ToString()
+            $hostInfo["{#HOST.MEMORY.CAPACITY}"] = $vmHost.MemoryCapacity.ToString()
             $hostInfo["{#HOST.NUMA.ENABLED}"] = $vmHost.NumaSpanningEnabled.ToString()
             $hostInfo["{#HOST.VIRTUALIZATION.FIRMWARE.VERSION}"] = if ($vmHost.VirtualizationFirmwareVersion) { $vmHost.VirtualizationFirmwareVersion } else { "Unknown" }
             $hostInfo["{#HOST.IOMMU.SUPPORT}"] = $vmHost.IovSupport.ToString()
@@ -862,12 +863,15 @@ function Get-VMDetailsById {
                     "{#DISK.VHD.FORMAT}" = if ($vhdInfo) { $vhdInfo.VhdFormat.ToString() } else { "Unknown" }
                     "{#DISK.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.Size / 1GB, 2).ToString() } else { "0" }
                     "{#DISK.FILE.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.FileSize / 1GB, 2).ToString() } else { "0" }
+                    "{#DISK.MINIMUM.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.MinimumSize / 1GB, 2).ToString() } else { "0" }
+                    "{#DISK.SIZE}" = if ($vhdInfo) { $vhdInfo.Size.ToString() } else { "0" }
+                    "{#DISK.FILE.SIZE}" = if ($vhdInfo) { $vhdInfo.FileSize.ToString() } else { "0" }
+                    "{#DISK.MINIMUM.SIZE}" = if ($vhdInfo) { $vhdInfo.MinimumSize.ToString() } else { "0" }
                     "{#DISK.FRAGMENTATION}" = if ($vhdInfo) { $vhdInfo.FragmentationPercentage.ToString() } else { "0" }
                     "{#DISK.ALIGNMENT}" = if ($vhdInfo) { $vhdInfo.Alignment.ToString() } else { "0" }
                     "{#DISK.BLOCK.SIZE}" = if ($vhdInfo) { $vhdInfo.BlockSize.ToString() } else { "0" }
                     "{#DISK.LOGICAL.SECTOR.SIZE}" = if ($vhdInfo) { $vhdInfo.LogicalSectorSize.ToString() } else { "0" }
                     "{#DISK.PHYSICAL.SECTOR.SIZE}" = if ($vhdInfo) { $vhdInfo.PhysicalSectorSize.ToString() } else { "0" }
-                    "{#DISK.MINIMUM.SIZE.GB}" = if ($vhdInfo) { [math]::Round($vhdInfo.MinimumSize / 1GB, 2).ToString() } else { "0" }
                 }
             } catch {
                 Write-DebugInfo "  Error processing disk: $($_.Exception.Message)"
