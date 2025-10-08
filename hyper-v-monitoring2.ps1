@@ -403,8 +403,11 @@ function Get-VMNetworkDiscovery {
                             # Use original adapter name for legacy counter (not translated)
                             $adapterNameOriginal = $adapter.Name
 
+                            # Escape VM name for performance counter (replace parentheses with square brackets)
+                            $vmNameEscaped = $vm.Name -replace '\(', '[' -replace '\)', ']'
+
                             # Build legacy counter format: VMName_AdapterNameOriginal_VMID--InterfaceIndex
-                            $adapterCounter = "$($vm.Name)_$($adapterNameOriginal)_$($vmIdClean)--$interfaceIndex"
+                            $adapterCounter = "$($vmNameEscaped)_$($adapterNameOriginal)_$($vmIdClean)--$interfaceIndex"
                             Write-DebugInfo "    Legacy counter format: $adapterCounter"
                         } else {
                             # Standard adapter processing
@@ -712,8 +715,11 @@ function Get-VMDetailsById {
                     # Use original adapter name for legacy counter (not translated)
                     $adapterNameOriginal = $adapter.Name
 
+                    # Escape VM name for performance counter (replace parentheses with square brackets)
+                    $vmNameEscaped = $vm.Name -replace '\(', '[' -replace '\)', ']'
+
                     # Build legacy counter format: VMName_AdapterNameOriginal_VMID--InterfaceIndex
-                    $adapterCounter = "$($vm.Name)_$($adapterNameOriginal)_$($vmIdClean)--$interfaceIndex"
+                    $adapterCounter = "$($vmNameEscaped)_$($adapterNameOriginal)_$($vmIdClean)--$interfaceIndex"
                     Write-DebugInfo "    Legacy counter format: $adapterCounter"
                 } else {
                     # Standard adapter processing

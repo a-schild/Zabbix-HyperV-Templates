@@ -39,18 +39,21 @@ zabbix_export:
           description: 'Discovers VM disks from vmdetails master data'
           item_prototypes:
             - uuid: eb58e4dceda34b3eaf0cd61c47f9f645
-              name: 'Disk {#DISK.ID} - % allocated'
+              name: 'Disk {#DISK.ID} - % Allocated'
               type: CALCULATED
               key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
               units: '%'
               params: '100*(last(//hyperv.vm.disk.filesize[{#DISK.ID}]))/last(//hyperv.vm.disk.size[{#DISK.ID}])'
+              description: |
+                How much of the max disk size is already allocated.
+                Only valid for Dynamic disks (vhd and vhdx)
             - uuid: 6b82378db618441697310230272ad120
-              name: 'Disk {#DISK.ID} - File Size'
+              name: 'Disk {#DISK.ID} - Allocated Size GB'
               type: DEPENDENT
-              key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
+              key: 'hyperv.vm.disk.filesize.gb[{#DISK.ID}]'
               delay: '0'
               units: GB
-              description: 'Actual file size of disk {#DISK.ID} at {#DISK.PATH}'
+              description: 'Actual allocated file size of disk {#DISK.ID} at {#DISK.PATH}'
               preprocessing:
                 - type: JAVASCRIPT
                   parameters:
@@ -59,6 +62,47 @@ zabbix_export:
                       var diskId = "{#DISK.ID}";
                       var diskIdMacro = "{"+"#"+"DISK.ID}";
                       var diskFileSizeMacro= "{"+"#DISK.FILE.SIZE.GB}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileSizeMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileSizeMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 80a65ca7de3c4358843b4c8aa5bdcf98
+              name: 'Disk {#DISK.ID} - Allocated Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
+              delay: '0'
+              units: bytes
+              description: 'Actual allocated file size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileSizeMacro= "{"+"#DISK.FILE.SIZE}";
                       
                       
                       // Debug: Return info about what we found
@@ -143,9 +187,9 @@ zabbix_export:
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: HIGH
             - uuid: c3d4e5f678904abca0123456789abce0
-              name: 'Disk {#DISK.ID} - Minimum Size'
+              name: 'Disk {#DISK.ID} - Minimum Size GB'
               type: DEPENDENT
-              key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
+              key: 'hyperv.vm.disk.minsize.gb[{#DISK.ID}]'
               delay: '0'
               units: GB
               description: 'Minimum size of disk {#DISK.ID} at {#DISK.PATH}'
@@ -183,17 +227,51 @@ zabbix_export:
                       throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-            - uuid: d0a43283e4f54f9db7db44323da04be9
-              name: 'Disk {#DISK.ID} - Size not allocated'
-              type: CALCULATED
-              key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
-              units: GB
-              params: 'last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
-              description: 'Compare disk size and dynamical growing {#DISK.ID}]'
-            - uuid: a1b2c3d4e5f64789a0123456789abcde
-              name: 'Disk {#DISK.ID} - Size'
+            - uuid: 005ecab74a444daaa646e702a6619fba
+              name: 'Disk {#DISK.ID} - Minimum Size'
               type: DEPENDENT
-              key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+              key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
+              delay: '0'
+              units: bytes
+              description: 'Minimum size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.MINIMUM.SIZE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: a1b2c3d4e5f64789a0123456789abcde
+              name: 'Disk {#DISK.ID} - Size GB'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.size.gb[{#DISK.ID}]'
               delay: '0'
               units: GB
               description: 'Current size of disk {#DISK.ID} at {#DISK.PATH}'
@@ -205,6 +283,58 @@ zabbix_export:
                       var diskId = "{#DISK.ID}";
                       var diskIdMacro = "{"+"#"+"DISK.ID}";
                       var diskFileMacro= "{"+"#DISK.SIZE.GB}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: d0a43283e4f54f9db7db44323da04be9
+              name: 'Disk {#DISK.ID} - Size not allocated'
+              type: CALCULATED
+              key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
+              value_type: FLOAT
+              units: bytes
+              params: 'last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
+              description: |
+                Compare disk size and dynamical growing {#DISK.ID}]
+                How much of the max disk size is already allocated.
+                Only valid for Dynamic disks (vhd and vhdx)
+            - uuid: d41040bd47374cbb92d6d6c2ac207820
+              name: 'Disk {#DISK.ID} - Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+              delay: '0'
+              units: bytes
+              description: 'Current size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.SIZE}";
                       
                       
                       // Debug: Return info about what we found
@@ -560,13 +690,13 @@ zabbix_export:
               name: 'Disk {#DISK.ID} size'
               ymin_type_1: FIXED
               graph_items:
-                - color: '274482'
+                - color: 2774A4
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
                 - sortorder: '1'
-                  color: 1A7C11
+                  color: F63100
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
@@ -578,12 +708,11 @@ zabbix_export:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
                 - sortorder: '3'
-                  color: FF0000
-                  yaxisside: RIGHT
+                  color: FC6EA3
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
+                    key: 'hyperv.vm.disk.size[{#DISK.ID}]'
                 - sortorder: '4'
                   drawtype: FILLED_REGION
                   color: 00FF00
@@ -592,12 +721,12 @@ zabbix_export:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
                 - sortorder: '5'
-                  drawtype: FILLED_REGION
-                  color: D2D2D2
+                  color: FF0000
+                  yaxisside: RIGHT
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+                    key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
           master_item:
             key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
           lld_macro_paths:
@@ -605,6 +734,8 @@ zabbix_export:
               path: '$["{#DISK.CONTROLLER}"]'
             - lld_macro: '{#DISK.FILE.SIZE.GB}'
               path: '$["{#DISK.FILE.SIZE.GB}"]'
+            - lld_macro: '{#DISK.FILE.SIZE}'
+              path: '$["{#DISK.FILE.SIZE}"]'
             - lld_macro: '{#DISK.FRAGMENTATION}'
               path: '$["{#DISK.FRAGMENTATION}"]'
             - lld_macro: '{#DISK.ID}'
@@ -613,6 +744,8 @@ zabbix_export:
               path: '$["{#DISK.LOCATION}"]'
             - lld_macro: '{#DISK.MINIMUM.SIZE.GB}'
               path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
+            - lld_macro: '{#DISK.MINIMUM.SIZE}'
+              path: '$["{#DISK.MINIMUM.SIZE}"]'
             - lld_macro: '{#DISK.NUMBER}'
               path: '$["{#DISK.NUMBER}"]'
             - lld_macro: '{#DISK.PATH_COUNTER}'
@@ -621,6 +754,8 @@ zabbix_export:
               path: '$["{#DISK.PATH}"]'
             - lld_macro: '{#DISK.SIZE.GB}'
               path: '$["{#DISK.SIZE.GB}"]'
+            - lld_macro: '{#DISK.SIZE}'
+              path: '$["{#DISK.SIZE}"]'
             - lld_macro: '{#DISK.VHD.FORMAT}'
               path: '$["{#DISK.VHD.FORMAT}"]'
             - lld_macro: '{#DISK.VHD.TYPE}'
@@ -630,11 +765,11 @@ zabbix_export:
               parameters:
                 - '$["disks"]'
         - uuid: 253533ec0932452fae14861f85ae1ad5
-          name: 'VM Network Adapters Discovery'
+          name: 'VM Network Regular Adapters Discovery'
           type: DEPENDENT
           key: hyperv.vm.networks.discovery
           delay: '0'
-          description: 'Discovers VM network adapters from vmdetails master data'
+          description: 'Discovers VM network regular adapters from vmdetails master data'
           item_prototypes:
             - uuid: e5f67890abcd4ef0823456789abcdef2
               name: '{#ADAPTER.SHORTNAME} - Connected'
@@ -1088,7 +1223,60 @@ zabbix_export:
           preprocessing:
             - type: JSONPATH
               parameters:
-                - '$["networks"]'
+                - '$.networks[?(@[''{#ADAPTER.IS.LEGACY}''] == ''False'')]'
+        - uuid: 4cfc8e3c94704581b29bdc9f78ce0b7b
+          name: 'VM Network Legacy Adapters Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.networks.discovery.legacy
+          delay: '0'
+          description: 'Discovers VM Legacy network adapters from vmdetails master data'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#ADAPTER.CONNECTED}'
+              path: '$["{#ADAPTER.CONNECTED}"]'
+            - lld_macro: '{#ADAPTER.COUNTER}'
+              path: '$["{#ADAPTER.COUNTER}"]'
+            - lld_macro: '{#ADAPTER.DHCP.GUARD}'
+              path: '$["{#ADAPTER.DHCP.GUARD}"]'
+            - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
+              path: '$["{#ADAPTER.DYNAMIC.MAC}"]'
+            - lld_macro: '{#ADAPTER.ID.JS}'
+              path: '$["{#ADAPTER.ID.JS}"]'
+            - lld_macro: '{#ADAPTER.ID}'
+              path: '$["{#ADAPTER.ID}"]'
+            - lld_macro: '{#ADAPTER.IEEE.PRIORITY}'
+              path: '$["{#ADAPTER.IEEE.PRIORITY}"]'
+            - lld_macro: '{#ADAPTER.IS.LEGACY}'
+              path: '$["{#ADAPTER.IS.LEGACY}"]'
+            - lld_macro: '{#ADAPTER.MAC.SPOOFING}'
+              path: '$["{#ADAPTER.MAC.SPOOFING}"]'
+            - lld_macro: '{#ADAPTER.MAC}'
+              path: '$["{#ADAPTER.MAC}"]'
+            - lld_macro: '{#ADAPTER.NAME.TRANSLATED}'
+              path: '$["{#ADAPTER.NAME.TRANSLATED}"]'
+            - lld_macro: '{#ADAPTER.NAME}'
+              path: '$["{#ADAPTER.NAME}"]'
+            - lld_macro: '{#ADAPTER.PACKET.DIRECT}'
+              path: '$["{#ADAPTER.PACKET.DIRECT}"]'
+            - lld_macro: '{#ADAPTER.PORT.MIRRORING}'
+              path: '$["{#ADAPTER.PORT.MIRRORING}"]'
+            - lld_macro: '{#ADAPTER.SHORTNAME}'
+              path: '$["{#ADAPTER.SHORTNAME}"]'
+            - lld_macro: '{#ADAPTER.SR.IOV}'
+              path: '$["{#ADAPTER.SR.IOV}"]'
+            - lld_macro: '{#ADAPTER.SWITCH}'
+              path: '$["{#ADAPTER.SWITCH}"]'
+            - lld_macro: '{#ADAPTER.VLAN}'
+              path: '$["{#ADAPTER.VLAN}"]'
+            - lld_macro: '{#ADAPTER.VM.QUEUE}'
+              path: '$["{#ADAPTER.VM.QUEUE}"]'
+            - lld_macro: '{#VM.NAME}'
+              path: '$["{#VM.NAME}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.networks[?(@[''{#ADAPTER.IS.LEGACY}''] == ''True'')]'
       tags:
         - tag: class
           value: software
