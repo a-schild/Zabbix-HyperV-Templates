@@ -1,0 +1,1593 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 0b4d87047ee14edb98a87b309ee5a803
+      name: 'HyperV VM'
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+    - uuid: aea23489ce3a49b6806ebb28e0cda430
+      name: Windows
+  templates:
+    - uuid: 553c9735a18645849c38ebda859ace9c
+      template: 'Template Windows Hyper-V VM Guest 2'
+      name: 'Template Windows Hyper-V VM Guest 2'
+      description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template'
+      groups:
+        - name: 'HyperV VM'
+        - name: Templates
+        - name: Windows
+      items:
+        - uuid: 77b70fa1ac3b41259978c203f4ac34f0
+          name: 'Hyper-V VM master data'
+          key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          delay: 10m
+          value_type: TEXT
+          trends: '0'
+          description: |
+            Fetch details of VM {$VM.ID}
+            Used for LLD
+            Contains VM details as well as disks and nic informations
+            
+            Needs to be Zabbix agent in passive mode, since the request is sent to the Hyper-V server
+          timeout: 30s
+      discovery_rules:
+        - uuid: f88de644e4f34b72be0b4ad9ed31d27e
+          name: 'VM Disks Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.disks.discovery
+          delay: '0'
+          description: 'Discovers VM disks from vmdetails master data'
+          item_prototypes:
+            - uuid: eb58e4dceda34b3eaf0cd61c47f9f645
+              name: 'Disk {#DISK.ID} - % Allocated'
+              type: CALCULATED
+              key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
+              units: '%'
+              params: '100*(last(//hyperv.vm.disk.filesize[{#DISK.ID}]))/last(//hyperv.vm.disk.size[{#DISK.ID}])'
+              description: |
+                How much of the max disk size is already allocated.
+                Only valid for Dynamic disks (vhd and vhdx)
+            - uuid: 6b82378db618441697310230272ad120
+              name: 'Disk {#DISK.ID} - Allocated Size GB'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.filesize.gb[{#DISK.ID}]'
+              delay: '0'
+              units: GB
+              description: 'Actual allocated file size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileSizeMacro= "{"+"#DISK.FILE.SIZE.GB}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileSizeMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileSizeMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 80a65ca7de3c4358843b4c8aa5bdcf98
+              name: 'Disk {#DISK.ID} - Allocated Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
+              delay: '0'
+              units: bytes
+              description: 'Actual allocated file size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileSizeMacro= "{"+"#DISK.FILE.SIZE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileSizeMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileSizeMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: d4e5f67890ab4cde90123456789abce1
+              name: 'Disk {#DISK.ID} - Fragmentation'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
+              delay: '0'
+              units: '%'
+              description: 'Fragmentation percentage of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.FRAGMENTATION}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+              trigger_prototypes:
+                - uuid: a9f906e6f00e4cb2a291f49452d91303
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=20 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<50'
+                  name: 'Disk {#DISK.ID} fragmentation over 20%'
+                  opdata: 'Fragmentation ({ITEM.VALUE1})'
+                  priority: WARNING
+                - uuid: cd03c4cf160c48d087a64e403da62fa2
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=50 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<80'
+                  name: 'Disk {#DISK.ID} fragmentation over 50%'
+                  opdata: 'Fragmentation ({ITEM.VALUE1})'
+                  priority: AVERAGE
+                - uuid: 39161df6465c4df793a72d7b83217b5b
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=80'
+                  name: 'Disk {#DISK.ID} fragmentation over 80%'
+                  opdata: 'Fragmentation ({ITEM.VALUE1})'
+                  priority: HIGH
+            - uuid: c3d4e5f678904abca0123456789abce0
+              name: 'Disk {#DISK.ID} - Minimum Size GB'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.minsize.gb[{#DISK.ID}]'
+              delay: '0'
+              units: GB
+              description: 'Minimum size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.MINIMUM.SIZE.GB}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 005ecab74a444daaa646e702a6619fba
+              name: 'Disk {#DISK.ID} - Minimum Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
+              delay: '0'
+              units: bytes
+              description: 'Minimum size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.MINIMUM.SIZE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: a1b2c3d4e5f64789a0123456789abcde
+              name: 'Disk {#DISK.ID} - Size GB'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.size.gb[{#DISK.ID}]'
+              delay: '0'
+              units: GB
+              description: 'Current size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.SIZE.GB}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: d0a43283e4f54f9db7db44323da04be9
+              name: 'Disk {#DISK.ID} - Size not allocated'
+              type: CALCULATED
+              key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
+              value_type: FLOAT
+              units: bytes
+              params: 'last(//hyperv.vm.disk.size[{#DISK.ID}])-last(//hyperv.vm.disk.filesize[{#DISK.ID}])'
+              description: |
+                Compare disk size and dynamical growing {#DISK.ID}]
+                How much of the max disk size is already allocated.
+                Only valid for Dynamic disks (vhd and vhdx)
+            - uuid: d41040bd47374cbb92d6d6c2ac207820
+              name: 'Disk {#DISK.ID} - Size'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+              delay: '0'
+              units: bytes
+              description: 'Current size of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.SIZE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 56010d91d23c4b539070de7f93492def
+              name: 'Disk {#DISK.ID} - Type'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.type[{#DISK.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: 'Disk type of disk {#DISK.ID} at {#DISK.PATH}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var diskFileMacro= "{"+"#DISK.VHD.TYPE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+                      
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fileSize = disk[diskFileMacro];
+                          if (!fileSize) {
+                            throw "ZBX_UNSUPPORTED: Field "+diskFileMacro+" not found or empty";
+                          }
+                          return fileSize;
+                        }
+                      }
+                      
+                      // Debug: Show what disk IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 36789012abcd4f018789012abc012348
+              name: 'Disk {#DISK.ID} - Average Write Latency'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: s
+              description: 'Average disk write latency for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 9cf62d67d8d747929da2e9cce796d966
+              name: 'Disk {#DISK.ID} - Byte Quota Replenishment Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Byte Quota Replenishment Rate"]'
+              value_type: FLOAT
+              description: 'Byte Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: e15ccda5219a4584bbc142f441dc1a59
+              name: 'Disk {#DISK.ID} - Error Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
+              value_type: FLOAT
+              description: 'Error Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+              trigger_prototypes:
+                - uuid: f645561679d643cfaf34a93f83d731cd
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]) <> min(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"],1d)'
+                  name: 'Disk {#DISK.ID} error count increasing'
+                  opdata: 'Error count: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  priority: AVERAGE
+                  description: 'Number of disk errors changed in the last 24 hours'
+            - uuid: 0024b57796ba443eaf2e96c1f9517c35
+              name: 'Disk {#DISK.ID} - Flush Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
+              value_type: FLOAT
+              description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 32aee40dd4b748da85efc088efbe58d7
+              name: 'Disk {#DISK.ID} - IO Quota Replenishment Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              description: 'Io Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: cffaaddc2de34fcc8c61bdcb07af71cd
+              name: 'Disk {#DISK.ID} - Latency'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
+              value_type: FLOAT
+              units: s
+              description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+              trigger_prototypes:
+                - uuid: de980912c1d848e6878cd08942c1948f
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])<0.01'
+                  name: 'Disk {#DISK.ID} latency ok < 10ms'
+                  opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  status: DISABLED
+                  priority: INFO
+                - uuid: 1a9d660132a440af8b2052f6e5bfbcd8
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])>0.015'
+                  name: 'Disk {#DISK.ID} latency warning > 15ms'
+                  opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  priority: WARNING
+                  dependencies:
+                    - name: 'Disk {#DISK.ID} latency warning > 25ms'
+                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])>0.025'
+                - uuid: ac4a41a939ac4eee8d7077bbd4f46e52
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])>0.025'
+                  name: 'Disk {#DISK.ID} latency warning > 25ms'
+                  opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  priority: AVERAGE
+            - uuid: 25678901abcd4f018678901abc012347
+              name: 'Disk {#DISK.ID} - Lower Latency'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
+              value_type: FLOAT
+              units: s
+              description: 'Lower Latency for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 5aa9ba08dcb9470fa66f6c137ef6a301
+              name: 'Disk {#DISK.ID} - Lower Queue Length'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Queue Length"]'
+              value_type: FLOAT
+              units: s
+              description: 'Lower Queue Length for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: be5ed5f2658d46f4b8bb5ad79c93c7cc
+              name: 'Disk {#DISK.ID} - Maximum Adapter Worker Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Adapter Worker Count"]'
+              value_type: FLOAT
+              description: 'Maximum Adapter Worker Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: cb22af897eaf4ea9a878fe2a34f4e190
+              name: 'Disk {#DISK.ID} - Maximum Bandwidth'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Bandwidth"]'
+              value_type: FLOAT
+              description: 'Maximum Bandwidth for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 4e662b9c9ac14cb1a79177c58120ef66
+              name: 'Disk {#DISK.ID} - Maximum IO Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              description: 'Maximum IO Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 33085294c6b649dbbb3ccb7deced1f6b
+              name: 'Disk {#DISK.ID} - Minimum IO Rate'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              description: 'Minimum IO Rate for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 5851d1ef4a7748ffb53ee514c9afffe4
+              name: 'Disk {#DISK.ID} - Normalized Throughput'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
+              value_type: FLOAT
+              units: ops
+              description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
+              name: 'Disk {#DISK.ID} - Queue Length'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Queue Length"]'
+              value_type: FLOAT
+              description: 'Queue Length for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: e1f234567890472d9f0123456789abc0
+              name: 'Disk {#DISK.ID} - Read Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",30]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 1913a23214b54c4c8c1fbc3b04367a4a
+              name: 'Disk {#DISK.ID} - Read Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
+              value_type: FLOAT
+              description: 'Read Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 03456789abcd4f018456789abc012345
+              name: 'Disk {#DISK.ID} - Read Operations/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",30]'
+              value_type: FLOAT
+              units: ops
+              description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: bc0d3ed4e9c94cf992201a8dfb557805
+              name: 'Disk {#DISK.ID} - Throughput'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
+              value_type: FLOAT
+              units: ops
+              description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: f2345678abcd4f0183456789abc01234
+              name: 'Disk {#DISK.ID} - Write Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",30]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 5417373178af40a4a86da68f8accc1bf
+              name: 'Disk {#DISK.ID} - Write Count'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
+              value_type: FLOAT
+              description: 'Write Count for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+            - uuid: 14567890abcd4f018567890abc012346
+              name: 'Disk {#DISK.ID} - Write Operations/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",30]'
+              value_type: FLOAT
+              units: ops
+              description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
+              timeout: 30s
+          trigger_prototypes:
+            - uuid: ae22186d99d24d22b36f31708fffc44a
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=99 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} 100% allocated'
+              opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+              description: 'Disk allocated size'
+            - uuid: 298cb8dd69d3438db995772e56588bdf
+              expression: '(last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=80 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])<99) and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} over 80% allocated'
+              opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+              priority: WARNING
+              description: 'Disk allocated'
+          graph_prototypes:
+            - uuid: b813a689babe4e49a9bec2ad8f5b258b
+              name: 'Disk counters {#DISK.ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: FF0080
+                  yaxisside: RIGHT
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
+                - sortorder: '1'
+                  color: BF00FF
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
+                - sortorder: '2'
+                  color: 0080FF
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
+                - sortorder: '3'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
+            - uuid: ee9ac9a8ec434dc1983cc1039dd78113
+              name: 'Disk IO rate {#DISK.ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
+                - sortorder: '2'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
+              discover: NO_DISCOVER
+            - uuid: 22e079999e9149f989280d7c30fba97b
+              name: 'Disk latency {#DISK_ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
+                - sortorder: '2'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
+            - uuid: d3ed810673934007ab32f21f265537c1
+              name: 'Disk Read/Write {#DISK.ID}'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",30]'
+                - sortorder: '1'
+                  color: A5D6A7
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",30]'
+                - sortorder: '2'
+                  color: FFB74D
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",30]'
+                - sortorder: '3'
+                  color: BA68C8
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",30]'
+            - uuid: abfaff554baf4f689b9064855f533c8b
+              name: 'Disk {#DISK.ID} size'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 2774A4
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'hyperv.vm.disk.minsize[{#DISK.ID}]'
+                - sortorder: '1'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'hyperv.vm.disk.filesize[{#DISK.ID}]'
+                - sortorder: '2'
+                  color: A54F10
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
+                - sortorder: '3'
+                  drawtype: FILLED_REGION
+                  color: 00BFFF
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'hyperv.vm.disk.size[{#DISK.ID}]'
+                - sortorder: '4'
+                  drawtype: FILLED_REGION
+                  color: 00FF00
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'hyperv.vm.disk.size.notallocated[{#DISK.ID}]'
+                - sortorder: '5'
+                  color: FF0000
+                  yaxisside: RIGHT
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'hyperv.vm.disk.fragmentation[{#DISK.ID}]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#DISK.CONTROLLER}'
+              path: '$["{#DISK.CONTROLLER}"]'
+            - lld_macro: '{#DISK.FILE.SIZE.GB}'
+              path: '$["{#DISK.FILE.SIZE.GB}"]'
+            - lld_macro: '{#DISK.FILE.SIZE}'
+              path: '$["{#DISK.FILE.SIZE}"]'
+            - lld_macro: '{#DISK.FRAGMENTATION}'
+              path: '$["{#DISK.FRAGMENTATION}"]'
+            - lld_macro: '{#DISK.ID}'
+              path: '$["{#DISK.ID}"]'
+            - lld_macro: '{#DISK.LOCATION}'
+              path: '$["{#DISK.LOCATION}"]'
+            - lld_macro: '{#DISK.MINIMUM.SIZE.GB}'
+              path: '$["{#DISK.MINIMUM.SIZE.GB}"]'
+            - lld_macro: '{#DISK.MINIMUM.SIZE}'
+              path: '$["{#DISK.MINIMUM.SIZE}"]'
+            - lld_macro: '{#DISK.NUMBER}'
+              path: '$["{#DISK.NUMBER}"]'
+            - lld_macro: '{#DISK.PATH_COUNTER}'
+              path: '$["{#DISK.PATH_COUNTER}"]'
+            - lld_macro: '{#DISK.PATH}'
+              path: '$["{#DISK.PATH}"]'
+            - lld_macro: '{#DISK.SIZE.GB}'
+              path: '$["{#DISK.SIZE.GB}"]'
+            - lld_macro: '{#DISK.SIZE}'
+              path: '$["{#DISK.SIZE}"]'
+            - lld_macro: '{#DISK.VHD.FORMAT}'
+              path: '$["{#DISK.VHD.FORMAT}"]'
+            - lld_macro: '{#DISK.VHD.TYPE}'
+              path: '$["{#DISK.VHD.TYPE}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$["disks"]'
+        - uuid: 253533ec0932452fae14861f85ae1ad5
+          name: 'VM Network Regular Adapters Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.networks.discovery
+          delay: '0'
+          description: 'Discovers VM network regular adapters from vmdetails master data'
+          item_prototypes:
+            - uuid: e5f67890abcd4ef0823456789abcdef2
+              name: '{#ADAPTER.SHORTNAME} - Connected'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.connected[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.CONNECTED}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 07890abcdef04234a6789abcdef01234
+              name: '{#ADAPTER.SHORTNAME} - MAC Address'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.mac[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'MAC address of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.MAC}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: f6789abcdef04123956789abcdef0123
+              name: '{#ADAPTER.SHORTNAME} - Connected switch'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.switch[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'Virtual switch of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.SWITCH}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 18901bcdef014345b789abcdef012345
+              name: '{#ADAPTER.SHORTNAME} - VLAN'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.vlan[{#ADAPTER.ID}]'
+              delay: '0'
+              description: 'VLAN ID of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 5f4cb2167042457b837dbe55575d1059
+              name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Received/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Broadcast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: b5e977aeaf954c9bb847933993797057
+              name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Sent/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Broadcast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 2a63b6e5f87d4a1884a3698a980ccae3
+              name: '{#ADAPTER.SHORTNAME} - Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes/sec",30]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Bytes/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 47890123bcde40129456789abc012349
+              name: '{#ADAPTER.SHORTNAME} - Bytes Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Received/sec",30]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Network receive throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 58901234cdef41239567890abc01234a
+              name: '{#ADAPTER.SHORTNAME} - Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Sent/sec",30]'
+              value_type: FLOAT
+              units: Bps
+              description: 'Network send throughput for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: ee916f90d15d4c39bc558fbfddbc7eea
+              name: '{#ADAPTER.SHORTNAME} - Directed Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Received/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Directed Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 750d0709df7647a4870f55b02d008b57
+              name: '{#ADAPTER.SHORTNAME} - Directed Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Sent/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 6acea1c4f88545a4aae8738a53d2d361
+              name: '{#ADAPTER.SHORTNAME} - Dropped Packets Incoming/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Dropped Packets Incoming/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 20b58667c42a47d19336808e8b56e96a
+              name: '{#ADAPTER.SHORTNAME} - Dropped Packets Outgoing/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Dropped Packets Outgoing/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: d3549d8bc1c04fe68d7b76a9b6dbea64
+              name: '{#ADAPTER.SHORTNAME} - IPsec offload Bytes Receive/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\IPsec offload Bytes Receive/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'IPsec offload Bytes Receive/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 85d28674b6ba4d7082de4677496de8b5
+              name: '{#ADAPTER.SHORTNAME} - IPsec offload Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\IPsec offload Bytes Sent/sec",30]'
+              value_type: FLOAT
+              units: Bps
+              description: 'IPsec offload Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: a89de1b7ad224e899ab49fe401cf9e8a
+              name: '{#ADAPTER.SHORTNAME} - Multicast Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Received/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Multicast Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 4939735e553e4c54a96a642481bedda6
+              name: '{#ADAPTER.SHORTNAME} - Multicast Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Sent/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Multicast Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: fb869b95a8484ca5933049cc13e9005e
+              name: '{#ADAPTER.SHORTNAME} - Output Queue Length'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length",30]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              description: 'Directed Packets Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+              trigger_prototypes:
+                - uuid: 59299a37d4e446139053fcc1d345e89e
+                  expression: 'avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length",30],5m)=0'
+                  name: 'Network adapter {#ADAPTER.SHORTNAME} output queue length ok'
+                  opdata: 'Output queue ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  status: DISABLED
+                  priority: INFO
+                - uuid: b7c647f585804b5bab9733ec80b170f6
+                  expression: 'avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length",30],5m)>1 and avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length",30],5m)<2'
+                  name: 'Network adapter {#ADAPTER.SHORTNAME} output queue length warning (1-2)'
+                  opdata: 'Output queue ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  priority: WARNING
+                - uuid: 3b0a30a62ced459daef63eea5aade902
+                  expression: 'avg(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Output Queue Length",30],5m)>2'
+                  name: 'Network adapter {#ADAPTER.SHORTNAME} output queue length warning (>2)'
+                  opdata: 'Output queue ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  priority: HIGH
+            - uuid: 4c48cc320f38443eb9fac841fd7ca1b5
+              name: '{#ADAPTER.SHORTNAME} - Packets/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Packets/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 9234567801234567a901234abc01234e
+              name: '{#ADAPTER.SHORTNAME} - Packets Outbound Errors'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Outbound Errors",30]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: pps
+              description: 'Network send errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 77ff3ce1f925440fadc4f1a41fc1260f
+              name: '{#ADAPTER.SHORTNAME} - Packets Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Packets Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 81234567f01244569890123abc01234d
+              name: '{#ADAPTER.SHORTNAME} - Packets Received Errors'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Received Errors",30]'
+              value_type: FLOAT
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: pps
+              description: 'Network receive errors for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+            - uuid: 70123456ef0143459789012abc01234c
+              name: '{#ADAPTER.SHORTNAME} - Packets Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Packets Sent/sec",30]'
+              value_type: FLOAT
+              units: pps
+              description: 'Network send packet rate for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              timeout: 30s
+          graph_prototypes:
+            - uuid: 5c75e34811304f89adbd61b737921a8e
+              name: '{#ADAPTER.SHORTNAME} traffic'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: 4000FF
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Received/sec",30]'
+                - sortorder: '1'
+                  color: 4CAF50
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Bytes Sent/sec",30]'
+            - uuid: cc8b4211f7614a7a897d2345f7cf0d0d
+              name: '{#ADAPTER.SHORTNAME} traffic packets'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: B2EBF2
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Received/sec",30]'
+                - sortorder: '1'
+                  color: 4DD0E1
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Sent/sec",30]'
+                - sortorder: '2'
+                  color: 66BB6A
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Received/sec",30]'
+                - sortorder: '3'
+                  color: 2774A4
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Directed Packets Sent/sec",30]'
+                - sortorder: '4'
+                  color: 6C59DC
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Received/sec",30]'
+                - sortorder: '5'
+                  color: AC8C14
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Multicast Packets Sent/sec",30]'
+                - sortorder: '6'
+                  drawtype: BOLD_LINE
+                  color: FF0000
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Incoming/sec",30]'
+                - sortorder: '7'
+                  drawtype: BOLD_LINE
+                  color: FF8000
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Dropped Packets Outgoing/sec",30]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#ADAPTER.CONNECTED}'
+              path: '$["{#ADAPTER.CONNECTED}"]'
+            - lld_macro: '{#ADAPTER.COUNTER}'
+              path: '$["{#ADAPTER.COUNTER}"]'
+            - lld_macro: '{#ADAPTER.DHCP.GUARD}'
+              path: '$["{#ADAPTER.DHCP.GUARD}"]'
+            - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
+              path: '$["{#ADAPTER.DYNAMIC.MAC}"]'
+            - lld_macro: '{#ADAPTER.ID.JS}'
+              path: '$["{#ADAPTER.ID.JS}"]'
+            - lld_macro: '{#ADAPTER.ID}'
+              path: '$["{#ADAPTER.ID}"]'
+            - lld_macro: '{#ADAPTER.IEEE.PRIORITY}'
+              path: '$["{#ADAPTER.IEEE.PRIORITY}"]'
+            - lld_macro: '{#ADAPTER.IS.LEGACY}'
+              path: '$["{#ADAPTER.IS.LEGACY}"]'
+            - lld_macro: '{#ADAPTER.MAC.SPOOFING}'
+              path: '$["{#ADAPTER.MAC.SPOOFING}"]'
+            - lld_macro: '{#ADAPTER.MAC}'
+              path: '$["{#ADAPTER.MAC}"]'
+            - lld_macro: '{#ADAPTER.NAME.TRANSLATED}'
+              path: '$["{#ADAPTER.NAME.TRANSLATED}"]'
+            - lld_macro: '{#ADAPTER.NAME}'
+              path: '$["{#ADAPTER.NAME}"]'
+            - lld_macro: '{#ADAPTER.PACKET.DIRECT}'
+              path: '$["{#ADAPTER.PACKET.DIRECT}"]'
+            - lld_macro: '{#ADAPTER.PORT.MIRRORING}'
+              path: '$["{#ADAPTER.PORT.MIRRORING}"]'
+            - lld_macro: '{#ADAPTER.SHORTNAME}'
+              path: '$["{#ADAPTER.SHORTNAME}"]'
+            - lld_macro: '{#ADAPTER.SR.IOV}'
+              path: '$["{#ADAPTER.SR.IOV}"]'
+            - lld_macro: '{#ADAPTER.SWITCH}'
+              path: '$["{#ADAPTER.SWITCH}"]'
+            - lld_macro: '{#ADAPTER.VLAN}'
+              path: '$["{#ADAPTER.VLAN}"]'
+            - lld_macro: '{#ADAPTER.VM.QUEUE}'
+              path: '$["{#ADAPTER.VM.QUEUE}"]'
+            - lld_macro: '{#VM.NAME}'
+              path: '$["{#VM.NAME}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.networks[?(@[''{#ADAPTER.IS.LEGACY}''] == ''False'')]'
+        - uuid: 4cfc8e3c94704581b29bdc9f78ce0b7b
+          name: 'VM Network Legacy Adapters Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.networks.discovery.legacy
+          delay: '0'
+          description: 'Discovers VM Legacy network adapters from vmdetails master data'
+          item_prototypes:
+            - uuid: 5d268d3fe67a43c087dffe9c99bc0771
+              name: '{#ADAPTER.SHORTNAME} - Connected switch'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.connected.switch[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.SWITCH}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: a74219c30e2f47ee99f42b2a7a757c75
+              name: '{#ADAPTER.SHORTNAME} - Connected'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.connected[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.CONNECTED}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: d2b8af71fdf542f59fc57f76dc1e8b92
+              name: '{#ADAPTER.SHORTNAME} - MAC'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.mac[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'MAC of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.MAC}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: a69607289056418188405aff86c34c56
+              name: '{#ADAPTER.SHORTNAME} - VLAN'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.vlan[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'VLAN of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 20d314a13989468f95f62fc7ea8d5d7d
+              name: '{#ADAPTER.SHORTNAME} - Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes/sec",30]'
+              units: bps
+              description: 'Bytes/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+            - uuid: 56ab8bb04a9b41dd838b904ff39e946f
+              name: '{#ADAPTER.SHORTNAME} - Bytes Dropped'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Dropped",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: bytes
+              description: |
+                Bytes Dropped for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+            - uuid: ca65500c8c6d489aaa7a48faedec3cc9
+              name: '{#ADAPTER.SHORTNAME} - Bytes Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Received/sec",30]'
+              units: bps
+              description: 'Bytes Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+            - uuid: e7ef88ffdf18410eba21ccab1efa7c4a
+              name: '{#ADAPTER.SHORTNAME} - Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Sent/sec",30]'
+              units: bps
+              description: 'Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+            - uuid: 6f10509fb90e43fcbec8e1127b00e867
+              name: '{#ADAPTER.SHORTNAME} - Frames Dropped'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Frames Dropped",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              description: |
+                Frames Dropped for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+            - uuid: 8991b80c31d54cb2b0bb82fc167a55eb
+              name: '{#ADAPTER.SHORTNAME} - Frames Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Frames Received/sec",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: fps
+              description: |
+                Frames Recieved/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+            - uuid: 0a6290ee06524f77bfd1583c632fa48c
+              name: '{#ADAPTER.SHORTNAME} - Frames Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Frames Sent/sec",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: fps
+              description: |
+                Frames Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+          graph_prototypes:
+            - uuid: 2c76810cb8954e1d9d7dfa5e0a4e7ece
+              name: '{#ADAPTER.SHORTNAME} legacy traffic'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Received/sec",30]'
+                - sortorder: '1'
+                  color: 4DB6AC
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Sent/sec",30]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#ADAPTER.CONNECTED}'
+              path: '$["{#ADAPTER.CONNECTED}"]'
+            - lld_macro: '{#ADAPTER.COUNTER}'
+              path: '$["{#ADAPTER.COUNTER}"]'
+            - lld_macro: '{#ADAPTER.DHCP.GUARD}'
+              path: '$["{#ADAPTER.DHCP.GUARD}"]'
+            - lld_macro: '{#ADAPTER.DYNAMIC.MAC}'
+              path: '$["{#ADAPTER.DYNAMIC.MAC}"]'
+            - lld_macro: '{#ADAPTER.ID.JS}'
+              path: '$["{#ADAPTER.ID.JS}"]'
+            - lld_macro: '{#ADAPTER.ID}'
+              path: '$["{#ADAPTER.ID}"]'
+            - lld_macro: '{#ADAPTER.IEEE.PRIORITY}'
+              path: '$["{#ADAPTER.IEEE.PRIORITY}"]'
+            - lld_macro: '{#ADAPTER.IS.LEGACY}'
+              path: '$["{#ADAPTER.IS.LEGACY}"]'
+            - lld_macro: '{#ADAPTER.MAC.SPOOFING}'
+              path: '$["{#ADAPTER.MAC.SPOOFING}"]'
+            - lld_macro: '{#ADAPTER.MAC}'
+              path: '$["{#ADAPTER.MAC}"]'
+            - lld_macro: '{#ADAPTER.NAME.TRANSLATED}'
+              path: '$["{#ADAPTER.NAME.TRANSLATED}"]'
+            - lld_macro: '{#ADAPTER.NAME}'
+              path: '$["{#ADAPTER.NAME}"]'
+            - lld_macro: '{#ADAPTER.PACKET.DIRECT}'
+              path: '$["{#ADAPTER.PACKET.DIRECT}"]'
+            - lld_macro: '{#ADAPTER.PORT.MIRRORING}'
+              path: '$["{#ADAPTER.PORT.MIRRORING}"]'
+            - lld_macro: '{#ADAPTER.SHORTNAME}'
+              path: '$["{#ADAPTER.SHORTNAME}"]'
+            - lld_macro: '{#ADAPTER.SR.IOV}'
+              path: '$["{#ADAPTER.SR.IOV}"]'
+            - lld_macro: '{#ADAPTER.SWITCH}'
+              path: '$["{#ADAPTER.SWITCH}"]'
+            - lld_macro: '{#ADAPTER.VLAN}'
+              path: '$["{#ADAPTER.VLAN}"]'
+            - lld_macro: '{#ADAPTER.VM.QUEUE}'
+              path: '$["{#ADAPTER.VM.QUEUE}"]'
+            - lld_macro: '{#VM.NAME}'
+              path: '$["{#VM.NAME}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.networks[?(@[''{#ADAPTER.IS.LEGACY}''] == ''True'')]'
+      tags:
+        - tag: class
+          value: software
+        - tag: target
+          value: hyper-v
+        - tag: target
+          value: hyper-v-vm
+      dashboards:
+        - uuid: 2f549e6c78ab4c6fb5f31cc5394a0c1a
+          name: VM
+          pages:
+            - widgets:
+                - type: graphprototype
+                  name: 'Disk Read/Writes'
+                  width: '34'
+                  height: '5'
+                  fields:
+                    - type: INTEGER
+                      name: columns
+                      value: '1'
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Disk Read/Write {#DISK.ID}'
+                    - type: STRING
+                      name: reference
+                      value: XBVEB
+                - type: graphprototype
+                  name: 'Network traffic'
+                  'y': '5'
+                  width: '62'
+                  height: '5'
+                  fields:
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: '{#ADAPTER.SHORTNAME} traffic'
+                    - type: STRING
+                      name: reference
+                      value: FQWSH
+                - type: graphprototype
+                  name: 'Disk size'
+                  x: '34'
+                  width: '28'
+                  height: '5'
+                  fields:
+                    - type: INTEGER
+                      name: columns
+                      value: '1'
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Disk {#DISK.ID} size'
+                    - type: STRING
+                      name: reference
+                      value: WLYNQ
