@@ -708,7 +708,8 @@ zabbix_export:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'hyperv.vm.disk.allocated[{#DISK.ID}]'
                 - sortorder: '3'
-                  color: FC6EA3
+                  drawtype: FILLED_REGION
+                  color: 00BFFF
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
@@ -1230,6 +1231,260 @@ zabbix_export:
           key: hyperv.vm.networks.discovery.legacy
           delay: '0'
           description: 'Discovers VM Legacy network adapters from vmdetails master data'
+          item_prototypes:
+            - uuid: 5d268d3fe67a43c087dffe9c99bc0771
+              name: '{#ADAPTER.SHORTNAME} - Connected switch'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.connected.switch[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.SWITCH}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: a74219c30e2f47ee99f42b2a7a757c75
+              name: '{#ADAPTER.SHORTNAME} - Connected'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.connected[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'Connection status of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.CONNECTED}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: d2b8af71fdf542f59fc57f76dc1e8b92
+              name: '{#ADAPTER.SHORTNAME} - MAC'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.mac[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'MAC of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.MAC}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: a69607289056418188405aff86c34c56
+              name: '{#ADAPTER.SHORTNAME} - VLAN'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.vlan[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: 'VLAN of network adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 20d314a13989468f95f62fc7ea8d5d7d
+              name: '{#ADAPTER.SHORTNAME} - Bytes/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes/sec",30]'
+              units: bps
+              description: 'Bytes/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+            - uuid: 56ab8bb04a9b41dd838b904ff39e946f
+              name: '{#ADAPTER.SHORTNAME} - Bytes Dropped'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Dropped",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: bytes
+              description: |
+                Bytes Dropped for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+            - uuid: ca65500c8c6d489aaa7a48faedec3cc9
+              name: '{#ADAPTER.SHORTNAME} - Bytes Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Received/sec",30]'
+              units: bps
+              description: 'Bytes Received/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+            - uuid: e7ef88ffdf18410eba21ccab1efa7c4a
+              name: '{#ADAPTER.SHORTNAME} - Bytes Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Sent/sec",30]'
+              units: bps
+              description: 'Bytes Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})'
+            - uuid: 6f10509fb90e43fcbec8e1127b00e867
+              name: '{#ADAPTER.SHORTNAME} - Frames Dropped'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Frames Dropped",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              description: |
+                Frames Dropped for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+            - uuid: 8991b80c31d54cb2b0bb82fc167a55eb
+              name: '{#ADAPTER.SHORTNAME} - Frames Received/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Frames Received/sec",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: fps
+              description: |
+                Frames Recieved/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+            - uuid: 0a6290ee06524f77bfd1583c632fa48c
+              name: '{#ADAPTER.SHORTNAME} - Frames Sent/sec'
+              key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Frames Sent/sec",30]'
+              status: DISABLED
+              discover: NO_DISCOVER
+              units: fps
+              description: |
+                Frames Sent/sec for adapter {#ADAPTER.NAME} (ID: {#ADAPTER.ID})
+                
+                Disabled because the performance counter uses a language dependent counter name, like: \Hyper-V Legacy Network Adapter(sv101 [linux]:Ethernet Card)\Frames Dropped
+          graph_prototypes:
+            - uuid: 2c76810cb8954e1d9d7dfa5e0a4e7ece
+              name: '{#ADAPTER.SHORTNAME} legacy traffic'
+              ymin_type_1: FIXED
+              graph_items:
+                - color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Received/sec",30]'
+                - sortorder: '1'
+                  color: 4DB6AC
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#ADAPTER.COUNTER})\Bytes Sent/sec",30]'
           master_item:
             key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
           lld_macro_paths:
