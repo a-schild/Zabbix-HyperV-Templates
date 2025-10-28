@@ -429,6 +429,7 @@ zabbix_export:
                   expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]) <> min(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"],1d)'
                   name: 'Disk {#DISK.ID} error count increasing'
                   opdata: 'Error count: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
+                  status: DISABLED
                   priority: AVERAGE
                   description: 'Number of disk errors changed in the last 24 hours'
             - uuid: 0024b57796ba443eaf2e96c1f9517c35
@@ -686,6 +687,13 @@ zabbix_export:
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
                     key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",30]'
+                - sortorder: '4'
+                  color: FF0080
+                  yaxisside: RIGHT
+                  calc_fnc: ALL
+                  item:
+                    host: 'Template Windows Hyper-V VM Guest 2'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
             - uuid: abfaff554baf4f689b9064855f533c8b
               name: 'Disk {#DISK.ID} size'
               ymin_type_1: FIXED
