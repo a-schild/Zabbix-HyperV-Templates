@@ -33,8 +33,8 @@ zabbix_export:
             We do it once every 59 minutes (not every 60m to have drifting times)
           timeout: 30s
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: e9961c8a8ef1464eb38e31a679118107
           name: 'Hyper-V VMS master data'
           type: ZABBIX_ACTIVE
@@ -50,13 +50,16 @@ zabbix_export:
             We do it once every 29 minutes (not every 60m to have drifting times)
           timeout: 30s
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: c686fcfab6c54262a934156cb48504a9
           name: 'Hyper-V Host free memory'
           type: CALCULATED
           key: hyperv.host.memory.free
           params: 'last(//vm.memory.size[total]) - last(//vm.memory.size[used])'
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
           triggers:
             - uuid: c632f7273c504452a0fdb9b4d51630f3
               expression: 'last(/Template Windows Hyper-V Host 2/hyperv.host.memory.free)<100'
@@ -74,6 +77,9 @@ zabbix_export:
                 - '$["{#HOST.VM.TOTAL.COUNT}"]'
           master_item:
             key: hyperv.discovery.host
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 63f736e67dd04603b33e764c88521b97
           name: 'Hyper-V VM status off'
           type: DEPENDENT
@@ -85,6 +91,9 @@ zabbix_export:
                 - '$["{#HOST.VM.OFF.COUNT}"]'
           master_item:
             key: hyperv.discovery.host
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 8168913491ae4b1799b1ef6ad4b8b882
           name: 'Hyper-V VM status other'
           type: DEPENDENT
@@ -96,6 +105,9 @@ zabbix_export:
                 - '$["{#HOST.VM.OTHER.COUNT}"]'
           master_item:
             key: hyperv.discovery.host
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 24e0212d7a754e46bfdf399514d57854
           name: 'Hyper-V VM status paused'
           type: DEPENDENT
@@ -107,6 +119,9 @@ zabbix_export:
                 - '$["{#HOST.VM.PAUSED.COUNT}"]'
           master_item:
             key: hyperv.discovery.host
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 76def2b788f749f09d5dff525f9734b8
           name: 'Hyper-V VM status running'
           type: DEPENDENT
@@ -118,6 +133,9 @@ zabbix_export:
                 - '$["{#HOST.VM.RUNNING.COUNT}"]'
           master_item:
             key: hyperv.discovery.host
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 826a3cb5388044168078f3096a59d12f
           name: 'Hyper-V VM status saved'
           type: DEPENDENT
@@ -129,30 +147,33 @@ zabbix_export:
                 - '$["{#HOST.VM.SAVED.COUNT}"]'
           master_item:
             key: hyperv.discovery.host
+          tags:
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 6367908986344057a2b47cbb8ddd87fb
           name: 'Hyper-V Average memory pressure'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure]'
+          key: 'perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the processor in guest code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
           triggers:
             - uuid: 339d4fae480f4438ab07b02f8eab55fa
-              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])>=80 and last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])<100'
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure,30])>=80 and last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure,30])<100'
               name: 'Hyper-V Host Memory pressure 80-100%'
               opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
             - uuid: 46ec6d4317484e3d8e1f5a35386e6d2e
-              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])>=100'
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure,30])>=100'
               name: 'Hyper-V Host Memory pressure 100%'
               opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
             - uuid: 3c20f00e923d4a909545b5714de6121d
-              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure])<80'
+              expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure,30])<80'
               name: 'Hyper-V Host Memory pressure <80%'
               opdata: 'Memory ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               status: DISABLED
@@ -160,140 +181,140 @@ zabbix_export:
         - uuid: e821d78e692d4fe9a5aee8efcf835ad0
           name: 'Hyper-V Logical CPU Guest Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the processor in guest code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 3db3c5f3b51f44489a30a71a64449567
           name: 'Hyper-V Logical CPU Hypervisor Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the processor in hypervisor code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 90656d91814849d4ab23e279cfddad97
           name: 'Hyper-V Logical CPU Idle Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the processor in an idle state.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
           triggers:
             - uuid: 8560faf355c746418b64f9c5fa0ee77d
-              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<=20 and avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)>0'
+              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time,30],#3)<=20 and avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time,30],#3)>0'
               name: 'Hyper-V CPU load over 80%'
               opdata: 'Load ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
             - uuid: e052005af8a2464ca987be3591c4dcaf
-              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<= 0'
+              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time,30],#3)<= 0'
               name: 'Hyper-V Host CPU load 100%'
               opdata: 'Load ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: HIGH
             - uuid: 6b51bc6076134fb98c824704119dbfd1
-              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time],#3)<10'
+              expression: 'avg(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Idle Time,30],#3)<10'
               name: 'Hyper-V Host Idle CPU < 10%'
               opdata: 'Idle ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
         - uuid: 13c65c374ac64ce5af0188b22fed248a
           name: 'Hyper-V Root Virtual CPU Guest Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Guest Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor in guest code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: f8f7a8a647fd405399143575cb213e7c
           name: 'Hyper-V Root Virtual CPU Hypervisor Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Hypervisor Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor in hypervisor code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 66a1b3f2df2245cfb1a89a53665befbc
           name: 'Hyper-V Root Virtual CPU Remote Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Remote Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor running on a remote node.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 859e1fec865b4ea49ec79e2e72af3efc
           name: 'Hyper-V Root Virtual CPU Total Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Root Virtual Processor(_Total)\% Total Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: a7513c5d39744daba9b941c59c209ced
           name: 'Hyper-V Virtual CPU Guest Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Guest Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor in guest code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 9c031ed643344bdb8687030a69a3cd20
           name: 'Hyper-V Virtual CPU Hypervisor Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Hypervisor Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor in hypervisor code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: d644d39b088441ffb33779e9d2fb279f
           name: 'Hyper-V Virtual CPU Remote Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Remote Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor running on a remote node.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: e8fe4b95de3b4a45a40a517451059c5d
           name: 'Hyper-V Virtual CPU Total Runtime %'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time]'
+          key: 'perf_counter_en[\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time,30]'
           history: 30d
           value_type: FLOAT
           units: '%'
           description: 'The percentage of time spent by the virtual processor in guest and hypervisor code.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 2cbdcd352aeb4250a23ee445591ec561
           name: 'Hyper-V Number of Logical CPUs'
           type: ZABBIX_ACTIVE
@@ -302,8 +323,8 @@ zabbix_export:
           history: 2w
           trends: 90d
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 20d1afa4d39c4bdcaaa28621eb7bab82
           name: 'Hyper-V Monitored Notifications'
           type: ZABBIX_ACTIVE
@@ -312,8 +333,8 @@ zabbix_export:
           history: 2w
           trends: 90d
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 9caf2f2f25d14cc1a7cf236f716000a2
           name: 'Hyper-V Number of Partitions (VMs)'
           type: ZABBIX_ACTIVE
@@ -322,8 +343,8 @@ zabbix_export:
           history: 2w
           trends: 90d
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: c3edec645a3148f985b70bd4d9f68bda
           name: 'Hyper-V Total Pages'
           type: ZABBIX_ACTIVE
@@ -331,8 +352,8 @@ zabbix_export:
           delay: 5m
           history: 2w
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 3b05e4584cc04fc5b243e226e71fad0d
           name: 'Hyper-V Number of Virtual CPUs'
           type: ZABBIX_ACTIVE
@@ -341,8 +362,8 @@ zabbix_export:
           history: 2w
           trends: 90d
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 26df9a03fd1f4078a664cbdae694942a
           name: 'Hyper-V VMs Critical'
           type: ZABBIX_ACTIVE
@@ -351,8 +372,8 @@ zabbix_export:
           trends: 90d
           description: 'The number of critical VMs on a host.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
           triggers:
             - uuid: e1c7915d6d5f46ebae96edf40ed0ad8e
               expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Critical])>0'
@@ -368,8 +389,8 @@ zabbix_export:
           trends: 90d
           description: 'The number of OK VM''s on a host.'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
           triggers:
             - uuid: 563e8236f913450ca49bb0e83796077a
               expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Ok])=0'
@@ -379,7 +400,7 @@ zabbix_export:
         - uuid: cb82c72cc0ad4ff58c83e09e5850c93c
           name: 'Hyper-V Virtual Switch B/s Received'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Received/sec]'
+          key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Received/sec,30]'
           history: 30d
           value_type: FLOAT
           units: Bits/sec
@@ -388,12 +409,12 @@ zabbix_export:
               parameters:
                 - '8'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: 24f9473f101e4d3eb64b52939aa66b1c
           name: 'Hyper-V Virtual Switch B/s Sent'
           type: ZABBIX_ACTIVE
-          key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]'
+          key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Sent/sec,30]'
           history: 30d
           value_type: FLOAT
           units: Bits/sec
@@ -402,8 +423,8 @@ zabbix_export:
               parameters:
                 - '8'
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
         - uuid: ea9570dda2934b228ecb9490513d88d6
           name: 'Hyper-V Service State'
           type: ZABBIX_ACTIVE
@@ -411,8 +432,8 @@ zabbix_export:
           delay: 5m
           history: 30d
           tags:
-            - tag: Application
-              value: 'HyperV Host'
+            - tag: application
+              value: 'Hyper-V Host'
           triggers:
             - uuid: f659c1c0060b4b2984b773891142c5a3
               expression: 'last(/Template Windows Hyper-V Host 2/service.info[vmms])<>0'
@@ -430,54 +451,435 @@ zabbix_export:
             HyperV Guest VM Discovery
             Requires PowerShell script installed on HyperV Host.
           item_prototypes:
+            - uuid: b4982f9f8d1a471db696302f5c26f207
+              name: 'Replication Data {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.data[${#VM.ID}]'
+              delay: '0'
+              master_item:
+                key: hyperv.discovery.vms
             - uuid: 23ad2a0c2494465d96a19403bfe74edc
-              name: 'Replication {#VMNAME}'
-              type: ZABBIX_ACTIVE
-              key: 'hyperv.vm.replication[{#VMNAME_SAFE}]'
-              delay: 10m
+              name: 'Replication enabled for {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.enabled[{#VM.ID}]'
+              delay: '0'
               history: 90d
-              value_type: TEXT
+              value_type: CHAR
               trends: '0'
-              timeout: 30s
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.ENABLED}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
               tags:
                 - tag: application
-                  value: 'HyperV Host'
+                  value: 'Hyper-V Host'
+            - uuid: 48b12a1b43ae45a6b042b33c3d133366
+              name: 'Replication frequency {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.frequency[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              trends: '0'
+              units: s
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.FREQUENCY}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
+            - uuid: 4af1e0dcf47940d4a708176296dafbd1
+              name: 'Replication health for {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.health[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              value_type: CHAR
+              trends: '0'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.HEALTH}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
               trigger_prototypes:
                 - uuid: 6fdae3fd74264b19b417697178c45aa4
-                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.replication[{#VMNAME_SAFE}],,"regexp","Critical")=1'
-                  name: 'Replication state {#VMNAME} critical'
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.health[{#VM.ID}])="Critical"'
+                  name: 'Replication health {#VM.NAME} critical'
                   priority: HIGH
+                - uuid: 8d58f44ec9a143258c3103be5ab11037
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.health[{#VM.ID}])="Normal"'
+                  name: 'Replication health {#VM.NAME} normal'
+                  status: DISABLED
+                  discover: NO_DISCOVER
+                  priority: INFO
                 - uuid: bae3bc3117314e7ba4299e1f1ee1e2ff
-                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.replication[{#VMNAME_SAFE}],,"regexp","Warning")=1'
-                  name: 'Replication state {#VMNAME} warning'
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.health[{#VM.ID}])="Warning"'
+                  name: 'Replication health {#VM.NAME} warning'
                   priority: WARNING
-            - uuid: 900cba1fd9434476ba87508bcdd4e959
-              name: 'VM status {#VMNAME}'
-              type: ZABBIX_ACTIVE
-              key: 'hyperv.vm.status[{#VMNAME_SAFE}]'
-              delay: 5m
+            - uuid: 87112f483c10463c82f00bfde43e95a7
+              name: 'Replication last sync {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.last.sync[{#VM.ID}]'
+              delay: '0'
               history: 90d
-              value_type: TEXT
+              value_type: CHAR
               trends: '0'
-              description: 'Status of VM'
-              timeout: 30s
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.LAST.TIME}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
               tags:
                 - tag: application
-                  value: 'HyperV Host'
+                  value: 'Hyper-V Host'
+            - uuid: 0052175de26144b7897a025530b6da75
+              name: 'Replication mode for {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.mode[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              value_type: CHAR
+              trends: '0'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.MODE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
+            - uuid: 2c46ea7cb5bf49089c76602bfc9140e4
+              name: 'Replication primary server for {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.primary.server[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              value_type: CHAR
+              trends: '0'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.PRIMARY.SERVER}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
+            - uuid: ce6109b2d88b448eb42bbc9952643018
+              name: 'Replication replica server for {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.replica.server[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              value_type: CHAR
+              trends: '0'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.REPLICA.SERVER}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
+            - uuid: 305c05fb695a4dc0a36d520a761cf266
+              name: 'Replication state for {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.state[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              value_type: CHAR
+              trends: '0'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.STATE}";
+                      
+                      
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+                      
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          if (!retData) {
+                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          }
+                          return retData;
+                        }
+                      }
+                      
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
               trigger_prototypes:
-                - uuid: 1c710786e45b4c7d810955fa3a0d6417
-                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.status[{#VMNAME_SAFE}],1s,"like","Saved")=1'
-                  name: '{#VMNAME} in saved state'
-                  priority: HIGH
-                - uuid: 1c651d66ab8f4d4bb813b14795acd96f
-                  expression: 'find(/Template Windows Hyper-V Host 2/hyperv.vm.status[{#VMNAME_SAFE}],1s,"like","Off")=1'
-                  name: '{#VMNAME} is Off'
-                  status: DISABLED
+                - uuid: 917037d47e6d42e3a3f1c1de9490bc2e
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="Disabled"'
+                  name: 'Replication state {#VM.NAME} disabled'
+                  priority: INFO
+                - uuid: f9e1a8318a7249f4b6a8bef847872578
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="FailbackComplete"'
+                  name: 'Replication state {#VM.NAME} failback complete'
+                  priority: INFO
+                - uuid: b311cdb0a7384d41abe6ee46deaea543
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="FailbackInProgress"'
+                  name: 'Replication state {#VM.NAME} failback in progress'
+                  priority: INFO
+                - uuid: c59461fa437549159865a319729642eb
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="InitialReplicationInProgress"'
+                  name: 'Replication state {#VM.NAME} initial replication in progress'
+                  priority: INFO
+                - uuid: 08b3064833bf449583dc506013cfa905
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="RecoveryInProgress"'
+                  name: 'Replication state {#VM.NAME} recovery in progress'
+                  priority: INFO
+                - uuid: 2c0fc065d19b405c90c51f8b0d905b15
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="ResynchronizeSuspended"'
+                  name: 'Replication state {#VM.NAME} resynchronize suspended'
+                  priority: WARNING
+                - uuid: b56571d500fe4fa284e66a756a5a5520
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="Resynchronizing"'
+                  name: 'Replication state {#VM.NAME} resynchronizing'
+                  priority: INFO
+                - uuid: a243a8f892914ddfa77d502fbe323944
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="Suspended"'
+                  name: 'Replication state {#VM.NAME} suspended'
+                  priority: WARNING
+                - uuid: 66bf87e9f97c4fe39916eac115b7125b
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="Unknown"'
+                  name: 'Replication state {#VM.NAME} unknown'
+                  priority: WARNING
+                - uuid: abf8cd82ea1e4785ba89fe35df07c986
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="WaitingForInitialReplication"'
+                  name: 'Replication state {#VM.NAME} waiting for initial replication'
                   priority: INFO
           host_prototypes:
             - uuid: 7cea3780685d4c87942d7676269e8cb8
               host: '{#VMNAME_SAFE}_{#VMHOST}'
               name: '{#VMNAME}_{#VMHOST}'
+              status: DISABLED
+              discover: NO_DISCOVER
               group_links:
                 - group:
                     name: 'HyperV VM'
@@ -529,9 +931,9 @@ zabbix_export:
                 - 2h
       tags:
         - tag: target
-          value: hyper-v-host
+          value: hyper-v
         - tag: target
-          value: hyperv
+          value: hyper-v-host
       dashboards:
         - uuid: 53891ef2820347ecad4a9d16ab1062a0
           name: 'Hyper-V Host'
@@ -647,12 +1049,12 @@ zabbix_export:
         - color: 00CC00
           item:
             host: 'Template Windows Hyper-V Host 2'
-            key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time]'
+            key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Guest Run Time,30]'
         - sortorder: '1'
           color: DD0000
           item:
             host: 'Template Windows Hyper-V Host 2'
-            key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time]'
+            key: 'perf_counter_en[\Hyper-V Hypervisor Logical Processor(_Total)\% Hypervisor Run Time,30]'
     - uuid: 399eb5c2ccae410f93fbe61ad35e6d55
       name: 'Hyper-V Network'
       height: '300'
@@ -661,13 +1063,13 @@ zabbix_export:
           color: 3333FF
           item:
             host: 'Template Windows Hyper-V Host 2'
-            key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Received/sec]'
+            key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Received/sec,30]'
         - sortorder: '1'
           drawtype: GRADIENT_LINE
           color: 00DD00
           item:
             host: 'Template Windows Hyper-V Host 2'
-            key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Sent/sec]'
+            key: 'perf_counter_en[\Hyper-V Virtual Switch(*)\Bytes Sent/sec,30]'
     - uuid: ea96c817763f465dacf0e3763f832b05
       name: 'Hyper-V Total Pages'
       height: '300'

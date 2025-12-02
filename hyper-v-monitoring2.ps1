@@ -35,12 +35,13 @@ try {
     [System.Environment]::SetEnvironmentVariable("LC_ALL", "en-US.UTF-8", "Process")
     [System.Environment]::SetEnvironmentVariable("LANGUAGE", "en-US", "Process")
 
-    # Force reload of Hyper-V module with English culture
-    if (Get-Module -Name Hyper-V) {
-        Write-DebugInfo "Removing and re-importing Hyper-V module with English culture"
-        Remove-Module Hyper-V -Force -ErrorAction SilentlyContinue
+    # Import Hyper-V module with English culture (only if not already loaded)
+    if (-not (Get-Module -Name Hyper-V)) {
+        Write-DebugInfo "Importing Hyper-V module with English culture"
+        Import-Module Hyper-V -ErrorAction Stop
+    } else {
+        Write-DebugInfo "Hyper-V module already loaded, skipping import"
     }
-    Import-Module Hyper-V -Force -ErrorAction Stop
 
     Write-DebugInfo "Culture successfully set to en-US and Hyper-V module reloaded"
 } catch {
@@ -303,6 +304,39 @@ function Get-VMDiscoveryData {
                     Write-DebugInfo "    Error processing checkpoint: $($_.Exception.Message)"
                 }
             }
+
+            # Get replication information
+            Write-DebugInfo "  Getting replication status for $($vm.Name)"
+            $vmReplication = $null
+            $replicationEnabled = $false
+            $replicationState = "NotEnabled"
+            $replicationMode = "None"
+            $replicationHealth = "NotApplicable"
+            $replicationFrequency = 0
+            $lastReplicationTime = ""
+            $primaryServer = ""
+            $replicaServer = ""
+
+            try {
+                $vmReplication = Get-VMReplication -VM $vm -ErrorAction SilentlyContinue
+                if ($vmReplication) {
+                    $replicationEnabled = $true
+                    $replicationState = $vmReplication.State.ToString()
+                    $replicationMode = $vmReplication.ReplicationMode.ToString()
+                    $replicationHealth = $vmReplication.ReplicationHealth.ToString()
+                    $replicationFrequency = $vmReplication.ReplicationFrequencySec
+                    if ($vmReplication.LastReplicationTime) {
+                        $lastReplicationTime = $vmReplication.LastReplicationTime.ToString("yyyy-MM-dd HH:mm:ss")
+                    }
+                    $primaryServer = if ($vmReplication.PrimaryServerName) { $vmReplication.PrimaryServerName } else { "" }
+                    $replicaServer = if ($vmReplication.ReplicaServerName) { $vmReplication.ReplicaServerName } else { "" }
+                    Write-DebugInfo "    Replication enabled: State=$replicationState, Mode=$replicationMode, Health=$replicationHealth"
+                } else {
+                    Write-DebugInfo "    Replication not enabled for this VM"
+                }
+            } catch {
+                Write-DebugInfo "    Error getting replication status: $($_.Exception.Message)"
+            }
             
             $vmData = @{
                 "{#VM.NAME}" = $vm.Name
@@ -344,6 +378,14 @@ function Get-VMDiscoveryData {
                 "{#VM.DVD.INFO}" = ($dvdInfo | ConvertTo-Json -Compress)
                 "{#VM.INTEGRATION.INFO}" = ($integrationInfo | ConvertTo-Json -Compress)
                 "{#VM.CHECKPOINT.INFO}" = ($checkpointInfo | ConvertTo-Json -Compress)
+                "{#VM.REPLICATION.ENABLED}" = $replicationEnabled.ToString()
+                "{#VM.REPLICATION.STATE}" = $replicationState
+                "{#VM.REPLICATION.MODE}" = $replicationMode
+                "{#VM.REPLICATION.HEALTH}" = $replicationHealth
+                "{#VM.REPLICATION.FREQUENCY}" = $replicationFrequency.ToString()
+                "{#VM.REPLICATION.LAST.TIME}" = $lastReplicationTime
+                "{#VM.REPLICATION.PRIMARY.SERVER}" = $primaryServer
+                "{#VM.REPLICATION.REPLICA.SERVER}" = $replicaServer
                 "{#VMHOST.NAME}" = $hostName
                 "{#VMHOST.FQDN}" = $hostFQDN
             }
@@ -562,17 +604,18 @@ function Get-HyperVHostInfo {
             $hostInfo["{#HOST.VIRTUAL.SWITCHES.COUNT}"] = "0"
         }
 
-        # Get VM summary statistics
+        # Get VM summary statistics - optimized to only retrieve State property
         try {
             Write-DebugInfo "Getting VM summary statistics"
-            $vms = Get-VM -ErrorAction SilentlyContinue
+            # Only select the State property to speed up the query significantly
+            $vmStates = @(Get-VM -ErrorAction SilentlyContinue | Select-Object -ExpandProperty State)
             $vmStats = @{
-                "Total" = $vms.Count
-                "Running" = ($vms | Where-Object { $_.State -eq "Running" }).Count
-                "Off" = ($vms | Where-Object { $_.State -eq "Off" }).Count
-                "Saved" = ($vms | Where-Object { $_.State -eq "Saved" }).Count
-                "Paused" = ($vms | Where-Object { $_.State -eq "Paused" }).Count
-                "Other" = ($vms | Where-Object { $_.State -notin @("Running", "Off", "Saved", "Paused") }).Count
+                "Total" = $vmStates.Count
+                "Running" = @($vmStates | Where-Object { $_ -eq "Running" }).Count
+                "Off" = @($vmStates | Where-Object { $_ -eq "Off" }).Count
+                "Saved" = @($vmStates | Where-Object { $_ -eq "Saved" }).Count
+                "Paused" = @($vmStates | Where-Object { $_ -eq "Paused" }).Count
+                "Other" = @($vmStates | Where-Object { $_ -notin @("Running", "Off", "Saved", "Paused") }).Count
             }
 
             $hostInfo["{#HOST.VM.TOTAL.COUNT}"] = $vmStats.Total.ToString()
@@ -595,34 +638,27 @@ function Get-HyperVHostInfo {
             $hostInfo["{#HOST.VM.STATISTICS}"] = "{}"
         }
 
-        # Get Hyper-V feature status
+        # Get Hyper-V feature status - OPTIMIZED: Skip this slow check
+        # The Get-WindowsOptionalFeature command is extremely slow (10-20 seconds)
+        # Since we already know Hyper-V is enabled (we're running Get-VMHost successfully),
+        # we can safely assume it's "Enabled" and skip this expensive check
         try {
-            Write-DebugInfo "Getting Hyper-V feature status"
-            $hyperVFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -ErrorAction SilentlyContinue
-            if ($hyperVFeature) {
-                $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = $hyperVFeature.State.ToString()
+            Write-DebugInfo "Skipping slow Hyper-V feature status check (assumed Enabled)"
+            # If Get-VMHost worked above, Hyper-V is definitely enabled
+            if ($vmHost) {
+                $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = "Enabled"
             } else {
-                # Try server method
-                try {
-                    $hyperVRole = Get-WindowsFeature -Name Hyper-V -ErrorAction SilentlyContinue
-                    if ($hyperVRole) {
-                        $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = $hyperVRole.InstallState.ToString()
-                    } else {
-                        $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = "Unknown"
-                    }
-                } catch {
-                    $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = "Unknown"
-                }
+                $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = "Unknown"
             }
         } catch {
             Write-DebugInfo "Error getting Hyper-V feature status: $($_.Exception.Message)"
             $hostInfo["{#HOST.HYPERV.FEATURE.STATE}"] = "Unknown"
         }
 
-        # Get OS information
+        # Get OS information - optimized to only select needed properties
         try {
             Write-DebugInfo "Getting OS information"
-            $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
+            $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property Caption,Version,BuildNumber,OSArchitecture,InstallDate,LastBootUpTime -ErrorAction SilentlyContinue
             if ($osInfo) {
                 $hostInfo["{#HOST.OS.NAME}"] = $osInfo.Caption
                 $hostInfo["{#HOST.OS.VERSION}"] = $osInfo.Version
