@@ -84,7 +84,7 @@ Remove-Item -Path $exportPath
 	* If you get an error check
 		* If your certificate is signed/you changed the policy to unrestricted.
 		* If your path in the config file is correct.
-```The argument 'C:\Program Files\Zabbix Agent 2\zabbix-vm-perf2.ps1' to the -File parameter does not exist. 
+```The argument 'C:\Program Files\Zabbix Agent 2\hyper-v-monitoring2.ps1' to the -File parameter does not exist. 
 Provide the path to an existing '.ps1' file as an argument to the -File parameter.
 Windows PowerShell 
 Copyright (C) 2016 Microsoft Corporation. All rights reserved.
@@ -96,14 +96,14 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 - Depending on the load of your Hyper-V server, you will have to increase the default
   **Zabbix Timeout from 3 to 15-30 seconds
   
-- Make sure the agent is allowed to execute the zabbix-vm-perf.ps1 file.
+- Make sure the agent is allowed to execute the hyper-v-monitoring2.ps1 file.
   For this open a cmd console in the `C:\Program Files\Zabbix Agent 2` location
-  Then type `powershell zabbix-vm-perf.ps1` + enter
+  Then type `powershell hyper-v-monitoring2.ps1` + enter
   This should return a json structure with all the VM's on this host,
   including the vm state, and the replication status
 
 ```cmd
-c:\Program Files\Zabbix Agent 2\>powershell .\zabbix-vm-perf2.ps1
+c:\Program Files\Zabbix Agent 2\>powershell .\hyper-v-monitoring2.ps1
 ```
 - This should return a big json object with all VM's on the server
   including some details
