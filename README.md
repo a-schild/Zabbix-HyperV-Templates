@@ -95,6 +95,9 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 
 - Depending on the load of your Hyper-V server, you will have to increase the default
   **Zabbix Timeout from 3 to 15-30 seconds
+
+- The Hyper-V Host needs to be setup to use passive Zabbix agent.
+  The active agent won't work, as the VM's don't have an active agent inside
   
 - Make sure the agent is allowed to execute the hyper-v-monitoring2.ps1 file.
   For this open a cmd console in the `C:\Program Files\Zabbix Agent 2` location
@@ -116,16 +119,3 @@ This should return the same json data as invoking the script directly
 zabbix_get -s 127.0.0.1 -k hyperv.discovery --tls-connect psk \
     --tls-psk-identity SERVER-IDENTITY --tls-psk-file "C:\Program Files\Zabbix Agent 2\psk.key"
 ```
-
-
-## Changelog
-- 2025-10-09
-  - Complete rewrite of LLD logic and related templates
-- 2025-09-22
-  - Better handling of special characters in VM names
-- 2024-11-20
-  - Switch item prototypes in VM Guest template to Zabbix passive agent
-- 2024-11-13
-  - Switched performance counters to work with all OS languages.
-    Thanks to the new perf_counter_en zabbix item.
-	Updated documentation
