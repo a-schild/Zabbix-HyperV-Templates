@@ -563,7 +563,7 @@ function Get-HyperVHostInfo {
             $vmHost = Get-VMHost -ErrorAction Stop
 
             $hostInfo["{#HOST.NAME}"] = $env:COMPUTERNAME
-            $hostInfo["{#HOST.FQDN}"] = [System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
+            $hostInfo["{#HOST.FQDN}"] = [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName
             $hostInfo["{#HOST.HYPERV.VERSION}"] = $vmHost.HyperVVersion
             $hostInfo["{#HOST.LOGICAL.PROCESSORS}"] = $vmHost.LogicalProcessorCount.ToString()
             $hostInfo["{#HOST.MEMORY.CAPACITY.GB}"] = [math]::Round($vmHost.MemoryCapacity / 1GB, 2).ToString()
