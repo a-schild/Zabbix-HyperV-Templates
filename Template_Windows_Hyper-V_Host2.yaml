@@ -10,6 +10,9 @@ zabbix_export:
     - uuid: b24fe1d11add4b02b46f2e9d87024533
       template: 'Template Windows Hyper-V Host 2'
       name: 'Template Windows Hyper-V Host 2'
+      vendor:
+        name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
+        version: '2.0.2'
       description: |
         Detect Hyper-V VMs via LLD and create hosts to monitor
         Needs the Template Windows HyperV VM Guest 2 too
@@ -874,30 +877,18 @@ zabbix_export:
                   expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.state[{#VM.ID}])="WaitingForInitialReplication"'
                   name: 'Replication state {#VM.NAME} waiting for initial replication'
                   priority: INFO
-          host_prototypes:
-            - uuid: 7cea3780685d4c87942d7676269e8cb8
-              host: '{#VMNAME_SAFE}_{#VMHOST}'
-              name: '{#VMNAME}_{#VMHOST}'
-              status: DISABLED
-              discover: NO_DISCOVER
-              group_links:
-                - group:
-                    name: 'HyperV VM'
-              group_prototypes:
-                - name: 'Hyper-V Host [{#VMHOST}]'
-              templates:
-                - name: 'Template Windows Hyper-V VM Guest 2'
-              tags:
-                - tag: target
-                  value: hyper-v
-                - tag: target
-                  value: hyper-v-vm
           timeout: 30s
         - uuid: de4954b68aaf4c7cb219a0f393377777
-          name: 'Hyper-V VM Disk Discovery'
+          name: 'Hyper-V VM Host Prototype Discovery'
           type: DEPENDENT
           key: hyperv.discover.vms.data
           delay: '0'
+          description: |
+            Creates one Zabbix host per discovered Hyper-V guest VM and links
+            the 'Template Windows Hyper-V VM Guest 2' template to it.
+            Iterates the hyperv.discovery.vms master item (one entry per VM).
+            The {$VM.ID} macro passed to each host drives the guest template's
+            hyperv.discovery.vmdetails[{$VM.ID}] data collection.
           host_prototypes:
             - uuid: 10df6bc5f7444f30bfa5dfd5ab34781a
               host: '{#VM.ID} {#VMHOST.FQDN}'

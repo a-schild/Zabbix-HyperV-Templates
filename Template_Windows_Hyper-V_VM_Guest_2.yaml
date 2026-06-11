@@ -11,7 +11,10 @@ zabbix_export:
     - uuid: 553c9735a18645849c38ebda859ace9c
       template: 'Template Windows Hyper-V VM Guest 2'
       name: 'Template Windows Hyper-V VM Guest 2'
-      description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template'
+      vendor:
+        name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
+        version: '2.0.2'
+      description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template. See https://github.com/a-schild/Zabbix-HyperV-Templates'
       groups:
         - name: 'HyperV VM'
         - name: Templates

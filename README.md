@@ -66,6 +66,77 @@ Import-Certificate -FilePath $exportPath -CertStoreLocation Cert:\LocalMachine\R
 Remove-Item -Path $exportPath
 ```
 
+  Alternatively, run the bundled helper script `ZabbixAgentScriptSigner.ps1`
+  from an **elevated** PowerShell. It creates (or reuses) a self-signed
+  code-signing certificate, signs the monitoring script with a timestamp, and
+  imports the certificate into the trusted stores:
+```powershell
+.\ZabbixAgentScriptSigner.ps1
+# or point it at a different location / enforce AllSigned afterwards:
+.\ZabbixAgentScriptSigner.ps1 -ScriptPath 'D:\Zabbix\hyper-v-monitoring2.ps1' -SetExecutionPolicy
+```
+
+  > **Security warning — understand what signing this way does before running it:**
+  > - The certificate is imported into `Cert:\LocalMachine\Root`, so the host
+  >   trusts it as a root CA. Anything signed by the matching private key is then
+  >   treated as a trusted publisher on this machine. (Root is needed only
+  >   because the certificate is self-signed and is therefore its own CA.)
+  > - The private key stays in `Cert:\LocalMachine\My` on the host. Anyone with
+  >   administrative/local access can use it to sign arbitrary scripts that will
+  >   pass `AllSigned` and look trusted — the signature proves nothing about
+  >   identity, it is self-issued.
+  > - `-SetExecutionPolicy AllSigned` affects **every** PowerShell script on the
+  >   machine, not just this one.
+  >
+  > Lower-risk options: sign with a certificate from your internal/enterprise PKI
+  > (no Root import, identity is validated), use `RemoteSigned` instead of
+  > `AllSigned`, or scope the execution policy to a process/user instead of the
+  > whole machine.
+
+  ### Preferred in a domain: sign with an Active Directory CA (AD CS)
+
+  If you have an Active Directory enterprise CA (AD Certificate Services), this
+  is the recommended approach and avoids the biggest risks of the self-signed
+  flow above. Because the enterprise CA is already a trusted root on every
+  domain-joined machine (published automatically via Group Policy), a script
+  signed by an AD-issued **Code Signing** certificate is trusted across the
+  whole domain with **no per-host `Root` import**.
+
+  Benefits over self-signing:
+  * **No `LocalMachine\Root` import** on the Hyper-V hosts — the issuing CA is
+    already trusted domain-wide. (At most you push the signing cert into
+    `TrustedPublisher` via GPO to suppress the `AllSigned` prompt.)
+  * **Sign once, centrally.** Sign `hyper-v-monitoring2.ps1` a single time on a
+    controlled workstation/build server, then deploy the already-signed file to
+    every host. The private key never has to live on the monitored Hyper-V
+    hosts.
+  * **Revocable.** If the signing certificate is ever compromised, revoke it at
+    the CA (CRL/OCSP) and the whole domain stops trusting anything it signed.
+  * **Real identity.** The signature is tied to an AD identity issued under your
+    CA's policy, not a self-issued certificate that proves nothing.
+
+  Workflow (requires a Code Signing certificate template enrolled in AD CS):
+```powershell
+# On a controlled signing box, request a Code Signing certificate from AD CS
+# (Get-Certificate uses the "CodeSigning" template; adjust -Template to your
+#  duplicated template name and enrollment permissions as needed):
+$cert = (Get-Certificate -Template CodeSigning `
+    -CertStoreLocation Cert:\CurrentUser\My -Url ldap:).Certificate
+
+# Sign the script once, with a timestamp so it stays valid after cert expiry:
+Set-AuthenticodeSignature -Certificate $cert `
+    -FilePath 'C:\Program Files\Zabbix Agent 2\hyper-v-monitoring2.ps1' `
+    -TimestampServer 'http://timestamp.digicert.com'
+```
+  Then deploy the now-signed `hyper-v-monitoring2.ps1` to each Hyper-V host. No
+  certificate import is needed on the hosts as long as the issuing enterprise CA
+  is trusted there (the default for domain members). Under `AllSigned` you may
+  additionally push the signing certificate to `TrustedPublisher` via GPO to
+  avoid the one-time trust prompt.
+
+  Use the bundled self-signed helper script only when no enterprise PKI is
+  available — standing up AD CS just to sign one monitoring script is overkill.
+
 * In case you don't care about security, you can lower the restrictions
   If you downloaded the script from internet, then make sure windows is not blocking it.
    
