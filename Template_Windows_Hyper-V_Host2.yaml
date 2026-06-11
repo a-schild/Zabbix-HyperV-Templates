@@ -12,7 +12,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V Host 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.0.2'
+        version: '2.0.3'
       description: |
         Detect Hyper-V VMs via LLD and create hosts to monitor
         Needs the Template Windows HyperV VM Guest 2 too
@@ -38,6 +38,16 @@ zabbix_export:
           tags:
             - tag: application
               value: 'Hyper-V Host'
+          triggers:
+            - uuid: 1448ae029be94ce78367454965f38aef
+              expression: 'nodata(/Template Windows Hyper-V Host 2/hyperv.discovery.host,2h)=1'
+              name: 'Hyper-V host data collection has stopped'
+              priority: WARNING
+              description: |
+                No Hyper-V host data has been received for 2h (this item polls
+                every 59m). Common causes: the monitoring PowerShell script is
+                unsigned and blocked by the execution policy, the script path in
+                the agent config is wrong, or the Zabbix agent is down.
         - uuid: e9961c8a8ef1464eb38e31a679118107
           name: 'Hyper-V VMS master data'
           type: ZABBIX_ACTIVE
@@ -55,6 +65,16 @@ zabbix_export:
           tags:
             - tag: application
               value: 'Hyper-V Host'
+          triggers:
+            - uuid: dbf8153eac384ff9a5413da41383a677
+              expression: 'nodata(/Template Windows Hyper-V Host 2/hyperv.discovery.vms,90m)=1'
+              name: 'Hyper-V VM discovery data collection has stopped'
+              priority: WARNING
+              description: |
+                No Hyper-V VM master data has been received for 90m (this item
+                polls every 29m). All VM discovery and per-VM monitoring depends
+                on this item. Check that the monitoring script runs (signing /
+                execution policy / path) and that the Zabbix agent is up.
         - uuid: c686fcfab6c54262a934156cb48504a9
           name: 'Hyper-V Host free memory'
           type: CALCULATED

@@ -1,6 +1,15 @@
 # Changelog
 
 - 2026-06-11
+  - Release v2.0.3
+  - Added data-collection health triggers on the Hyper-V host template: alert
+    when the host data or VM master data item stops receiving data (catches an
+    unsigned/blocked script, wrong path, or a stopped agent)
+  - hyper-v-monitoring2.ps1: replaced the deprecated
+    [System.Net.Dns]::GetHostByName() with GetHostEntry() for host FQDN
+    resolution
+
+- 2026-06-11
   - Release v2.0.2
   - Removed stale, disabled VM host prototype that still referenced the
     obsolete {#VMNAME_SAFE}/{#VMNAME}/{#VMHOST} LLD macros
