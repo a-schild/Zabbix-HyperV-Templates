@@ -157,7 +157,7 @@ function Get-VMDiscoveryData {
         $hostName = $env:COMPUTERNAME
         $hostFQDN = "Unknown"
         try {
-            $hostFQDN = [System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
+            $hostFQDN = [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName
             Write-DebugInfo "Host Name: $hostName"
             Write-DebugInfo "Host FQDN: $hostFQDN"
         } catch {

@@ -1,6 +1,21 @@
 # Changelog
 
 - 2026-06-11
+  - Release v2.0.4
+  - Removed a redundant agent/script call: the "Hyper-V VM Discovery" LLD rule
+    is now a dependent rule on the hyperv.discovery.vms master item instead of
+    polling the agent on its own schedule. Dropped the duplicate
+    hyperv.discover.vms UserParameter from hyper-v.conf. This saves one full
+    ~30s VM enumeration per discovery cycle.
+  - hyper-v-monitoring2.ps1: replaced the remaining deprecated
+    [System.Net.Dns]::GetHostByName() call (the v2.0.3 fix missed one of the
+    two occurrences)
+  - Host dashboard: added a "Hyper-V Host Memory" graph (free memory + memory
+    pressure on a second axis), VMs-running / Total-VMs / vmms-service-state
+    value tiles, and a Current problems widget
+  - VM Guest dashboard: added a Current problems widget
+
+- 2026-06-11
   - Release v2.0.3
   - Added data-collection health triggers on the Hyper-V host template: alert
     when the host data or VM master data item stops receiving data (catches an
