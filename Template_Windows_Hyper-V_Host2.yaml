@@ -12,7 +12,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V Host 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.0.3'
+        version: '2.0.4'
       description: |
         Detect Hyper-V VMs via LLD and create hosts to monitor
         Needs the Template Windows HyperV VM Guest 2 too
@@ -466,13 +466,20 @@ zabbix_export:
       discovery_rules:
         - uuid: 0bb424a20f1741278efdf0c8c26788ee
           name: 'Hyper-V VM Discovery'
+          type: DEPENDENT
           key: hyperv.discover.vms
-          delay: 1h
+          delay: '0'
           lifetime: 15d
           enabled_lifetime_type: DISABLE_NEVER
           description: |
             HyperV Guest VM Discovery
             Requires PowerShell script installed on HyperV Host.
+
+            Dependent on the 'Hyper-V VMS master data' item (hyperv.discovery.vms)
+            so discovery reuses that data instead of triggering its own separate
+            agent/script invocation.
+          master_item:
+            key: hyperv.discovery.vms
           item_prototypes:
             - uuid: b4982f9f8d1a471db696302f5c26f207
               name: 'Replication Data {#VM.NAME}'
@@ -1015,6 +1022,73 @@ zabbix_export:
                     - type: STRING
                       name: reference
                       value: VCNGI
+                - type: graph
+                  x: '36'
+                  'y': '10'
+                  width: '35'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        name: 'Hyper-V Host Memory'
+                    - type: STRING
+                      name: reference
+                      value: MEMGR
+                - type: item
+                  name: 'VMs running'
+                  'y': '15'
+                  width: '24'
+                  height: '3'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        key: hyperv.vms.count.running
+                    - type: STRING
+                      name: reference
+                      value: VRUNN
+                - type: item
+                  name: 'Total VMs'
+                  x: '24'
+                  'y': '15'
+                  width: '24'
+                  height: '3'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        key: hyperv.vms.count
+                    - type: STRING
+                      name: reference
+                      value: VTOTL
+                - type: item
+                  name: 'vmms service state'
+                  x: '48'
+                  'y': '15'
+                  width: '24'
+                  height: '3'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V Host 2'
+                        key: 'service.info[vmms]'
+                    - type: STRING
+                      name: reference
+                      value: VMMSS
+                - type: problems
+                  name: 'Current problems'
+                  'y': '18'
+                  width: '72'
+                  height: '5'
+                  fields:
+                    - type: STRING
+                      name: reference
+                      value: PROBL
   triggers:
     - uuid: f6a36d3b6d4346ada278f9bf868355e0
       expression: 'last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor\Virtual Processors])/last(/Template Windows Hyper-V Host 2/perf_counter_en[\Hyper-V Hypervisor\Logical Processors])>5'
@@ -1144,3 +1218,20 @@ zabbix_export:
           item:
             host: 'Template Windows Hyper-V Host 2'
             key: 'perf_counter_en[\Hyper-V Virtual Machine Health Summary\Health Ok]'
+    - uuid: 2276b7161b1c4640b68efe2cb4fd745b
+      name: 'Hyper-V Host Memory'
+      height: '300'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: 1E87C8
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: hyperv.host.memory.free
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: F63100
+          yaxisside: RIGHT
+          item:
+            host: 'Template Windows Hyper-V Host 2'
+            key: 'perf_counter_en[\Hyper-V Dynamic Memory Balancer(System Balancer)\Average Pressure,30]'
