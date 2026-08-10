@@ -1,6 +1,7 @@
 # Changelog
 
-- 2026-08-10 (unreleased)
+- 2026-08-10
+  - Release v2.0.6
   - Checkpoint monitoring (#47). The script already collected checkpoints but
     nothing consumed them. hyper-v-monitoring2.ps1 now also reports the oldest
     and newest checkpoint (name, creation time, epoch and age) in both the
