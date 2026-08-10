@@ -45,6 +45,40 @@ The following _host_ parameters are monitored:
 	* Hyper-V Virtual Switch(*)\Bytes
 	* Hyper-V Virtual Machine Health Summary\Health Critical
 	
+## Requirements
+
+Before importing anything, check these three. Most of the reported problems come
+from one of them.
+
+* **The Hyper-V host needs a Zabbix "Agent" interface.** Not just a host entry -
+  an interface of type *Agent*, pointing at the Hyper-V host, port 10050. The
+  discovered VM hosts inherit it. Without it, linking the template fails with
+  `Cannot inherit LLD rule with key "hyperv.discover.vms" ... because a host
+  interface of type "Agent" is required.`
+
+* **The Zabbix server (or a proxy) must be able to reach that agent on port
+  10050.** The two templates are deliberately different here:
+
+  | Template | Check type | Direction |
+  |---|---|---|
+  | Hyper-V Host | active | agent connects out to the server |
+  | Hyper-V VM Guest | passive | **server connects in to the agent** |
+
+  Every VM guest item is a passive check, because the performance counters for a
+  VM live on the Hyper-V host and the VMs have no agent of their own. If the
+  server cannot open a connection to the host's agent, the Hyper-V host itself
+  will look perfectly healthy while **every discovered VM stays unavailable**
+  with `cannot establish TCP connection to [x.x.x.x]:10050: timed out`.
+
+  This bites hardest with **Zabbix Cloud**, or any setup where the server is not
+  on the same network as the Hyper-V host: the server sits on the internet and
+  the host is behind NAT. Either allow inbound 10050 from the server, or - much
+  better - **run a Zabbix proxy on site**. The proxy connects outbound to the
+  cloud server and polls the agent locally, so nothing needs to be exposed.
+
+* **A Windows agent template must be linked to the Hyper-V host as well**, for
+  example "Windows by Zabbix agent". See the note under Usage below.
+
 ## Usage
 * Import provided templates in this order
   1. Template_Windows_HyperV_VM_Guest2.xml (or the yaml version)
@@ -168,6 +202,41 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 ```
 
 
+## Troubleshooting by error message
+
+**`Cannot inherit LLD rule with key "hyperv.discover.vms" ... because a host
+interface of type "Agent" is required`** when linking the template.
+The Hyper-V host has no Agent interface. Add one (type *Agent*, the host's
+address, port 10050) and link the template again.
+
+**`Cannot find the "data" array in the received JSON object`** on
+`hyperv.discover.vms.data`, usually on a host with only one VM.
+A bug in versions before 2.0.5: a single VM was serialized as a json object
+instead of a one element array. Upgrade `hyper-v-monitoring2.ps1` on the
+Hyper-V host to 2.0.5 or newer. Re-importing the templates alone does not help,
+the fix is in the script.
+
+**`cannot establish TCP connection to [x.x.x.x]:10050: timed out`** on the
+discovered VM hosts, while the Hyper-V host itself reports fine.
+The VM guest items are passive checks, so the server has to reach the agent.
+See Requirements above - with Zabbix Cloud or any server outside the host's
+network, run a Zabbix proxy on site.
+
+**`Cannot evaluate function: item "vm.memory.size[total]" does not exist`**.
+Link a Windows agent template to the Hyper-V host, that is where those items
+come from.
+
+**`Value of type "string" is not suitable for value type "Numeric (unsigned)"`**
+or **`ZBX_UNSUPPORTED: Field {#VM.REPLICATION.PRIMARY.SERVER} not found or
+empty`**.
+Both fixed in 2.0.6, re-import the templates.
+
+**VM hosts are never created**, and the discovery shows no error.
+Discovery runs hourly and the VM details every 29 minutes, so allow up to about
+1.5 hours. If nothing appears after that, check that the "Hyper-V VMS master
+data" item on the Hyper-V host actually has a value, and that both templates
+were imported.
+
 ## F.A.Q.
 
 - Depending on the load of your Hyper-V server, you will have to increase the default
@@ -175,6 +244,7 @@ Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 
 - The Hyper-V Host needs to be setup to use passive Zabbix agent.
   The active agent won't work, as the VM's don't have an active agent inside
+  See the Requirements section for what that means for firewalls and Zabbix Cloud.
   
 - Make sure the agent is allowed to execute the hyper-v-monitoring2.ps1 file.
   For this open a cmd console in the `C:\Program Files\Zabbix Agent 2` location
