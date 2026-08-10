@@ -373,11 +373,13 @@ function Get-VMDiscoveryData {
                 "{#VM.DISK.COUNT}" = $vmHardDisks.Count.ToString()
                 "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
                 "{#VM.CHECKPOINT.COUNT}" = $checkpoints.Count.ToString()
-                "{#VM.NETWORK.INFO}" = ($networkInfo | ConvertTo-Json -Compress)
-                "{#VM.DISK.INFO}" = ($diskInfo | ConvertTo-Json -Compress)
-                "{#VM.DVD.INFO}" = ($dvdInfo | ConvertTo-Json -Compress)
-                "{#VM.INTEGRATION.INFO}" = ($integrationInfo | ConvertTo-Json -Compress)
-                "{#VM.CHECKPOINT.INFO}" = ($checkpointInfo | ConvertTo-Json -Compress)
+                # -InputObject so a VM with a single nic/disk/dvd/checkpoint still
+                # yields a json array in these embedded payloads, not a bare object
+                "{#VM.NETWORK.INFO}" = (ConvertTo-Json -InputObject $networkInfo -Compress)
+                "{#VM.DISK.INFO}" = (ConvertTo-Json -InputObject $diskInfo -Compress)
+                "{#VM.DVD.INFO}" = (ConvertTo-Json -InputObject $dvdInfo -Compress)
+                "{#VM.INTEGRATION.INFO}" = (ConvertTo-Json -InputObject $integrationInfo -Compress)
+                "{#VM.CHECKPOINT.INFO}" = (ConvertTo-Json -InputObject $checkpointInfo -Compress)
                 "{#VM.REPLICATION.ENABLED}" = $replicationEnabled.ToString()
                 "{#VM.REPLICATION.STATE}" = $replicationState
                 "{#VM.REPLICATION.MODE}" = $replicationMode
@@ -397,13 +399,16 @@ function Get-VMDiscoveryData {
         Write-DebugInfo "Discovery completed. Processed $($discoveryData.Count) VMs"
 
         # Return direct JSON array for Zabbix 7.0+
-        return $discoveryData | ConvertTo-Json -Depth 10
+        # Use -InputObject instead of the pipeline: piping an array unrolls it,
+        # so a host with exactly one VM would emit a bare object instead of an
+        # array and Zabbix LLD fails with 'Cannot find the "data" array'.
+        return ConvertTo-Json -InputObject $discoveryData -Depth 10
 
     } catch {
         Write-DebugInfo "Fatal error in VM discovery: $($_.Exception.Message)"
         Write-DebugInfo "Stack trace: $($_.ScriptStackTrace)"
         # Return empty array in case of error
-        return @() | ConvertTo-Json
+        return ConvertTo-Json -InputObject @()
     }
 }
 
@@ -495,10 +500,11 @@ function Get-VMNetworkDiscovery {
         }
 
         Write-DebugInfo "Network discovery completed. Found $($discoveryData.Count) adapters"
-        return $discoveryData | ConvertTo-Json -Depth 5
+        # -InputObject keeps a single-element result an array, see Get-VMDiscoveryData
+        return ConvertTo-Json -InputObject $discoveryData -Depth 5
     } catch {
         Write-DebugInfo "Error in network discovery: $($_.Exception.Message)"
-        return @() | ConvertTo-Json
+        return ConvertTo-Json -InputObject @()
     }
 }
 
@@ -544,10 +550,11 @@ function Get-VMDiskDiscovery {
         }
 
         Write-DebugInfo "Disk discovery completed. Found $($discoveryData.Count) disks"
-        return $discoveryData | ConvertTo-Json -Depth 5
+        # -InputObject keeps a single-element result an array, see Get-VMDiscoveryData
+        return ConvertTo-Json -InputObject $discoveryData -Depth 5
     } catch {
         Write-DebugInfo "Error in disk discovery: $($_.Exception.Message)"
-        return @() | ConvertTo-Json
+        return ConvertTo-Json -InputObject @()
     }
 }
 
@@ -595,7 +602,8 @@ function Get-HyperVHostInfo {
                     "Extensions" = if ($switch.Extensions) { ($switch.Extensions | ForEach-Object { $_.Name }) -join "," } else { "" }
                 }
             }
-            $hostInfo["{#HOST.VIRTUAL.SWITCHES}"] = ($switchInfo | ConvertTo-Json -Compress)
+            # -InputObject so a host with a single vswitch still yields an array
+            $hostInfo["{#HOST.VIRTUAL.SWITCHES}"] = (ConvertTo-Json -InputObject $switchInfo -Compress)
             $hostInfo["{#HOST.VIRTUAL.SWITCHES.COUNT}"] = $switches.Count.ToString()
             Write-DebugInfo "Found $($switches.Count) virtual switches"
         } catch {
@@ -682,12 +690,14 @@ function Get-HyperVHostInfo {
 
         Write-DebugInfo "Hyper-V host discovery completed"
 
-        # Return as single-item array for Zabbix LLD format
-        return @($hostInfo) | ConvertTo-Json -Depth 10
+        # Return a single JSON object (NOT an array): the host template's
+        # dependent items address it directly, e.g. $["{#HOST.VM.TOTAL.COUNT}"]
+        return ConvertTo-Json -InputObject $hostInfo -Depth 10
 
     } catch {
         Write-DebugInfo "Fatal error in host discovery: $($_.Exception.Message)"
-        return @() | ConvertTo-Json
+        # Keep the object shape so dependent items get valid JSON
+        return ConvertTo-Json -InputObject @{}
     }
 }
 
