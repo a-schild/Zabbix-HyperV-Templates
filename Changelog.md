@@ -1,6 +1,7 @@
 # Changelog
 
 - 2026-08-10
+  - Release v2.0.5
   - Fix #54: VM discovery failed on Hyper-V hosts with exactly one VM, with
     'Cannot find the "data" array in the received JSON object'. Piping an array
     to ConvertTo-Json unrolls it, so a single VM was emitted as a bare JSON
