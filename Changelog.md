@@ -1,6 +1,70 @@
 # Changelog
 
 - 2026-08-10
+  - Release v2.0.6
+  - Checkpoint monitoring (#47). The script already collected checkpoints but
+    nothing consumed them. hyper-v-monitoring2.ps1 now also reports the oldest
+    and newest checkpoint (name, creation time, epoch and age) in both the
+    'vms' and the 'vmdetails' payload, and the VM Guest template exposes count,
+    type, oldest/newest name, creation time and age, plus the raw list.
+    Two new triggers: too many checkpoints ({$VM.CHECKPOINT.COUNT.MAX},
+    default 3) and a checkpoint left behind ({$VM.CHECKPOINT.AGE.MAX},
+    default 7d). Ages are computed on the Hyper-V host, so the Zabbix server
+    does not have to guess the host's timezone.
+  - The whole vm_info block was collected every poll and thrown away: no item
+    in either template read a single field of it (#45 "I dont see any
+    informations about the VMs like memory, CPU only Disks and NICs"). The VM
+    Guest template now has 38 dependent items covering state, status, uptime,
+    generation, configuration version, vCPU count/reserve/limit/weight, memory
+    startup/min/max/dynamic/buffer/weight, autostart and autostop behaviour,
+    config/checkpoint/smart-paging paths, notes, adapter/disk/dvd counts and
+    the integration services. All are dependent on the existing master item,
+    so they cost no additional agent or script calls.
+  - Two new triggers on VM health: status not 'Operating normally' (warning)
+    and VM not running (info, disable where VMs are legitimately off).
+  - {#VM.INTEGRATION.INFO} is now part of the vmdetails payload too.
+    Get-VMIntegrationService was already being called there and its result
+    discarded.
+  - Performance (#40):
+    - The VM details poll interval is now the {$VM.DETAILS.INTERVAL} macro.
+      The default stays 10m, so nothing changes unless you tune it. Every poll
+      starts a powershell.exe, imports the Hyper-V module and runs Get-VHD over
+      each disk, once per VM, so on a host with 20 VMs the 10m default is one
+      such run every 30 seconds. Raise the macro to 30m or 60m on busy hosts.
+    - The 21 disk performance counters now poll every 5m instead of every 1m.
+      16 of them are queried on demand, so that is five times fewer agent
+      queries per disk per VM.
+    - The five disk counters that carry an averaging window (latency, read and
+      write bytes/sec, read and write operations/sec) now average over 300s
+      instead of 30s, so the value covers the whole 5m interval rather than
+      sampling 30 seconds out of every 300. Note this changes their item key,
+      so Zabbix treats them as new items and their history starts fresh.
+      The agent samples these counters once a second regardless of the polling
+      interval, so the change is about data quality, not agent load.
+    - Network counters are left at 1m.
+  - Refactor: checkpoint and integration service collection moved into
+    Get-CheckpointSummary / Get-IntegrationServiceInfo so both payloads expose
+    identical fields instead of duplicating the loops.
+  - Fixed three further problems reported in #45:
+    - The 'Replication Data' item prototype was a dependent item with no
+      preprocessing and no explicit value type, so it defaulted to
+      Numeric (unsigned) and received the entire VM array. It failed on every
+      discovered VM with 'Value of type "string" is not suitable for value type
+      "Numeric (unsigned)"'. It is now a TEXT item that extracts just its own
+      VM's record. Its key also had a stray $ (hyperv.vm.data[${#VM.ID}]).
+    - The replication items threw ZBX_UNSUPPORTED whenever a field was empty,
+      which is the normal case for a VM without replication: no primary
+      server, no replica server and no last sync time. Every non replicated VM
+      therefore had three permanently unsupported items. They now return an
+      empty value ("0" for the numeric replication frequency) and only throw
+      when the VM itself is missing from the payload.
+    - The calculated 'Hyper-V Host free memory' item needs vm.memory.size[total]
+      and vm.memory.size[used], which come from a windows agent template and
+      not from this one. That requirement is now documented in the item, in the
+      template description and in the readme, instead of surfacing as
+      'Cannot evaluate function: item ... does not exist'.
+
+- 2026-08-10
   - Release v2.0.5
   - Fix #54: VM discovery failed on Hyper-V hosts with exactly one VM, with
     'Cannot find the "data" array in the received JSON object'. Piping an array
