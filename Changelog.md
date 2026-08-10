@@ -1,5 +1,14 @@
 # Changelog
 
+- 2026-08-10 (unreleased)
+  - README: added a Requirements section and a troubleshooting section keyed on
+    the actual error messages (#39). It now states that the Hyper-V host needs
+    a Zabbix Agent interface, and that the VM guest items are passive checks,
+    so the server has to be able to reach the agent on port 10050. The host
+    template is active and the guest template is passive, which is why a
+    firewalled or Zabbix Cloud setup shows a perfectly healthy Hyper-V host and
+    nothing but unavailable VMs. On site Zabbix proxy is the recommended fix.
+
 - 2026-08-10
   - Release v2.0.6
   - Checkpoint monitoring (#47). The script already collected checkpoints but
