@@ -24,12 +24,23 @@
   - {#VM.INTEGRATION.INFO} is now part of the vmdetails payload too.
     Get-VMIntegrationService was already being called there and its result
     discarded.
-  - Performance (#40): the VM details poll interval is now the
-    {$VM.DETAILS.INTERVAL} macro and defaults to 30m instead of 10m. Every
-    poll starts a powershell.exe, imports the Hyper-V module and runs Get-VHD
-    over each disk, once per VM. On a host with 20 VMs the old 10m interval
-    meant one such run every 30 seconds, which matches the reported symptom.
-    Lower the macro if faster VM state detection matters more than host CPU.
+  - Performance (#40):
+    - The VM details poll interval is now the {$VM.DETAILS.INTERVAL} macro.
+      The default stays 10m, so nothing changes unless you tune it. Every poll
+      starts a powershell.exe, imports the Hyper-V module and runs Get-VHD over
+      each disk, once per VM, so on a host with 20 VMs the 10m default is one
+      such run every 30 seconds. Raise the macro to 30m or 60m on busy hosts.
+    - The 21 disk performance counters now poll every 5m instead of every 1m.
+      16 of them are queried on demand, so that is five times fewer agent
+      queries per disk per VM.
+    - The five disk counters that carry an averaging window (latency, read and
+      write bytes/sec, read and write operations/sec) now average over 300s
+      instead of 30s, so the value covers the whole 5m interval rather than
+      sampling 30 seconds out of every 300. Note this changes their item key,
+      so Zabbix treats them as new items and their history starts fresh.
+      The agent samples these counters once a second regardless of the polling
+      interval, so the change is about data quality, not agent load.
+    - Network counters are left at 1m.
   - Refactor: checkpoint and integration service collection moved into
     Get-CheckpointSummary / Get-IntegrationServiceInfo so both payloads expose
     identical fields instead of duplicating the loops.

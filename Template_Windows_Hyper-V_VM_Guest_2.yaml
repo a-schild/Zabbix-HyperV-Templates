@@ -1182,6 +1182,7 @@ zabbix_export:
             - uuid: 36789012abcd4f018789012abc012348
               name: 'Disk {#DISK.ID} - Average Write Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
+              delay: 5m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -1191,12 +1192,14 @@ zabbix_export:
             - uuid: 9cf62d67d8d747929da2e9cce796d966
               name: 'Disk {#DISK.ID} - Byte Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Byte Quota Replenishment Rate"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Byte Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: e15ccda5219a4584bbc142f441dc1a59
               name: 'Disk {#DISK.ID} - Error Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Error Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
@@ -1211,12 +1214,14 @@ zabbix_export:
             - uuid: 0024b57796ba443eaf2e96c1f9517c35
               name: 'Disk {#DISK.ID} - Flush Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 32aee40dd4b748da85efc088efbe58d7
               name: 'Disk {#DISK.ID} - IO Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
+              delay: 5m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -1224,34 +1229,36 @@ zabbix_export:
               timeout: 30s
             - uuid: cffaaddc2de34fcc8c61bdcb07af71cd
               name: 'Disk {#DISK.ID} - Latency'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300]'
+              delay: 5m
               value_type: FLOAT
               units: s
               description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
               trigger_prototypes:
                 - uuid: de980912c1d848e6878cd08942c1948f
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])<0.01'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])<0.01'
                   name: 'Disk {#DISK.ID} latency ok < 10ms'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   status: DISABLED
                   priority: INFO
                 - uuid: 1a9d660132a440af8b2052f6e5bfbcd8
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])>0.015'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.015'
                   name: 'Disk {#DISK.ID} latency warning > 15ms'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: WARNING
                   dependencies:
                     - name: 'Disk {#DISK.ID} latency warning > 25ms'
-                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])>0.025'
+                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.025'
                 - uuid: ac4a41a939ac4eee8d7077bbd4f46e52
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30])>0.025'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.025'
                   name: 'Disk {#DISK.ID} latency warning > 25ms'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: AVERAGE
             - uuid: 25678901abcd4f018678901abc012347
               name: 'Disk {#DISK.ID} - Lower Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
+              delay: 5m
               value_type: FLOAT
               units: s
               description: 'Lower Latency for {#DISK.ID} at {#DISK.PATH}'
@@ -1259,6 +1266,7 @@ zabbix_export:
             - uuid: 5aa9ba08dcb9470fa66f6c137ef6a301
               name: 'Disk {#DISK.ID} - Lower Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Queue Length"]'
+              delay: 5m
               value_type: FLOAT
               units: s
               description: 'Lower Queue Length for {#DISK.ID} at {#DISK.PATH}'
@@ -1266,18 +1274,21 @@ zabbix_export:
             - uuid: be5ed5f2658d46f4b8bb5ad79c93c7cc
               name: 'Disk {#DISK.ID} - Maximum Adapter Worker Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Adapter Worker Count"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Maximum Adapter Worker Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: cb22af897eaf4ea9a878fe2a34f4e190
               name: 'Disk {#DISK.ID} - Maximum Bandwidth'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Bandwidth"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Maximum Bandwidth for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 4e662b9c9ac14cb1a79177c58120ef66
               name: 'Disk {#DISK.ID} - Maximum IO Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
+              delay: 5m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -1286,6 +1297,7 @@ zabbix_export:
             - uuid: 33085294c6b649dbbb3ccb7deced1f6b
               name: 'Disk {#DISK.ID} - Minimum IO Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
+              delay: 5m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -1294,6 +1306,7 @@ zabbix_export:
             - uuid: 5851d1ef4a7748ffb53ee514c9afffe4
               name: 'Disk {#DISK.ID} - Normalized Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
+              delay: 5m
               value_type: FLOAT
               units: ops
               description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -1301,12 +1314,14 @@ zabbix_export:
             - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
               name: 'Disk {#DISK.ID} - Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Queue Length"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Queue Length for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: e1f234567890472d9f0123456789abc0
               name: 'Disk {#DISK.ID} - Read Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",30]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",300]'
+              delay: 5m
               value_type: FLOAT
               units: Bps
               description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -1314,12 +1329,14 @@ zabbix_export:
             - uuid: 1913a23214b54c4c8c1fbc3b04367a4a
               name: 'Disk {#DISK.ID} - Read Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Read Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 03456789abcd4f018456789abc012345
               name: 'Disk {#DISK.ID} - Read Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",30]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",300]'
+              delay: 5m
               value_type: FLOAT
               units: ops
               description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
@@ -1327,13 +1344,15 @@ zabbix_export:
             - uuid: bc0d3ed4e9c94cf992201a8dfb557805
               name: 'Disk {#DISK.ID} - Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
+              delay: 5m
               value_type: FLOAT
               units: ops
               description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: f2345678abcd4f0183456789abc01234
               name: 'Disk {#DISK.ID} - Write Bytes/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",30]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",300]'
+              delay: 5m
               value_type: FLOAT
               units: Bps
               description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -1341,12 +1360,14 @@ zabbix_export:
             - uuid: 5417373178af40a4a86da68f8accc1bf
               name: 'Disk {#DISK.ID} - Write Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
+              delay: 5m
               value_type: FLOAT
               description: 'Write Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 14567890abcd4f018567890abc012346
               name: 'Disk {#DISK.ID} - Write Operations/sec'
-              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",30]'
+              key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",300]'
+              delay: 5m
               value_type: FLOAT
               units: ops
               description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
@@ -1429,7 +1450,7 @@ zabbix_export:
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300]'
                 - sortorder: '2'
                   color: F63100
                   calc_fnc: ALL
@@ -1444,32 +1465,32 @@ zabbix_export:
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",300]'
                 - sortorder: '1'
                   color: A5D6A7
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",300]'
                 - sortorder: '2'
                   color: FFB74D
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",300]'
                 - sortorder: '3'
                   color: BA68C8
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",300]'
                 - sortorder: '4'
                   color: FF0080
                   yaxisside: RIGHT
                   calc_fnc: ALL
                   item:
                     host: 'Template Windows Hyper-V VM Guest 2'
-                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",30]'
+                    key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300]'
             - uuid: abfaff554baf4f689b9064855f533c8b
               name: 'Disk {#DISK.ID} size'
               ymin_type_1: FIXED
@@ -2325,16 +2346,19 @@ zabbix_export:
           value: hyper-v-vm
       macros:
         - macro: '{$VM.DETAILS.INTERVAL}'
-          value: 30m
+          value: 10m
           description: |
             How often the Hyper-V host is asked for this VM's details.
-            Every poll starts a powershell.exe, imports the Hyper-V module and
-            walks the VM config including Get-VHD on every disk, so the cost is
-            one such run per VM per interval. On a host with 20 VMs a 10m
-            interval means a run every 30 seconds.
+
+            RAISE THIS IF THE HOST CPU SUFFERS. Every poll starts a
+            powershell.exe, imports the Hyper-V module and walks the VM config
+            including Get-VHD on every disk, and it runs once per VM per
+            interval. On a host with 20 VMs the 10m default is one such run
+            every 30 seconds; 30m or 60m makes that far less frequent.
+
             The payload is configuration, inventory and checkpoint data, none of
-            which changes by the second. Lower it if you want faster VM state
-            detection, raise it on busy hosts.
+            which changes by the second, so a longer interval costs little
+            besides slower VM state detection.
         - macro: '{$VM.CHECKPOINT.COUNT.MAX}'
           value: '3'
           description: 'Warn above this many checkpoints on a single VM.'
