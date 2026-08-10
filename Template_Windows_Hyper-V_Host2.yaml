@@ -12,7 +12,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V Host 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.0.4'
+        version: '2.0.5'
       description: |
         Detect Hyper-V VMs via LLD and create hosts to monitor
         Needs the Template Windows HyperV VM Guest 2 too

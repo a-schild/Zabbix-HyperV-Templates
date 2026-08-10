@@ -1,5 +1,20 @@
 # Changelog
 
+- 2026-08-10
+  - Release v2.0.5
+  - Fix #54: VM discovery failed on Hyper-V hosts with exactly one VM, with
+    'Cannot find the "data" array in the received JSON object'. Piping an array
+    to ConvertTo-Json unrolls it, so a single VM was emitted as a bare JSON
+    object instead of an array. All discovery functions now serialize via
+    ConvertTo-Json -InputObject. Hosts with zero VMs returned empty output
+    before and now correctly return [].
+  - Same fix applied to the embedded {#VM.NETWORK.INFO} / {#VM.DISK.INFO} /
+    {#VM.DVD.INFO} / {#VM.INTEGRATION.INFO} / {#VM.CHECKPOINT.INFO} and
+    {#HOST.VIRTUAL.SWITCHES} payloads, which had the same single-element
+    problem (a VM with one nic, one disk, ...)
+  - Developers.md: removed the stale notes about the xml/json counter cache and
+    the RebuildCache command, which only existed in the v1 script
+
 - 2026-06-11
   - Release v2.0.4
   - Removed a redundant agent/script call: the "Hyper-V VM Discovery" LLD rule
