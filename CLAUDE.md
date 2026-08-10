@@ -56,10 +56,19 @@ everything else is `DEPENDENT` on it:
   call the script. VM counts, replication items, the `Hyper-V VM Discovery` LLD rule and the
   `Hyper-V VM Host Prototype Discovery` rule all hang off them as dependent items/rules.
 - Guest template: `hyperv.discovery.vmdetails[{$VM.ID}]` is the single master item; the three LLD
-  rules (disks, regular NICs, legacy NICs) and all their dependent items parse it.
+  rules (disks, regular NICs, legacy NICs) and ~38 template-level items parse it. Its payload has
+  four roots — `vm_info`, `networks`, `disks`, `checkpoints`.
 
 When adding anything, make it dependent on an existing master item. A new LLD rule or item that
 polls the agent directly costs another full enumeration per interval.
+
+**Know what a poll actually costs.** The vmdetails master item runs once *per VM per interval*,
+and each run starts a `powershell.exe`, imports the Hyper-V module and calls `Get-VHD` on every
+disk. On a 20-VM host a 10-minute interval is a fresh PowerShell every 30 seconds — the cause of
+the CPU spikes in issue #40. The interval is the `{$VM.DETAILS.INTERVAL}` macro (default 30m).
+Separately, the guest template's `perf_counter_en[...]` prototypes poll at 1m and there are ~21
+per disk and ~19 per NIC, so a VM with two disks and a NIC is ~60 agent queries a minute. Those
+are agent-side and cheap individually, but they multiply by VM count.
 
 **Host prototypes create the VM hosts.** `Hyper-V VM Host Prototype Discovery` creates one Zabbix
 host per VM named `{#VM.ID} {#VMHOST.FQDN}` and sets `{$VM.ID}`/`{$VMHOST.FQDN}` on it. That

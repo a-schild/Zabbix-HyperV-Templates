@@ -146,6 +146,12 @@ Set-AuthenticodeSignature -Certificate $cert `
 * Set-up Hyper-V host in Zabbix interface. 
 	* Add a new host, if needed.
 	* Link it with "Template Windows HyperV Host" template. 
+	* **Also link a Windows agent template** to the same host, for example
+	  "Windows by Zabbix agent". The host memory items of the Hyper-V template
+	  are calculated from `vm.memory.size[total]` and `vm.memory.size[used]`,
+	  which come from that template. Without it you get
+	  `Cannot evaluate function: item "vm.memory.size[total]" does not exist`
+	  and the memory graph stays empty.
 	* Wait for a guest discovery to fire, it will:
 		* discover Hyper-V guests, 
 		* create a new host for each VM,

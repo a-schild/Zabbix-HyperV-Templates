@@ -48,6 +48,90 @@ try {
     Write-DebugInfo "Could not set culture or reload module: $($_.Exception.Message)"
 }
 
+# Describe the integration services of a VM.
+# Names and status texts are localized by Windows, so both the raw and the
+# english value are returned.
+function Get-IntegrationServiceInfo {
+    param($Services)
+
+    $info = @()
+    foreach ($service in $Services) {
+        try {
+            Write-DebugInfo "    Processing service: $($service.Name)"
+            $info += @{
+                "Name" = $service.Name
+                "NameTranslated" = ConvertToEnglish -Value $service.Name
+                "Enabled" = $service.Enabled.ToString()
+                "PrimaryStatusDescription" = $service.PrimaryStatusDescription
+                "PrimaryStatusDescriptionTranslated" = ConvertToEnglish -Value $service.PrimaryStatusDescription
+            }
+        } catch {
+            Write-DebugInfo "    Error processing integration service: $($_.Exception.Message)"
+        }
+    }
+    return ,$info
+}
+
+# Summarize the checkpoints of a VM.
+# Both the 'vms' and the 'vmdetails' payload expose the same fields, so the
+# host template and the VM guest template can monitor checkpoints identically.
+# Ages are computed here, on the Hyper-V host, so no timezone handling is
+# needed on the Zabbix side (CreationTime carries no offset of its own).
+function Get-CheckpointSummary {
+    param($Checkpoints)
+
+    $now = Get-Date
+    $list = @()
+
+    foreach ($checkpoint in $Checkpoints) {
+        try {
+            Write-DebugInfo "    Processing checkpoint: $($checkpoint.Name)"
+            $created = $checkpoint.CreationTime
+            $list += @{
+                "Name" = $checkpoint.Name
+                "CreationTime" = $created.ToString("yyyy-MM-dd HH:mm:ss")
+                "CreationEpoch" = [int64]([System.DateTimeOffset]$created).ToUnixTimeSeconds()
+                "AgeSeconds" = [int64](New-TimeSpan -Start $created -End $now).TotalSeconds
+                "ParentCheckpointName" = $checkpoint.ParentCheckpointName
+                "SnapshotType" = if ($checkpoint.SnapshotType) { $checkpoint.SnapshotType.ToString() } else { "Unknown" }
+            }
+        } catch {
+            Write-DebugInfo "    Error processing checkpoint: $($_.Exception.Message)"
+        }
+    }
+
+    # Sorted oldest first. @() keeps this an array when the VM has one checkpoint.
+    $sorted = @($list | Sort-Object { $_.CreationEpoch })
+
+    $summary = @{
+        "Count" = $sorted.Count
+        "Info" = $sorted
+        "OldestName" = ""
+        "OldestCreated" = ""
+        "OldestEpoch" = 0
+        "OldestAge" = 0
+        "NewestName" = ""
+        "NewestCreated" = ""
+        "NewestEpoch" = 0
+        "NewestAge" = 0
+    }
+
+    if ($sorted.Count -gt 0) {
+        $oldest = $sorted[0]
+        $newest = $sorted[$sorted.Count - 1]
+        $summary["OldestName"] = $oldest.Name
+        $summary["OldestCreated"] = $oldest.CreationTime
+        $summary["OldestEpoch"] = $oldest.CreationEpoch
+        $summary["OldestAge"] = $oldest.AgeSeconds
+        $summary["NewestName"] = $newest.Name
+        $summary["NewestCreated"] = $newest.CreationTime
+        $summary["NewestEpoch"] = $newest.CreationEpoch
+        $summary["NewestAge"] = $newest.AgeSeconds
+    }
+
+    return $summary
+}
+
 # Convert localized terms to English while preserving original values
 function ConvertToEnglish {
     param($Value)
@@ -271,39 +355,14 @@ function Get-VMDiscoveryData {
             
             # Build integration services info
             Write-DebugInfo "  Building integration services info for $($vm.Name)"
-            $integrationInfo = @()
-            foreach ($service in $vmIntegrationServices) {
-                try {
-                    Write-DebugInfo "    Processing service: $($service.Name)"
-                    $integrationInfo += @{
-                        "Name" = $service.Name
-                        "NameTranslated" = ConvertToEnglish -Value $service.Name
-                        "Enabled" = $service.Enabled.ToString()
-                        "PrimaryStatusDescription" = $service.PrimaryStatusDescription
-                        "PrimaryStatusDescriptionTranslated" = ConvertToEnglish -Value $service.PrimaryStatusDescription
-                    }
-                } catch {
-                    Write-DebugInfo "    Error processing integration service: $($_.Exception.Message)"
-                }
-            }
+            $integrationInfo = Get-IntegrationServiceInfo -Services $vmIntegrationServices
             
             # Get checkpoint information
             Write-DebugInfo "  Getting checkpoints for $($vm.Name)"
             $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
             Write-DebugInfo "    Found $($checkpoints.Count) checkpoints"
-            $checkpointInfo = @()
-            foreach ($checkpoint in $checkpoints) {
-                try {
-                    Write-DebugInfo "    Processing checkpoint: $($checkpoint.Name)"
-                    $checkpointInfo += @{
-                        "Name" = $checkpoint.Name
-                        "CreationTime" = $checkpoint.CreationTime.ToString("yyyy-MM-dd HH:mm:ss")
-                        "ParentCheckpointName" = $checkpoint.ParentCheckpointName
-                    }
-                } catch {
-                    Write-DebugInfo "    Error processing checkpoint: $($_.Exception.Message)"
-                }
-            }
+            $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
+            $checkpointInfo = $checkpointSummary.Info
 
             # Get replication information
             Write-DebugInfo "  Getting replication status for $($vm.Name)"
@@ -372,7 +431,15 @@ function Get-VMDiscoveryData {
                 "{#VM.NETWORK.COUNT}" = $vmNetworkAdapters.Count.ToString()
                 "{#VM.DISK.COUNT}" = $vmHardDisks.Count.ToString()
                 "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
-                "{#VM.CHECKPOINT.COUNT}" = $checkpoints.Count.ToString()
+                "{#VM.CHECKPOINT.COUNT}" = $checkpointSummary.Count.ToString()
+                "{#VM.CHECKPOINT.OLDEST.NAME}" = $checkpointSummary.OldestName
+                "{#VM.CHECKPOINT.OLDEST.CREATED}" = $checkpointSummary.OldestCreated
+                "{#VM.CHECKPOINT.OLDEST.EPOCH}" = $checkpointSummary.OldestEpoch.ToString()
+                "{#VM.CHECKPOINT.OLDEST.AGE}" = $checkpointSummary.OldestAge.ToString()
+                "{#VM.CHECKPOINT.NEWEST.NAME}" = $checkpointSummary.NewestName
+                "{#VM.CHECKPOINT.NEWEST.CREATED}" = $checkpointSummary.NewestCreated
+                "{#VM.CHECKPOINT.NEWEST.EPOCH}" = $checkpointSummary.NewestEpoch.ToString()
+                "{#VM.CHECKPOINT.NEWEST.AGE}" = $checkpointSummary.NewestAge.ToString()
                 # -InputObject so a VM with a single nic/disk/dvd/checkpoint still
                 # yields a json array in these embedded payloads, not a bare object
                 "{#VM.NETWORK.INFO}" = (ConvertTo-Json -InputObject $networkInfo -Compress)
@@ -731,6 +798,7 @@ function Get-VMDetailsById {
         $vmDvdDrives = Get-VMDvdDrive -VM $vm -ErrorAction Stop
         $vmIntegrationServices = Get-VMIntegrationService -VM $vm -ErrorAction Stop
         $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
+        $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
 
         # Build network adapter LLD data
         Write-DebugInfo "Building network adapter LLD data for $($vm.Name)"
@@ -966,10 +1034,21 @@ function Get-VMDetailsById {
                 "{#VM.NETWORK.COUNT}" = $vmNetworkAdapters.Count.ToString()
                 "{#VM.DISK.COUNT}" = $vmHardDisks.Count.ToString()
                 "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
-                "{#VM.CHECKPOINT.COUNT}" = $checkpoints.Count.ToString()
+                "{#VM.CHECKPOINT.COUNT}" = $checkpointSummary.Count.ToString()
+                "{#VM.CHECKPOINT.OLDEST.NAME}" = $checkpointSummary.OldestName
+                "{#VM.CHECKPOINT.OLDEST.CREATED}" = $checkpointSummary.OldestCreated
+                "{#VM.CHECKPOINT.OLDEST.EPOCH}" = $checkpointSummary.OldestEpoch.ToString()
+                "{#VM.CHECKPOINT.OLDEST.AGE}" = $checkpointSummary.OldestAge.ToString()
+                "{#VM.CHECKPOINT.NEWEST.NAME}" = $checkpointSummary.NewestName
+                "{#VM.CHECKPOINT.NEWEST.CREATED}" = $checkpointSummary.NewestCreated
+                "{#VM.CHECKPOINT.NEWEST.EPOCH}" = $checkpointSummary.NewestEpoch.ToString()
+                "{#VM.CHECKPOINT.NEWEST.AGE}" = $checkpointSummary.NewestAge.ToString()
+                "{#VM.CHECKPOINT.INFO}" = (ConvertTo-Json -InputObject $checkpointSummary.Info -Compress)
+                "{#VM.INTEGRATION.INFO}" = (ConvertTo-Json -InputObject (Get-IntegrationServiceInfo -Services $vmIntegrationServices) -Compress)
             }
             "networks" = @($networkLLD)
             "disks" = @($diskLLD)
+            "checkpoints" = @($checkpointSummary.Info)
         }
 
         Write-DebugInfo "VM details discovery completed for $($vm.Name)"
@@ -983,6 +1062,7 @@ function Get-VMDetailsById {
             "vm_info" = @{}
             "networks" = @()
             "disks" = @()
+            "checkpoints" = @()
         } | ConvertTo-Json -Depth 5
     }
 }

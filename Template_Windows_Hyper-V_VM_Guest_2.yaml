@@ -23,7 +23,7 @@ zabbix_export:
         - uuid: 77b70fa1ac3b41259978c203f4ac34f0
           name: 'Hyper-V VM master data'
           key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
-          delay: 10m
+          delay: '{$VM.DETAILS.INTERVAL}'
           value_type: TEXT
           trends: '0'
           description: |
@@ -33,6 +33,779 @@ zabbix_export:
             
             Needs to be Zabbix agent in passive mode, since the request is sent to the Hyper-V server
           timeout: 30s
+        - uuid: 9622b2ac2b1f4f8b8887129057c8a04b
+          name: 'Checkpoints: count'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Number of checkpoints (snapshots) currently present for this VM.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+          triggers:
+            - uuid: aba804d6efa148fab782cf4dae64656f
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.count)>{$VM.CHECKPOINT.COUNT.MAX}'
+              name: 'Hyper-V: too many checkpoints on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                Each checkpoint adds another avhdx to the differencing chain, which costs
+                read performance and disk space. Adjust with {$VM.CHECKPOINT.COUNT.MAX}.
+        - uuid: 382a5623652c42c0a788083d340776f8
+          name: 'Checkpoints: type'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.type
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Checkpoint type configured for this VM (Standard or Production).'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.TYPE}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: 4b0a14b462284d2c8ac983c68628aa0c
+          name: 'Checkpoints: oldest name'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.oldest.name
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Name of the oldest checkpoint. Empty when the VM has no checkpoints.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.OLDEST.NAME}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: bc05a0f7c62744ec97ab9a0462406eec
+          name: 'Checkpoints: oldest created'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.oldest.created
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Creation time of the oldest checkpoint, as local time on the Hyper-V host.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.OLDEST.CREATED}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: dac4cb96a287416faa8571ecf65ad757
+          name: 'Checkpoints: oldest age'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.oldest.age
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            Age of the oldest checkpoint. Computed on the Hyper-V host, so no timezone
+            correction is needed here. 0 when the VM has no checkpoints.
+            Long lived checkpoints keep growing their avhdx chain and eventually fill
+            the volume, which is what the accompanying trigger watches for.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.OLDEST.AGE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+          triggers:
+            - uuid: 84b43c71750e425cb94d85d297dad707
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.count)>0 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.oldest.age)>{$VM.CHECKPOINT.AGE.MAX}'
+              name: 'Hyper-V: checkpoint older than {$VM.CHECKPOINT.AGE.MAX} on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                A checkpoint has been left behind. Its avhdx keeps growing for as long as
+                it exists and merging it back gets slower the longer it is kept.
+                The count check guards against firing on VMs that have no checkpoints.
+        - uuid: 5bfbfc7c457c46d0a764cf9c554ae543
+          name: 'Checkpoints: newest name'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.newest.name
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Name of the most recent checkpoint. Empty when the VM has no checkpoints.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.NEWEST.NAME}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: 5d25508402f44bc7aca9993b4bcd8a93
+          name: 'Checkpoints: newest created'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.newest.created
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Creation time of the most recent checkpoint, as local time on the Hyper-V host.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.NEWEST.CREATED}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: e9e62a7026ea4c03ba2b0dcfc352efc4
+          name: 'Checkpoints: newest age'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.newest.age
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: 'Age of the most recent checkpoint. 0 when the VM has no checkpoints.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.NEWEST.AGE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: 25881f04954d4e389d83d5d052d6e9b0
+          name: 'Checkpoints: details'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.info
+          delay: '0'
+          value_type: TEXT
+          trends: '0'
+          description: 'Raw json list of all checkpoints: name, creation time, age, parent and type.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.INFO}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: 5bd59090c2084b32ad5dd581f1e4172a
+          name: 'VM name'
+          type: DEPENDENT
+          key: hyperv.vm.name
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Name of the VM as configured on the Hyper-V host.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.NAME}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 0472e6a7f2794e77ac5404744d600902
+          name: 'VM state'
+          type: DEPENDENT
+          key: hyperv.vm.state
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Run state of the VM: Running, Off, Paused, Saved, ...'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.STATE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+          triggers:
+            - uuid: 121f3d8ab4ba45a6827100fde8be70de
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.state)<>"Running"'
+              name: 'Hyper-V: VM is not running on {HOST.NAME}'
+              priority: INFO
+              description: |
+                The VM is not in the Running state. Informational by design, since a VM
+                may legitimately be switched off. Disable this trigger on templates or
+                hosts where it is only noise.
+        - uuid: 696a0aefe73c42e69ce365c99a682baa
+          name: 'VM state (numeric)'
+          type: DEPENDENT
+          key: hyperv.vm.state.value
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Run state as the numeric Hyper-V VMState enum value, for graphing.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.STATE.VALUE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+        - uuid: f1924b0c64534d8093d02712a4497ec3
+          name: 'VM status'
+          type: DEPENDENT
+          key: hyperv.vm.status
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Health status of the VM, normalized to english regardless of the host
+            language (see ConvertToEnglish in hyper-v-monitoring2.ps1).
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.STATUS.TRANSLATED}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+          triggers:
+            - uuid: 060ec7d23b3d4990b0f2df73d452b71d
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>""'
+              name: 'Hyper-V: VM status is not normal on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                The Hyper-V host reports a degraded status for this VM, for example a
+                failed checkpoint merge, a paused-critical state or a lost connection to
+                its storage.
+        - uuid: ba93b78a94964e25bd11d868b49ec851
+          name: 'VM status (host language)'
+          type: DEPENDENT
+          key: hyperv.vm.status.raw
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Health status exactly as reported by the Hyper-V host, in the host language.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.STATUS}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+        - uuid: 5dde33d559314b07a33cda7aead55ced
+          name: 'VM uptime'
+          type: DEPENDENT
+          key: hyperv.vm.uptime
+          delay: '0'
+          value_type: FLOAT
+          units: 's'
+          description: 'Time since the VM was started. 0 when the VM is not running.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.UPTIME}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+        - uuid: 2f5c1112539a4992a933e49740d99230
+          name: 'VM generation'
+          type: DEPENDENT
+          key: hyperv.vm.generation
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Hyper-V VM generation (1 or 2).'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GENERATION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 2c6ce1e162724ba08a1b9e35ddc595e0
+          name: 'VM configuration version'
+          type: DEPENDENT
+          key: hyperv.vm.version
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'VM configuration version. An outdated version blocks newer Hyper-V features.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.VERSION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 4aa656a8e026430ea1ab8c6748e721cc
+          name: 'CPU: virtual processors'
+          type: DEPENDENT
+          key: hyperv.vm.cpu.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Number of virtual processors assigned to the VM.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CPU.COUNT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: b419b3bd3d1b4b85bd448ba7ecb43840
+          name: 'CPU: reserve'
+          type: DEPENDENT
+          key: hyperv.vm.cpu.reserve
+          delay: '0'
+          value_type: UNSIGNED
+          units: '%'
+          description: 'Percentage of host CPU reserved for this VM.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CPU.RESERVE}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: dc1506eda2974fc291ab0b38419e5492
+          name: 'CPU: limit'
+          type: DEPENDENT
+          key: hyperv.vm.cpu.maximum
+          delay: '0'
+          value_type: UNSIGNED
+          units: '%'
+          description: 'Maximum percentage of host CPU this VM may use.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CPU.MAXIMUM}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 1fca9eb64491498abe1ae3d140b96a55
+          name: 'CPU: relative weight'
+          type: DEPENDENT
+          key: hyperv.vm.cpu.weight
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Relative scheduling weight against other VMs (default 100).'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CPU.WEIGHT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 43c11883d4854394b26ac476986f8b7b
+          name: 'Memory: startup'
+          type: DEPENDENT
+          key: hyperv.vm.memory.startup
+          delay: '0'
+          value_type: UNSIGNED
+          units: 'B'
+          description: |
+            Startup memory. The source lld macro is named .MB for historical reasons
+            but the value is in bytes.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.STARTUP.MB}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 21235481f42246c4a179ca5a3c2a2322
+          name: 'Memory: minimum'
+          type: DEPENDENT
+          key: hyperv.vm.memory.minimum
+          delay: '0'
+          value_type: UNSIGNED
+          units: 'B'
+          description: 'Minimum memory when dynamic memory is enabled. Value is in bytes.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.MINIMUM.MB}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: d7f40e382b7b4b3ebddfd33d70300a41
+          name: 'Memory: maximum'
+          type: DEPENDENT
+          key: hyperv.vm.memory.maximum
+          delay: '0'
+          value_type: UNSIGNED
+          units: 'B'
+          description: 'Maximum memory when dynamic memory is enabled. Value is in bytes.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.MAXIMUM.MB}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 6a223f17b255429eb21c8d28e181cbba
+          name: 'Memory: dynamic enabled'
+          type: DEPENDENT
+          key: hyperv.vm.memory.dynamic
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Whether dynamic memory is enabled for this VM.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.DYNAMIC}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 43be26c607974550a0f29392b4182421
+          name: 'Memory: buffer'
+          type: DEPENDENT
+          key: hyperv.vm.memory.buffer
+          delay: '0'
+          value_type: UNSIGNED
+          units: '%'
+          description: 'Dynamic memory buffer percentage.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.BUFFER}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 1c20bb7758b94501a4d660ecda38fa6b
+          name: 'Memory: weight'
+          type: DEPENDENT
+          key: hyperv.vm.memory.priority
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Memory weight used when the host is under memory pressure.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.PRIORITY}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: 529c4140a85243e79c6369b750172d25
+          name: 'Autostart action'
+          type: DEPENDENT
+          key: hyperv.vm.autostart.action
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'What the host does with this VM when it boots.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.AUTOSTART.ACTION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 708b60af25ee40bab3451c5444fb2148
+          name: 'Autostart delay'
+          type: DEPENDENT
+          key: hyperv.vm.autostart.delay
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: 'Delay before this VM is started automatically.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.AUTOSTART.DELAY}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: c563709e96d34609bf82d7f558bc5163
+          name: 'Autostop action'
+          type: DEPENDENT
+          key: hyperv.vm.autostop.action
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'What the host does with this VM when it shuts down.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.AUTOSTOP.ACTION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: c72ebad1557f4e31990f1502039bf195
+          name: 'Configuration path'
+          type: DEPENDENT
+          key: hyperv.vm.config.path
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Directory holding the VM configuration.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CONFIG.PATH}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: beb644ca30cb4cc4abe8a437b29e799a
+          name: 'Checkpoint path'
+          type: DEPENDENT
+          key: hyperv.vm.snapshot.path
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Directory where checkpoint files are stored.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SNAPSHOT.PATH}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: b57c8842e19044ba976694d96b9e3062
+          name: 'Smart paging path'
+          type: DEPENDENT
+          key: hyperv.vm.smart.paging.path
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Directory used for smart paging.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SMART.PAGING.PATH}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: af41ff2da00f4ca3962c851cf56a5df0
+          name: 'Notes'
+          type: DEPENDENT
+          key: hyperv.vm.notes
+          delay: '0'
+          value_type: TEXT
+          trends: '0'
+          description: 'Free text notes configured on the VM.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.NOTES}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 8683f21823ac43ed82d767671dede8fb
+          name: 'Network adapters'
+          type: DEPENDENT
+          key: hyperv.vm.network.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Number of virtual network adapters attached.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.NETWORK.COUNT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 4dde3f9d1d7746ab98b1cbc0b085c883
+          name: 'Hard disks'
+          type: DEPENDENT
+          key: hyperv.vm.disk.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Number of virtual hard disks attached.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.DISK.COUNT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 969fb8d32f3340e69d28e0b5b4df8de7
+          name: 'DVD drives'
+          type: DEPENDENT
+          key: hyperv.vm.dvd.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: 'Number of virtual dvd drives attached.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.DVD.COUNT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: a4c9057fcfb24e669b526fd5686cc620
+          name: 'Integration services'
+          type: DEPENDENT
+          key: hyperv.vm.integration.info
+          delay: '0'
+          value_type: TEXT
+          trends: '0'
+          description: 'Raw json list of the integration services and their state.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.INTEGRATION.INFO}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
       discovery_rules:
         - uuid: f88de644e4f34b72be0b4ad9ed31d27e
           name: 'VM Disks Discovery'
@@ -1550,6 +2323,24 @@ zabbix_export:
           value: hyper-v
         - tag: target
           value: hyper-v-vm
+      macros:
+        - macro: '{$VM.DETAILS.INTERVAL}'
+          value: 30m
+          description: |
+            How often the Hyper-V host is asked for this VM's details.
+            Every poll starts a powershell.exe, imports the Hyper-V module and
+            walks the VM config including Get-VHD on every disk, so the cost is
+            one such run per VM per interval. On a host with 20 VMs a 10m
+            interval means a run every 30 seconds.
+            The payload is configuration, inventory and checkpoint data, none of
+            which changes by the second. Lower it if you want faster VM state
+            detection, raise it on busy hosts.
+        - macro: '{$VM.CHECKPOINT.COUNT.MAX}'
+          value: '3'
+          description: 'Warn above this many checkpoints on a single VM.'
+        - macro: '{$VM.CHECKPOINT.AGE.MAX}'
+          value: '7d'
+          description: 'Warn when the oldest checkpoint of a VM is older than this.'
       dashboards:
         - uuid: 2f549e6c78ab4c6fb5f31cc5394a0c1a
           name: VM

@@ -16,7 +16,12 @@ zabbix_export:
       description: |
         Detect Hyper-V VMs via LLD and create hosts to monitor
         Needs the Template Windows HyperV VM Guest 2 too
-        
+
+        Link a windows agent template (for example 'Windows by Zabbix agent')
+        to the same host as well. The host memory items of this template are
+        calculated from vm.memory.size[total] / vm.memory.size[used], which
+        that template provides.
+
         See https://github.com/a-schild/Zabbix-HyperV-Templates
       groups:
         - name: Templates
@@ -80,6 +85,17 @@ zabbix_export:
           type: CALCULATED
           key: hyperv.host.memory.free
           params: 'last(//vm.memory.size[total]) - last(//vm.memory.size[used])'
+          description: |
+            Free physical memory on the Hyper-V host.
+
+            REQUIRES a windows agent template to be linked to the same host,
+            for example 'Windows by Zabbix agent' or 'Windows by Zabbix agent
+            active'. The vm.memory.size[total] and vm.memory.size[used] items
+            come from there, not from this template.
+
+            Without it this item stays unsupported with
+            'Cannot evaluate function: item "vm.memory.size[total]" does not
+            exist', and the memory graph on the host dashboard stays empty.
           tags:
             - tag: application
               value: 'Hyper-V Host'
@@ -484,8 +500,38 @@ zabbix_export:
             - uuid: b4982f9f8d1a471db696302f5c26f207
               name: 'Replication Data {#VM.NAME}'
               type: DEPENDENT
-              key: 'hyperv.vm.data[${#VM.ID}]'
+              key: 'hyperv.vm.data[{#VM.ID}]'
               delay: '0'
+              value_type: TEXT
+              trends: '0'
+              description: |
+                Raw discovery record for this VM, kept as a diagnostic aid.
+
+                Without the javascript step below this item received the whole
+                VM array, and being numeric it failed on every VM with
+                'Value of type "string" is not suitable for value type
+                "Numeric (unsigned)"'.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+
+                      for (var i = 0; i < data.length; i++) {
+                        if (data[i][vmIdMacro] === vmId) {
+                          return JSON.stringify(data[i]);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found";
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
               master_item:
                 key: hyperv.discovery.vms
             - uuid: 23ad2a0c2494465d96a19403bfe74edc
@@ -515,8 +561,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
@@ -560,8 +610,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "0";
                           }
                           return retData;
                         }
@@ -605,8 +659,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
@@ -665,8 +723,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
@@ -710,8 +772,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
@@ -755,8 +821,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
@@ -800,8 +870,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
@@ -845,8 +919,12 @@ zabbix_export:
                         var vm = data[i];
                         if (vm[vmIdMacro] === vmId ) {
                           var retData = vm[vmDataMacro];
-                          if (!retData) {
-                            throw "ZBX_UNSUPPORTED: Field "+vmDataMacro+" not found or empty";
+                          // A VM without replication has no primary/replica
+                          // server and no last sync time. That is normal, so
+                          // return a neutral value instead of making the item
+                          // unsupported and alerting on every non replicated VM.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return "";
                           }
                           return retData;
                         }
