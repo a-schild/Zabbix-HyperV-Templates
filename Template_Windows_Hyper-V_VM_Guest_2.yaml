@@ -1057,6 +1057,58 @@ zabbix_export:
           tags:
             - tag: component
               value: config
+        - uuid: cf6c752d4722449aa9302c6feefc3347
+          name: 'Mounted ISO images'
+          type: DEPENDENT
+          key: hyperv.vm.dvd.iso.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Number of DVD drives with an image attached. Mounting an iso is a perfectly
+            normal thing to do, but leaving it attached blocks live migration and quietly
+            pins the VM to its current host, which is usually discovered at the worst
+            possible moment.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.DVD.ISO.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+          triggers:
+            - uuid: e49d30733bcc42569bab381c7efdeba4
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.dvd.iso.count)>0'
+              name: 'Hyper-V: ISO image left mounted on {HOST.NAME}'
+              priority: INFO
+              description: |
+                An image is attached to this VM's DVD drive. The VM cannot be live
+                migrated while that is true.
+                INFO severity on purpose: this is routine during an installation and only
+                matters when it is forgotten. 'Mounted ISO paths' shows which image.
+        - uuid: 63954cbb9db44f07a7364351ef1b29f4
+          name: 'Mounted ISO paths'
+          type: DEPENDENT
+          key: hyperv.vm.dvd.iso.paths
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Paths of the attached images, separated by "; ". Empty when no image is
+            mounted.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.DVD.ISO.PATHS}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
         - uuid: 55ea1176074f48aea0a4b884a2156cf1
           name: 'Security: secure boot'
           type: DEPENDENT
@@ -2140,6 +2192,194 @@ zabbix_export:
                       throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 523bf5d69931459984a6dd82d699ffa5
+              name: 'Disk {#DISK.ID} parent VHD'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.parent[{#DISK.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: |
+                Path of the VHD this disk is a differencing child of. Empty for an ordinary disk.
+                Every layer in a differencing chain is read through on the way to the data,
+                and a checkpoint adds one. This is one level deep: it answers whether the
+                disk reads through something else, without a Get-VHD call per chain level.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var fieldMacro= "{"+"#DISK.PARENT.PATH}";
+
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fieldValue = disk[fieldMacro];
+                          // An empty answer is legitimate here: a disk with no parent is
+                          // not a differencing disk, and unset QoS reads 0. Returning it
+                          // keeps the item supported instead of failing every poll.
+                          if (fieldValue === undefined || fieldValue === null) {
+                            return "";
+                          }
+                          return fieldValue;
+                        }
+                      }
+
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 6941f3d50a4d4907a28736dfff0be153
+              name: 'Disk {#DISK.ID} is differencing'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.differencing[{#DISK.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: |
+                True when this disk has a parent VHD, whether from a checkpoint or from a
+                template it was cloned off.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var fieldMacro= "{"+"#DISK.IS.DIFFERENCING}";
+
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fieldValue = disk[fieldMacro];
+                          // An empty answer is legitimate here: a disk with no parent is
+                          // not a differencing disk, and unset QoS reads 0. Returning it
+                          // keeps the item supported instead of failing every poll.
+                          if (fieldValue === undefined || fieldValue === null) {
+                            return "";
+                          }
+                          return fieldValue;
+                        }
+                      }
+
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 9985be195bb248089aa82a16a6f226d1
+              name: 'Disk {#DISK.ID} QoS maximum IOPS'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.qos.max[{#DISK.ID}]'
+              delay: '0'
+              value_type: UNSIGNED
+              description: |
+                Storage QoS ceiling for this disk in normalized IOPS. 0 means no limit, which
+                is the default. A VM that mysteriously refuses to go faster is usually
+                sitting on one of these.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var fieldMacro= "{"+"#DISK.QOS.MAX.IOPS}";
+
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fieldValue = disk[fieldMacro];
+                          // An empty answer is legitimate here: a disk with no parent is
+                          // not a differencing disk, and unset QoS reads 0. Returning it
+                          // keeps the item supported instead of failing every poll.
+                          if (fieldValue === undefined || fieldValue === null) {
+                            return "";
+                          }
+                          return fieldValue;
+                        }
+                      }
+
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 0a8e35dff9b247dabcfd01fa1863ccfe
+              name: 'Disk {#DISK.ID} QoS minimum IOPS'
+              type: DEPENDENT
+              key: 'hyperv.vm.disk.qos.min[{#DISK.ID}]'
+              delay: '0'
+              value_type: UNSIGNED
+              description: |
+                Storage QoS reservation for this disk in normalized IOPS. 0 means none.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var diskId = "{#DISK.ID}";
+                      var diskIdMacro = "{"+"#"+"DISK.ID}";
+                      var fieldMacro= "{"+"#DISK.QOS.MIN.IOPS}";
+
+                      if (!data.disks || data.disks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No disks array found";
+                      }
+
+                      for (var i = 0; i < data.disks.length; i++) {
+                        var disk = data.disks[i];
+                        if (disk[diskIdMacro] === diskId) {
+                          var fieldValue = disk[fieldMacro];
+                          // An empty answer is legitimate here: a disk with no parent is
+                          // not a differencing disk, and unset QoS reads 0. Returning it
+                          // keeps the item supported instead of failing every poll.
+                          if (fieldValue === undefined || fieldValue === null) {
+                            return "";
+                          }
+                          return fieldValue;
+                        }
+                      }
+
+                      var foundIds = [];
+                      for (var i = 0; i < data.disks.length; i++) {
+                        foundIds.push(data.disks[i][diskIdMacro]);
+                      }
+                      throw "ZBX_UNSUPPORTED: Disk ID '" + diskId + "' not found. Found: " + foundIds.join(", ");
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1d
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 36789012abcd4f018789012abc012348
               name: 'Disk {#DISK.ID} - Average Write Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
@@ -2517,6 +2757,14 @@ zabbix_export:
               path: '$["{#DISK.NUMBER}"]'
             - lld_macro: '{#DISK.PATH_COUNTER}'
               path: '$["{#DISK.PATH_COUNTER}"]'
+            - lld_macro: '{#DISK.PARENT.PATH}'
+              path: '$["{#DISK.PARENT.PATH}"]'
+            - lld_macro: '{#DISK.IS.DIFFERENCING}'
+              path: '$["{#DISK.IS.DIFFERENCING}"]'
+            - lld_macro: '{#DISK.QOS.MAX.IOPS}'
+              path: '$["{#DISK.QOS.MAX.IOPS}"]'
+            - lld_macro: '{#DISK.QOS.MIN.IOPS}'
+              path: '$["{#DISK.QOS.MIN.IOPS}"]'
             - lld_macro: '{#DISK.PATH}'
               path: '$["{#DISK.PATH}"]'
             - lld_macro: '{#DISK.SIZE.GB}'
@@ -3298,6 +3546,149 @@ zabbix_export:
                       var adapterId = "{#ADAPTER.ID.JS}";
                       var adapterIdMacro= "{"+"#ADAPTER.ID}";
                       var searchKey= "{"+"#ADAPTER.VLAN}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 628bc626b55b46f59178aeee2d43181b
+              name: '{#ADAPTER.SHORTNAME} - VLAN mode'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.vlan.mode[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: |
+                VLAN operation mode of legacy adapter {#ADAPTER.NAME}: Untagged, Access, Trunk or
+                Private. An id of 0 means untagged on an Access adapter and nothing at all
+                on a Trunk.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN.MODE}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 86ca864a149d4074a15a88598318a553
+              name: '{#ADAPTER.SHORTNAME} - VLAN native'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.vlan.native[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: UNSIGNED
+              description: |
+                Native VLAN of legacy adapter {#ADAPTER.NAME} on a Trunk. 0 otherwise.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN.NATIVE}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: e1a54b58ec3447468b128860fa4f843e
+              name: '{#ADAPTER.SHORTNAME} - VLAN allowed list'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.legacy.vlan.allowed[{#ADAPTER.ID}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              description: |
+                VLANs a Trunk legacy adapter may carry, as Hyper-V formats the list. Empty
+                otherwise.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN.ALLOWED}";
                       
                       // Debug: Return info about what we found
                       if (!data.networks || data.networks.length === 0) {

@@ -107,6 +107,24 @@
     The accompanying 'secure boot disabled' trigger SHIPS DISABLED - plenty of
     VMs run with it off for good reason. Enable it where Secure Boot is a
     policy you enforce.
+  - Differencing chain and storage QoS per virtual disk. New disk prototypes
+    report the parent VHD path, whether the disk is a differencing child at
+    all, and the storage QoS maximum and minimum IOPS. All four come off
+    objects the script already holds (the Get-VHD result and the
+    Get-VMHardDiskDrive object), so nothing extra is called.
+    The parent chain is reported one level deep on purpose: walking it to the
+    root costs one Get-VHD per level, and a replica VM holding 24 recovery
+    points has a chain that deep, per disk, per poll.
+    Note these items return an empty value rather than going unsupported when
+    a disk has no parent or no QoS limit, unlike the older disk prototypes
+    which treat an empty field as an error.
+  - Mounted ISO images. The DVD data was collected but only ever counted; the
+    template now reports how many drives have an image attached and which
+    images they are, with an INFO trigger when one is left mounted. An
+    attached iso blocks live migration and pins the VM to its host, which
+    tends to be discovered at the worst possible moment.
+  - The three VLAN prototypes added for regular adapters now exist for legacy
+    adapters too, which are still in use on generation 1 VMs.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and

@@ -180,6 +180,55 @@ function Get-CheckpointSummary {
     return $summary
 }
 
+# Differencing chain and storage QoS of one virtual disk.
+# Both come from objects the caller already has: ParentPath off the Get-VHD result and
+# the QoS limits off the Get-VMHardDiskDrive object, so no extra call is made.
+# The parent chain is reported one level deep on purpose. Walking it to its root would
+# cost one Get-VHD per level, and a replica VM holding 24 recovery points has a chain
+# that deep - per disk, per poll. ParentPath answers "is this disk reading through
+# something else", which is the question worth asking every interval.
+function Get-DiskChainInfo {
+    param($Disk, $VhdInfo)
+
+    $info = @{
+        "ParentPath" = ""
+        "IsDifferencing" = "False"
+        "QosMaxIops" = "0"
+        "QosMinIops" = "0"
+    }
+
+    try {
+        if ($VhdInfo -and $VhdInfo.ParentPath) {
+            $info["ParentPath"] = $VhdInfo.ParentPath
+            $info["IsDifferencing"] = "True"
+        }
+        # 0 means no limit, which is also the Hyper-V default
+        if ($null -ne $Disk.MaximumIOPS) { $info["QosMaxIops"] = ([int64]$Disk.MaximumIOPS).ToString() }
+        if ($null -ne $Disk.MinimumIOPS) { $info["QosMinIops"] = ([int64]$Disk.MinimumIOPS).ToString() }
+    } catch {
+        Write-DebugInfo "    Error reading disk chain/QoS: $($_.Exception.Message)"
+    }
+
+    return $info
+}
+
+# Which DVD drives have an image mounted.
+# An attached iso blocks live migration and quietly pins the VM to its host, so it is
+# worth seeing even though it is a perfectly normal thing to do temporarily.
+function Get-MountedIsoInfo {
+    param($DvdDrives)
+
+    $paths = @()
+    foreach ($dvd in $DvdDrives) {
+        if ($dvd.Path) { $paths += $dvd.Path }
+    }
+
+    return @{
+        "Count" = $paths.Count
+        "Paths" = ($paths -join "; ")
+    }
+}
+
 # VLAN configuration of one network adapter.
 # No Get-VMNetworkAdapterVlan call needed: Get-VMNetworkAdapter already hands back the
 # whole VLAN setting object on .VlanSetting, the same type that cmdlet returns.
@@ -623,6 +672,7 @@ function Get-VMDiscoveryData {
                         }
                     }
 
+                    $chainInfo = Get-DiskChainInfo -Disk $disk -VhdInfo $vhdInfo
                     $diskInfo += @{
                         "ControllerType" = $disk.ControllerType.ToString()
                         "ControllerNumber" = $disk.ControllerNumber
@@ -631,6 +681,10 @@ function Get-VMDiscoveryData {
                         "VhdType" = if ($vhdInfo) { $vhdInfo.VhdType.ToString() } else { "Unknown" }
                         "VhdSizeGB" = if ($vhdInfo) { [math]::Round($vhdInfo.Size / 1GB, 2) } else { 0 }
                         "VhdFileSizeGB" = if ($vhdInfo) { [math]::Round($vhdInfo.FileSize / 1GB, 2) } else { 0 }
+                        "ParentPath" = $chainInfo.ParentPath
+                        "IsDifferencing" = $chainInfo.IsDifferencing
+                        "QosMaximumIOPS" = $chainInfo.QosMaxIops
+                        "QosMinimumIOPS" = $chainInfo.QosMinIops
                     }
                 } catch {
                     Write-DebugInfo "    Error processing disk: $($_.Exception.Message)"
@@ -659,6 +713,7 @@ function Get-VMDiscoveryData {
             $checkpointInfo = $checkpointSummary.Info
 
             # Get replication information
+            $isoInfo = Get-MountedIsoInfo -DvdDrives $vmDvdDrives
             $runtimeInfo = Get-VMRuntimeInfo -VM $vm
             $securityInfo = Get-VMSecurityInfo -VM $vm
             Write-DebugInfo "  Runtime: cpu=$($runtimeInfo.CpuUsage)% memoryPressure=$($runtimeInfo.MemoryPressure)% heartbeat=$($runtimeInfo.Heartbeat)"
@@ -715,6 +770,8 @@ function Get-VMDiscoveryData {
                 "{#VM.NETWORK.COUNT}" = $vmNetworkAdapters.Count.ToString()
                 "{#VM.DISK.COUNT}" = $vmHardDisks.Count.ToString()
                 "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
+                "{#VM.DVD.ISO.COUNT}" = $isoInfo.Count.ToString()
+                "{#VM.DVD.ISO.PATHS}" = $isoInfo.Paths
                 "{#VM.CHECKPOINT.COUNT}" = $checkpointSummary.Count.ToString()
                 "{#VM.CHECKPOINT.OLDEST.NAME}" = $checkpointSummary.OldestName
                 "{#VM.CHECKPOINT.OLDEST.CREATED}" = $checkpointSummary.OldestCreated
@@ -1107,6 +1164,7 @@ function Get-VMDetailsById {
         $vmIntegrationServices = Get-VMIntegrationService -VM $vm -ErrorAction Stop
         $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
         $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
+        $isoInfo = Get-MountedIsoInfo -DvdDrives $vmDvdDrives
         $runtimeInfo = Get-VMRuntimeInfo -VM $vm
         $securityInfo = Get-VMSecurityInfo -VM $vm
         Write-DebugInfo "Getting replication status for $($vm.Name)"
@@ -1283,6 +1341,7 @@ function Get-VMDetailsById {
                     $diskPathCounter = $disk.Path -replace '\\', '-'
                 }
 
+                $chainInfo = Get-DiskChainInfo -Disk $disk -VhdInfo $vhdInfo
                 $diskLLD += @{
                     "{#VM.NAME}" = $vm.Name
                     "{#VM.ID}" = $vm.Id.ToString()
@@ -1305,6 +1364,10 @@ function Get-VMDetailsById {
                     "{#DISK.BLOCK.SIZE}" = if ($vhdInfo) { $vhdInfo.BlockSize.ToString() } else { "0" }
                     "{#DISK.LOGICAL.SECTOR.SIZE}" = if ($vhdInfo) { $vhdInfo.LogicalSectorSize.ToString() } else { "0" }
                     "{#DISK.PHYSICAL.SECTOR.SIZE}" = if ($vhdInfo) { $vhdInfo.PhysicalSectorSize.ToString() } else { "0" }
+                    "{#DISK.PARENT.PATH}" = $chainInfo.ParentPath
+                    "{#DISK.IS.DIFFERENCING}" = $chainInfo.IsDifferencing
+                    "{#DISK.QOS.MAX.IOPS}" = $chainInfo.QosMaxIops
+                    "{#DISK.QOS.MIN.IOPS}" = $chainInfo.QosMinIops
                 }
             } catch {
                 Write-DebugInfo "  Error processing disk: $($_.Exception.Message)"
@@ -1362,6 +1425,8 @@ function Get-VMDetailsById {
                 "{#VM.NETWORK.COUNT}" = $vmNetworkAdapters.Count.ToString()
                 "{#VM.DISK.COUNT}" = $vmHardDisks.Count.ToString()
                 "{#VM.DVD.COUNT}" = $vmDvdDrives.Count.ToString()
+                "{#VM.DVD.ISO.COUNT}" = $isoInfo.Count.ToString()
+                "{#VM.DVD.ISO.PATHS}" = $isoInfo.Paths
                 "{#VM.CHECKPOINT.COUNT}" = $checkpointSummary.Count.ToString()
                 "{#VM.CHECKPOINT.OLDEST.NAME}" = $checkpointSummary.OldestName
                 "{#VM.CHECKPOINT.OLDEST.CREATED}" = $checkpointSummary.OldestCreated
