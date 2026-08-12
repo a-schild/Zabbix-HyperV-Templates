@@ -12,7 +12,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V Host 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.0.6'
+        version: '2.1.0'
       description: |
         Detect Hyper-V VMs via LLD and create hosts to monitor
         Needs the Template Windows HyperV VM Guest 2 too
@@ -745,6 +745,70 @@ zabbix_export:
               tags:
                 - tag: application
                   value: 'Hyper-V Host'
+            - uuid: c585b830de4347ad9b1fdd3edd8e669a
+              name: 'Replication last sync age {#VM.NAME}'
+              type: DEPENDENT
+              key: 'hyperv.vm.replication.last.sync.age[{#VM.ID}]'
+              delay: '0'
+              history: 90d
+              value_type: UNSIGNED
+              units: 's'
+              description: |
+                Seconds since the last completed replication of this VM, computed on the
+                Hyper-V host so no timezone correction is needed here.
+                0 when the VM is not replicated or has never replicated.
+                Only as fresh as the hyperv.discovery.vms master item, so it can lag
+                reality by up to that item's interval.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var vmId = "{#VM.ID}";
+                      var vmIdMacro = "{"+"#"+"VM.ID}";
+                      var vmDataMacro= "{"+"#VM.REPLICATION.LAST.AGE}";
+
+
+                      // Debug: Return info about what we found
+                      if (!data || data.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No vm array found";
+                      }
+
+                      for (var i = 0; i < data.length; i++) {
+                        var vm = data[i];
+                        if (vm[vmIdMacro] === vmId ) {
+                          var retData = vm[vmDataMacro];
+                          // Older hyper-v-monitoring2.ps1 versions do not report
+                          // the age at all, and a VM without replication has no
+                          // last sync time. Both are normal, so return 0 instead
+                          // of making the item unsupported.
+                          if (retData === undefined || retData === null || retData === "") {
+                            return 0;
+                          }
+                          return retData;
+                        }
+                      }
+
+                      // Debug: Show what VM IDs we found
+                      var foundIds = [];
+                      for (var i = 0; i < data.length; i++) {
+                        foundIds.push(data[i][vmIdMacro ]);
+                      }
+                      throw "ZBX_UNSUPPORTED: VM ID '" + vmId + "' not found. Found: " + foundIds.join(", ") + "Values: "+value;
+              master_item:
+                key: hyperv.discovery.vms
+              tags:
+                - tag: application
+                  value: 'Hyper-V Host'
+              trigger_prototypes:
+                - uuid: b843720249074048bacd89563755677b
+                  expression: 'last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.enabled[{#VM.ID}])="True" and last(/Template Windows Hyper-V Host 2/hyperv.vm.replication.last.sync.age[{#VM.ID}])>{$VM.REPLICATION.LAG.MAX}'
+                  name: 'Replication of {#VM.NAME} has not run for {$VM.REPLICATION.LAG.MAX}'
+                  priority: WARNING
+                  description: |
+                    The replica is falling behind. Hyper-V's own health field can still
+                    read Normal while cycles are merely slow, so this watches the clock
+                    directly. The enabled check keeps it off VMs that are not replicated.
             - uuid: 0052175de26144b7897a025530b6da75
               name: 'Replication mode for {#VM.NAME}'
               type: DEPENDENT
@@ -1030,6 +1094,16 @@ zabbix_export:
           value: hyper-v
         - tag: target
           value: hyper-v-host
+      macros:
+        - macro: '{$VM.REPLICATION.LAG.MAX}'
+          value: 1h
+          description: |
+            Warn when a replicated VM has not completed a replication for this long.
+
+            Must stay well above the hyperv.discovery.vms interval (29m by default):
+            the age is only refreshed when that master item runs, so it is already up
+            to one interval old when Zabbix sees it. The default 1h suits every
+            replication frequency Hyper-V offers (30s, 5m, 15m).
       dashboards:
         - uuid: 53891ef2820347ecad4a9d16ab1062a0
           name: 'Hyper-V Host'

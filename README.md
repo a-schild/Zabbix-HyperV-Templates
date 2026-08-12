@@ -27,7 +27,10 @@ Discovers VM guest performance counters and creates Zabbix items for each of the
 The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
-    * Hyper-V VM replication status
+    * Hyper-V VM replication status, including how long ago the last
+      replication completed
+    * Checkpoints, counted separately from the recovery points Hyper-V Replica
+      maintains by itself
 
 * Template Windows HyperV Host  
 The following _host_ parameters are monitored:
@@ -201,6 +204,77 @@ Windows PowerShell
 Copyright (C) 2016 Microsoft Corporation. All rights reserved.
 ```
 
+
+## Things that ship switched off
+
+Two parts of the VM Guest template are deliberately disabled after import. Both work;
+both cost more than they are worth to everybody by default.
+
+### Per vCPU CPU counters — the `VM vCPU Discovery` rule
+
+The `CPU usage` item shows the CPU load of a VM at the instant the master item ran,
+once per `{$VM.DETAILS.INTERVAL}`. That answers *what is this VM doing right now*, but
+it cannot show a spike that happened between two polls, and it must not be used for CPU
+alerting.
+
+Real per VM CPU utilisation comes from the Hyper-V virtual processor performance
+counters, which the `VM vCPU Discovery` rule creates: guest run time, hypervisor run
+time and total run time, per virtual processor.
+
+**Why it is disabled:** these are agent items polled every minute, one set per virtual
+processor. A VM with 4 vCPUs adds 12 agent queries a minute; a host with 20 such VMs
+adds 240 a minute, on top of the roughly 60 per VM that the disk and network counters
+already generate. On a busy Hyper-V host that is a noticeable amount of extra agent
+work, and most people do not need per vCPU numbers on every VM.
+
+**To enable it for every VM:**
+
+*Data collection* → *Templates* → *Template Windows Hyper-V VM Guest 2* → *Discovery
+rules* → *VM vCPU Discovery* → set *Enabled* and *Update*.
+
+**To enable it for one VM only**, which is the better way to investigate a single noisy
+machine: open that VM's host (*Data collection* → *Hosts* → the `<guid> <fqdn>` host) →
+*Discovery rules* → *VM vCPU Discovery* → *Enabled*.
+
+Consider raising the item prototypes' interval from `1m` to `5m` before enabling it
+broadly — the counters are averages and stay useful at a lower resolution.
+
+### Resource metering items
+
+`Metering: *` items report 0 until Hyper-V resource metering is switched on for a VM,
+which is not a template setting but a host one:
+
+```powershell
+Enable-VMResourceMetering -VMName ADS1        # one VM
+Get-VM | Enable-VMResourceMetering            # every VM on the host
+```
+
+The script checks the per VM `ResourceMeteringEnabled` flag before measuring anything,
+so hosts that never enable it pay nothing at all. Once enabled, the items report
+averages since the last `Reset-VMResourceMetering`, which is the one honest source of
+average CPU in MHz, normalised IOPS and disk latency per VM. `Resource metering
+enabled` shows the current state.
+
+## Troubleshooting by alert
+
+**`Hyper-V: no heartbeat from <VM>`** on a VM that is perfectly healthy.
+The guest has no working Hyper-V integration components — an appliance, an OS Hyper-V
+has no components for, or a Linux guest without `hyperv-daemons` installed. Hyper-V
+reports such a VM as `NoContact` forever, because it never had contact to lose.
+
+The trigger already filters most of these out: it only fires when the guest reports an
+OS name over the KVP exchange service, which a VM without integration components never
+does. A VM whose OS *hangs* keeps its last published KVP values, so a real hang still
+alerts.
+
+If a VM still alerts wrongly — a guest that publishes KVP data but no heartbeat, for
+instance — switch the check off for that VM alone:
+
+*Data collection* → *Hosts* → the `<guid> <fqdn>` host → *Macros* → *Inherited and host
+macros* → set `{$VM.HEARTBEAT.CHECK}` to `0`.
+
+Setting it on the template instead disables the heartbeat check for every VM, which is
+rarely what you want.
 
 ## Troubleshooting by error message
 

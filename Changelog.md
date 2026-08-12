@@ -1,6 +1,193 @@
 # Changelog
 
-- 2026-08-10 (unreleased)
+- 2026-08-12
+  - Release v2.1.0
+  - Checkpoint triggers no longer fire on Hyper-V Replica recovery points.
+    Get-VMSnapshot returns those next to normal checkpoints, so a replica VM
+    configured for additional hourly recovery points ("Abdeckung durch
+    zusätzliche Wiederherstellungspunkte", e.g. 24 hours) permanently carried
+    ~25 checkpoints, the oldest a day old, and kept both checkpoint triggers in
+    alarm. The script now classifies every checkpoint by its snapshot type
+    (Replica, AppConsistentReplica, SyncedReplica, Planned, Recovery and Missing
+    are Hyper-V Replica's own, Standard is a user checkpoint) and reports the
+    counts and oldest/newest figures separately. New VM Guest items:
+    'Checkpoints: user count', 'Checkpoints: user oldest age', 'Checkpoints:
+    user oldest name' and 'Checkpoints: replica recovery points'. The two
+    existing triggers now evaluate the user figures; the total count and oldest
+    age items are unchanged and still include the recovery points. The raw
+    checkpoint list gained an IsReplica flag per entry.
+    Needs the updated hyper-v-monitoring2.ps1 on the Hyper-V hosts, the new
+    items stay unsupported with the old script.
+  - Replication monitoring on the VM guest hosts. Until now replication was
+    only collected in the 'vms' payload, so it could only be seen on the
+    Hyper-V host, never on the Zabbix host that represents the VM itself.
+    The 'vmdetails' payload now carries the same fields and the VM Guest
+    template exposes them as nine items: enabled, state, mode, health,
+    frequency, last sync, last sync age, primary and replica server, with
+    triggers on health Critical (high) and Warning.
+    Collection moved into a shared Get-ReplicationSummary so both payloads
+    stay in step.
+  - Alerting on a replication that stopped running. Both payloads now report
+    the age of the last completed replication in seconds, computed on the
+    Hyper-V host so the Zabbix server does not have to guess its timezone.
+    New trigger in both templates, driven by {$VM.REPLICATION.LAG.MAX}
+    (default 1h): fires when a replicated VM has not completed a replication
+    within that time. Hyper-V's own health field can still read Normal while
+    cycles are merely slow, so this watches the clock directly.
+    Keep {$VM.REPLICATION.LAG.MAX} well above the master item interval, the
+    age is only refreshed when the item runs.
+    On the Hyper-V Host template this arrives as the new
+    'Replication last sync age {#VM.NAME}' item prototype; it reports 0
+    instead of going unsupported when the host still runs the old script.
+  - Replica recovery points that stop being merged are now caught. Both
+    payloads report the VM's configured recovery point count and VSS snapshot
+    interval (RecoveryHistory and VSSSnapshotFrequencyHour, both already
+    available from the Get-VMReplication call, so no extra cost per poll), and
+    the VM Guest template exposes them as 'Replication: recovery points
+    configured' and 'Replication: VSS snapshot frequency'.
+    The accompanying trigger fires when a Replica mode VM holds more recovery
+    points than its own settings ask for, which means Hyper-V has stopped
+    merging the old ones and the avhdx chain keeps growing. One point of slack
+    is allowed for the moment during a replication cycle when the newest point
+    exists alongside a full history.
+    This is the counterpart to the checkpoint fix above: normal checkpoint
+    alerting ignores replica recovery points, this watches them against what
+    was actually configured.
+  - Replication throughput and reliability, from Measure-VMReplication. Nine
+    new VM Guest items: pending, average and maximum replication size, average
+    and maximum latency, successful, missed and errored cycles, and the length
+    of the measuring window those figures refer to.
+    Two new triggers with tolerant defaults, since healthy VMs do miss the odd
+    cycle and log the odd error: {$VM.REPLICATION.MISSED.MAX} (default 3) and
+    {$VM.REPLICATION.ERRORS.MAX} (default 5).
+    Note the cycle counts are per measuring window, not lifetime totals, and
+    Hyper-V resets that window on its own, so never put a change() based
+    trigger on them.
+    Measure-VMReplication returns every replicated VM of a host in a single
+    call, about a second for a host with a dozen VMs, so the 'vms' path fetches
+    it once per run and looks the values up per VM instead of calling it in the
+    loop. The 'vmdetails' path measures the single VM it was asked about.
+  - Per VM CPU and memory usage. The VM Guest template had no runtime CPU or
+    memory items at all: everything it showed was configuration (vCPU count,
+    startup/min/max memory), and the only performance counters were disk and
+    network ones. Both payloads now report the runtime figures the Get-VM
+    object already carries, so this costs nothing per poll: CPU usage, memory
+    assigned, memory demand and demand as a percentage of assigned, plus
+    heartbeat, primary and secondary operational status, smart paging file in
+    use, clustered and resource metering enabled.
+    Memory demand is populated even with dynamic memory switched off, so the
+    pressure figure works for every VM.
+    Three new triggers: memory pressure above {$VM.MEMORY.PRESSURE.MAX}
+    (default 90), no heartbeat from a running VM (NoContact or
+    LostCommunication, the only signal these agentless VMs give that the guest
+    OS is alive), and the smart paging file being in use.
+    Note CPU usage is a spot sample taken when the master item runs, not an
+    average over the interval. It answers "what is it doing right now" and is
+    documented as unsuitable for CPU alerting; per virtual processor
+    performance counters are the right source and are not collected yet.
+    Not collected, having been checked on a real host and found unusable:
+    MemoryStatus and IntegrationServicesState are empty and
+    IntegrationServicesVersion reads 0.0 on current guests.
+  - VLAN mode per network adapter. The templates already had a VLAN item, but it
+    reported AccessVlanId alone, which is ambiguous: it reads 0 for an untagged
+    adapter AND for a trunk, whose configuration actually lives in the native
+    VLAN and the allowed list. Three new item prototypes on the network
+    discovery rule report the operation mode (Untagged, Access, Trunk,
+    Private), the native VLAN and the allowed VLAN list.
+    No extra cost: Get-VMNetworkAdapter already returns the complete VLAN
+    setting object on .VlanSetting, the same type Get-VMNetworkAdapterVlan
+    hands back, so no additional cmdlet call is needed.
+  - VM security items: virtual TPM, shielded, and whether saved state and live
+    migration traffic are encrypted. One Get-VMSecurity call per VM, all values
+    pure configuration, everything defaulting to False on hosts where the
+    cmdlet is unavailable.
+    Secure Boot and its certificate template come from Get-VMFirmware, which
+    fails outright on a Generation 1 VM, so it is only called when the VM is
+    Generation 2. Generation 1 VMs report NotSupported, which is deliberately
+    distinct from Off: they have no UEFI firmware at all.
+    The accompanying 'secure boot disabled' trigger SHIPS DISABLED - plenty of
+    VMs run with it off for good reason. Enable it where Secure Boot is a
+    policy you enforce.
+  - Differencing chain and storage QoS per virtual disk. New disk prototypes
+    report the parent VHD path, whether the disk is a differencing child at
+    all, and the storage QoS maximum and minimum IOPS. All four come off
+    objects the script already holds (the Get-VHD result and the
+    Get-VMHardDiskDrive object), so nothing extra is called.
+    The parent chain is reported one level deep on purpose: walking it to the
+    root costs one Get-VHD per level, and a replica VM holding 24 recovery
+    points has a chain that deep, per disk, per poll.
+    Note these items return an empty value rather than going unsupported when
+    a disk has no parent or no QoS limit, unlike the older disk prototypes
+    which treat an empty field as an error.
+  - Mounted ISO images. The DVD data was collected but only ever counted; the
+    template now reports how many drives have an image attached and which
+    images they are, with an INFO trigger when one is left mounted. An
+    attached iso blocks live migration and pins the VM to its host, which
+    tends to be discovered at the worst possible moment.
+  - The three VLAN prototypes added for regular adapters now exist for legacy
+    adapters too, which are still in use on generation 1 VMs.
+  - Per virtual processor CPU counters, as a new 'VM vCPU Discovery' rule on the
+    VM Guest template. The vmdetails payload gained a 'vcpus' root, one entry
+    per virtual processor, carrying the performance counter instance name
+    ("<VM name>:Hv VP <n>"). Prototypes for guest, hypervisor and total run
+    time.
+    THE RULE SHIPS DISABLED, for performance: three counters per vCPU at a 1m
+    interval is 12 agent queries a minute for a 4 vCPU VM, multiplied by the
+    number of VMs on the host, on top of the ~60 per VM the disk and network
+    counters already generate. The README explains where to switch it on, for
+    the whole template or for a single VM.
+    This is the proper source of per VM CPU utilisation; the 'CPU usage' item
+    remains a spot sample and is documented as unsuitable for alerting.
+  - Guest reported inventory through the KVP exchange service: OS name,
+    version and build, FQDN, IPv4 addresses and the integration services
+    version. This is what is running INSIDE a VM, read without any agent in
+    the guest.
+    The integration services version from KVP is the trustworthy one - the
+    host side property reads 0.0 on current guests.
+    Empty for VMs that are off, or whose KVP service is stopped or missing
+    (common on Linux guests without hyperv-daemons).
+    The 'vms' path reads every VM's KVP data in a single CIM query and indexes
+    it by VM id, rather than querying per VM.
+  - Resource metering items: average CPU in MHz, average and maximum RAM, total
+    disk allocation, network in and out, average normalized IOPS, average
+    latency and the length of the metering period.
+    These report 0 until resource metering is enabled per VM with
+    Enable-VMResourceMetering, and the script checks the ResourceMeteringEnabled
+    flag before calling Measure-VM, so hosts that never enable it pay nothing.
+    Unlike the CPU usage spot sample, the metered CPU figure is a true average
+    over the period.
+  - The heartbeat trigger no longer fires on VMs that never had a heartbeat.
+    Reported from a real deployment: a guest with no Hyper-V integration
+    components - an appliance, an unsupported OS, a Linux guest without
+    hyperv-daemons - is reported as NoContact permanently, because it never had
+    contact to lose, and the trigger treated that as a hung VM.
+    It now also requires the guest to report an OS name over the KVP exchange
+    service. A guest with no integration components publishes nothing, so an
+    empty OS name means "never talks to the host" rather than "stopped talking".
+    A guest that hangs keeps its last published KVP values, so a genuine hang
+    still alerts.
+    New {$VM.HEARTBEAT.CHECK} macro (default 1) switches the check off for a
+    single VM host, for anything the automatic filter does not catch.
+    Template change only, no need to redeploy hyper-v-monitoring2.ps1.
+  - The VM dashboard's Overview page now leads with the VM's actual state.
+    It only ever showed disk and network graphs plus the problem list, so
+    opening a VM told you its throughput and nothing about the machine.
+    Twelve value widgets across the top: state, uptime, CPU usage and memory
+    pressure; guest OS, guest IPv4, heartbeat and user checkpoint count;
+    replication mode, health and last sync age, and whether an ISO is mounted.
+    The graphs moved down accordingly.
+    The CPU tile is labelled "spot sample" for the same reason the item is:
+    it is the value at the moment the master item ran, not an average.
+  - Replication page on the VM dashboard. The VM Guest template's dashboard
+    gained a second page, 'Replication', with four graphs: latency and lag
+    (average and maximum cycle latency, time since the last replication, and
+    the configured frequency as a reference line), replication size (pending,
+    average and maximum), cycles (successful, missed, errors) and replica
+    recovery points (points held against points configured, with the user
+    checkpoint count alongside).
+    The existing page is now named 'Overview'.
+
+- 2026-08-10 (part of v2.1.0)
   - README: added a Requirements section and a troubleshooting section keyed on
     the actual error messages (#39). It now states that the Hyper-V host needs
     a Zabbix Agent interface, and that the VM guest items are passive checks,
