@@ -66,6 +66,27 @@
     call, about a second for a host with a dozen VMs, so the 'vms' path fetches
     it once per run and looks the values up per VM instead of calling it in the
     loop. The 'vmdetails' path measures the single VM it was asked about.
+  - Per VM CPU and memory usage. The VM Guest template had no runtime CPU or
+    memory items at all: everything it showed was configuration (vCPU count,
+    startup/min/max memory), and the only performance counters were disk and
+    network ones. Both payloads now report the runtime figures the Get-VM
+    object already carries, so this costs nothing per poll: CPU usage, memory
+    assigned, memory demand and demand as a percentage of assigned, plus
+    heartbeat, primary and secondary operational status, smart paging file in
+    use, clustered and resource metering enabled.
+    Memory demand is populated even with dynamic memory switched off, so the
+    pressure figure works for every VM.
+    Three new triggers: memory pressure above {$VM.MEMORY.PRESSURE.MAX}
+    (default 90), no heartbeat from a running VM (NoContact or
+    LostCommunication, the only signal these agentless VMs give that the guest
+    OS is alive), and the smart paging file being in use.
+    Note CPU usage is a spot sample taken when the master item runs, not an
+    average over the interval. It answers "what is it doing right now" and is
+    documented as unsuitable for CPU alerting; per virtual processor
+    performance counters are the right source and are not collected yet.
+    Not collected, having been checked on a real host and found unusable:
+    MemoryStatus and IntegrationServicesState are empty and
+    IntegrationServicesVersion reads 0.0 on current guests.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and

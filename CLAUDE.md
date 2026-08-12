@@ -56,7 +56,7 @@ everything else is `DEPENDENT` on it:
   call the script. VM counts, replication items, the `Hyper-V VM Discovery` LLD rule and the
   `Hyper-V VM Host Prototype Discovery` rule all hang off them as dependent items/rules.
 - Guest template: `hyperv.discovery.vmdetails[{$VM.ID}]` is the single master item; the three LLD
-  rules (disks, regular NICs, legacy NICs) and ~54 template-level items parse it. Its payload has
+  rules (disks, regular NICs, legacy NICs) and ~73 template-level items parse it. Its payload has
   four roots — `vm_info`, `networks`, `disks`, `checkpoints`.
 
 When adding anything, make it dependent on an existing master item. A new LLD rule or item that
@@ -121,6 +121,16 @@ one per covered hour forever. `Get-CheckpointSummary` splits them off by `Snapsh
 (`$script:ReplicaSnapshotTypes`: Replica, AppConsistentReplica, SyncedReplica, Planned, Recovery,
 Missing) and exposes both sets; the triggers watch the `USER` figures only. `SnapshotType` is not
 the VM's `CheckpointType` — a production checkpoint made by an admin is still `Standard` here.
+
+**Not every property on the `Get-VM` object is usable.** Verified on a Server 2016-era host:
+`MemoryStatus` and `IntegrationServicesState` come back empty, `IntegrationServicesVersion` reads
+`0.0` (modern guests get the components through Windows Update), and `$vm.ReplicationState` can
+disagree with `Get-VMReplication` for the same VM — it read `WaitingForInitialReplication` for a VM
+that `Get-VMReplication` reported as `Replicating` with a recent `LastReplicationTime`. Replication
+data comes from `Get-VMReplication`, never from the VM object. What *is* reliable and free:
+`CPUUsage` (a spot sample, not an average — see `Get-VMRuntimeInfo`), `MemoryAssigned`,
+`MemoryDemand` (populated even with dynamic memory off), `Heartbeat`, `PrimaryOperationalStatus`
+(enum, unlike the localized `Status`) and `SmartPagingFileInUse`.
 
 **Agent config requirements:** `UnsafeUserParameters=1` (counter paths contain backslashes) and a
 raised agent `Timeout` (15–30s; items are set to `timeout: 30s`).

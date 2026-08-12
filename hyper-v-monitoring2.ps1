@@ -180,6 +180,45 @@ function Get-CheckpointSummary {
     return $summary
 }
 
+# Runtime figures that the Get-VM object already carries, so collecting them costs
+# nothing beyond the Get-VM call both payloads already make.
+# Deliberately NOT taken from here: MemoryStatus and IntegrationServicesState come
+# back empty and IntegrationServicesVersion reads 0.0 on current guests (the
+# components ship through Windows Update), and $VM.ReplicationState can disagree
+# with Get-VMReplication - see Get-ReplicationSummary, which is the honest source.
+function Get-VMRuntimeInfo {
+    param($VM)
+
+    $assigned = if ($null -ne $VM.MemoryAssigned) { [int64]$VM.MemoryAssigned } else { 0 }
+    $demand = if ($null -ne $VM.MemoryDemand) { [int64]$VM.MemoryDemand } else { 0 }
+
+    # Demand against assigned is populated even with dynamic memory switched off,
+    # so this works for every VM. Both are 0 on a stopped VM.
+    $pressure = 0
+    if ($assigned -gt 0 -and $demand -gt 0) {
+        $pressure = [math]::Round((($demand / $assigned) * 100), 2)
+    }
+
+    return @{
+        # Percentage of the host CPU, sampled at this instant. It is a spot value,
+        # not an average over the interval - use the virtual processor performance
+        # counters for anything that needs a trend.
+        "CpuUsage" = if ($null -ne $VM.CPUUsage) { [int]$VM.CPUUsage } else { 0 }
+        "MemoryAssigned" = $assigned
+        "MemoryDemand" = $demand
+        # Invariant culture: this is the only non integer value in the payload and a
+        # decimal comma would make Zabbix reject it.
+        "MemoryPressure" = $pressure.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+        "Heartbeat" = if ($VM.Heartbeat) { $VM.Heartbeat.ToString() } else { "" }
+        # Enum values, unlike $VM.Status which is localized and needs ConvertToEnglish
+        "OperationalStatus" = if ($VM.PrimaryOperationalStatus) { $VM.PrimaryOperationalStatus.ToString() } else { "" }
+        "OperationalStatusSecondary" = if ($VM.SecondaryOperationalStatus) { $VM.SecondaryOperationalStatus.ToString() } else { "" }
+        "SmartPagingInUse" = if ($null -ne $VM.SmartPagingFileInUse) { $VM.SmartPagingFileInUse.ToString() } else { "False" }
+        "Clustered" = if ($null -ne $VM.IsClustered) { $VM.IsClustered.ToString() } else { "False" }
+        "MeteringEnabled" = if ($null -ne $VM.ResourceMeteringEnabled) { $VM.ResourceMeteringEnabled.ToString() } else { "False" }
+    }
+}
+
 # Collect the Hyper-V Replica state of a VM.
 # Like Get-CheckpointSummary this feeds both the 'vms' and the 'vmdetails'
 # payload, so the host template and the VM guest template see the same fields.
@@ -538,6 +577,9 @@ function Get-VMDiscoveryData {
             $checkpointInfo = $checkpointSummary.Info
 
             # Get replication information
+            $runtimeInfo = Get-VMRuntimeInfo -VM $vm
+            Write-DebugInfo "  Runtime: cpu=$($runtimeInfo.CpuUsage)% memoryPressure=$($runtimeInfo.MemoryPressure)% heartbeat=$($runtimeInfo.Heartbeat)"
+
             Write-DebugInfo "  Getting replication status for $($vm.Name)"
             $replicationSummary = Get-ReplicationSummary -VM $vm -Statistics $replicationStats[$vm.Id.ToString()]
 
@@ -557,6 +599,16 @@ function Get-VMDiscoveryData {
                 "{#VM.MEMORY.DYNAMIC}" = $vmSettings.DynamicMemoryEnabled.ToString()
                 "{#VM.MEMORY.BUFFER}" = $vmSettings.Buffer.ToString()
                 "{#VM.MEMORY.PRIORITY}" = $vmSettings.Priority.ToString()
+                "{#VM.CPU.USAGE}" = $runtimeInfo.CpuUsage.ToString()
+                "{#VM.MEMORY.ASSIGNED}" = $runtimeInfo.MemoryAssigned.ToString()
+                "{#VM.MEMORY.DEMAND}" = $runtimeInfo.MemoryDemand.ToString()
+                "{#VM.MEMORY.PRESSURE}" = $runtimeInfo.MemoryPressure
+                "{#VM.HEARTBEAT}" = $runtimeInfo.Heartbeat
+                "{#VM.OPERATIONAL.STATUS}" = $runtimeInfo.OperationalStatus
+                "{#VM.OPERATIONAL.STATUS.SECONDARY}" = $runtimeInfo.OperationalStatusSecondary
+                "{#VM.SMART.PAGING.IN.USE}" = $runtimeInfo.SmartPagingInUse
+                "{#VM.CLUSTERED}" = $runtimeInfo.Clustered
+                "{#VM.METERING.ENABLED}" = $runtimeInfo.MeteringEnabled
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()
@@ -967,6 +1019,7 @@ function Get-VMDetailsById {
         $vmIntegrationServices = Get-VMIntegrationService -VM $vm -ErrorAction Stop
         $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
         $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
+        $runtimeInfo = Get-VMRuntimeInfo -VM $vm
         Write-DebugInfo "Getting replication status for $($vm.Name)"
         $replicationSummary = Get-ReplicationSummary -VM $vm
 
@@ -1186,6 +1239,16 @@ function Get-VMDetailsById {
                 "{#VM.MEMORY.DYNAMIC}" = $vmSettings.DynamicMemoryEnabled.ToString()
                 "{#VM.MEMORY.BUFFER}" = $vmSettings.Buffer.ToString()
                 "{#VM.MEMORY.PRIORITY}" = $vmSettings.Priority.ToString()
+                "{#VM.CPU.USAGE}" = $runtimeInfo.CpuUsage.ToString()
+                "{#VM.MEMORY.ASSIGNED}" = $runtimeInfo.MemoryAssigned.ToString()
+                "{#VM.MEMORY.DEMAND}" = $runtimeInfo.MemoryDemand.ToString()
+                "{#VM.MEMORY.PRESSURE}" = $runtimeInfo.MemoryPressure
+                "{#VM.HEARTBEAT}" = $runtimeInfo.Heartbeat
+                "{#VM.OPERATIONAL.STATUS}" = $runtimeInfo.OperationalStatus
+                "{#VM.OPERATIONAL.STATUS.SECONDARY}" = $runtimeInfo.OperationalStatusSecondary
+                "{#VM.SMART.PAGING.IN.USE}" = $runtimeInfo.SmartPagingInUse
+                "{#VM.CLUSTERED}" = $runtimeInfo.Clustered
+                "{#VM.METERING.ENABLED}" = $runtimeInfo.MeteringEnabled
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()

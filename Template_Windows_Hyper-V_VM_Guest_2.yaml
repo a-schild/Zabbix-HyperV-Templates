@@ -805,6 +805,258 @@ zabbix_export:
           tags:
             - tag: component
               value: replication
+        - uuid: ac3efacd3d474ffea4bb3de1bff98493
+          name: 'CPU usage'
+          type: DEPENDENT
+          key: hyperv.vm.cpu.usage
+          delay: '0'
+          value_type: UNSIGNED
+          units: '%'
+          description: |
+            Share of the Hyper-V host's CPU this VM was using AT THE MOMENT THE MASTER
+            ITEM RAN. It is a spot sample taken once per {$VM.DETAILS.INTERVAL}, not an
+            average over the interval, so it will happily read 0 for a VM that spikes
+            between polls.
+            Good enough to answer "what is it doing right now"; do NOT build CPU
+            alerting on it. Per virtual processor performance counters are the right
+            source for that.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CPU.USAGE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: cpu
+        - uuid: 5b2972716e144e52b39e8a48683fd8cb
+          name: 'Memory assigned'
+          type: DEPENDENT
+          key: hyperv.vm.memory.assigned
+          delay: '0'
+          value_type: UNSIGNED
+          units: B
+          description: |
+            Memory the host currently has assigned to this VM. With dynamic memory off
+            this equals the startup memory; with it on it moves between the configured
+            minimum and maximum. 0 when the VM is not running.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.ASSIGNED}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: d366df14b08343aaae7c03c863efbc4e
+          name: 'Memory demand'
+          type: DEPENDENT
+          key: hyperv.vm.memory.demand
+          delay: '0'
+          value_type: UNSIGNED
+          units: B
+          description: |
+            Memory the guest actually wants. Hyper-V reports this even when dynamic
+            memory is switched off, so it works for every VM: it is the honest answer
+            to "is this VM over or under provisioned". 0 when the VM is not running.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.DEMAND}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+        - uuid: a21798d7a1ff40e696f11d90c8b26b02
+          name: 'Memory pressure'
+          type: DEPENDENT
+          key: hyperv.vm.memory.pressure
+          delay: '0'
+          value_type: FLOAT
+          units: '%'
+          description: |
+            Memory demand as a percentage of memory assigned, computed on the Hyper-V
+            host. Above 100 would mean the guest wants more than it has; a VM sitting
+            near the limit with dynamic memory on cannot grow any further.
+            0 when the VM is not running.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.MEMORY.PRESSURE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+          triggers:
+            - uuid: 93baf568a885451f87581fc592c8db1c
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.memory.pressure)>{$VM.MEMORY.PRESSURE.MAX}'
+              name: 'Hyper-V: memory pressure on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                The guest is demanding close to, or more than, the memory it has been
+                assigned. With dynamic memory enabled Hyper-V will already have grown
+                the VM as far as its maximum allows.
+        - uuid: cb199d912b0a450dbaebfebcd6e70606
+          name: 'Heartbeat'
+          type: DEPENDENT
+          key: hyperv.vm.heartbeat
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Heartbeat integration service state: OkApplicationsHealthy,
+            OkApplicationsUnknown, OkApplicationsCritical, NoContact,
+            LostCommunication, Paused, Error or Disabled. Empty for a stopped VM.
+            These VMs have no Zabbix agent of their own, so this is the only signal
+            that the guest operating system is alive at all.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.HEARTBEAT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+          triggers:
+            - uuid: 4ed6504fe4e44ba6a5bffa747f9ac483
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.state)="Running" and (last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.heartbeat)="NoContact" or last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.heartbeat)="LostCommunication")'
+              name: 'Hyper-V: no heartbeat from {HOST.NAME}'
+              priority: AVERAGE
+              description: |
+                The VM is running but the guest is not answering the heartbeat service.
+                The operating system has hung, is still booting, or the integration
+                services are stopped or missing.
+                Only evaluated while the VM is Running, a stopped VM legitimately has
+                no heartbeat.
+        - uuid: 17bc2489e6834cdcb20e40235c6e5298
+          name: 'Operational status'
+          type: DEPENDENT
+          key: hyperv.vm.operational.status
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Primary operational status of the VM as an enum value: Ok, Degraded, Error,
+            PredictiveFailure, ...
+            Unlike 'VM status' this is not localized, so it does not depend on the
+            ConvertToEnglish translation table in the script.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.OPERATIONAL.STATUS}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+        - uuid: f3ce023e074947268fde710cf4e13f5d
+          name: 'Operational status (secondary)'
+          type: DEPENDENT
+          key: hyperv.vm.operational.status.secondary
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Secondary operational status, empty on a healthy VM. This is where Hyper-V
+            puts the detail behind a problem, for example the reason a VM went
+            paused-critical.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.OPERATIONAL.STATUS.SECONDARY}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: state
+        - uuid: 43b8bc969f764bce8739c69444d26b13
+          name: 'Smart paging file in use'
+          type: DEPENDENT
+          key: hyperv.vm.smart.paging.in.use
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            True while Hyper-V is paging this VM's memory to disk because it could not
+            satisfy the startup memory from RAM. Disk backed memory is orders of
+            magnitude slower, and Hyper-V only resorts to it under real pressure.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SMART.PAGING.IN.USE}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: memory
+          triggers:
+            - uuid: 62f1f15a8f5847748334f80c0b33aed9
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.smart.paging.in.use)="True"'
+              name: 'Hyper-V: smart paging file in use on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                The Hyper-V host could not give this VM its startup memory from RAM and
+                is paging to disk instead. The host is overcommitted.
+        - uuid: 8c68557287204b3d9727f130d4337d56
+          name: 'Clustered'
+          type: DEPENDENT
+          key: hyperv.vm.clustered
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'True when this VM is a failover cluster resource and can move between nodes.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CLUSTERED}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
+        - uuid: 65e61585f94f48738e5c3bb362c33d94
+          name: 'Resource metering enabled'
+          type: DEPENDENT
+          key: hyperv.vm.metering.enabled
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            True when Hyper-V resource metering is switched on for this VM
+            (Enable-VMResourceMetering). Off by default.
+            Nothing in this template needs it yet; it is reported so it is obvious why
+            metering derived figures would be empty.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.ENABLED}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: config
         - uuid: 5bd59090c2084b32ad5dd581f1e4172a
           name: 'VM name'
           type: DEPENDENT
@@ -2950,6 +3202,12 @@ zabbix_export:
           description: |
             Warn when the oldest checkpoint of a VM is older than this.
             Hyper-V Replica recovery points are ignored.
+        - macro: '{$VM.MEMORY.PRESSURE.MAX}'
+          value: '90'
+          description: |
+            Warn when memory demand reaches this percentage of the memory assigned to
+            the VM. A VM parked near its dynamic memory maximum sits here permanently,
+            which is the point: it cannot grow any further.
         - macro: '{$VM.REPLICATION.MISSED.MAX}'
           value: '3'
           description: |
