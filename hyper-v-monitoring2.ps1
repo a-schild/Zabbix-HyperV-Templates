@@ -222,6 +222,10 @@ function Get-VMSecurityInfo {
         "TpmEnabled" = "False"
         "Shielded" = "False"
         "EncryptMigration" = "False"
+        # NotSupported rather than Off: a generation 1 VM has no UEFI firmware at all,
+        # which is a different statement from Secure Boot being switched off.
+        "SecureBoot" = "NotSupported"
+        "SecureBootTemplate" = ""
     }
 
     try {
@@ -235,6 +239,20 @@ function Get-VMSecurityInfo {
         }
     } catch {
         Write-DebugInfo "    Error getting VM security: $($_.Exception.Message)"
+    }
+
+    # Secure Boot comes from Get-VMFirmware, not Get-VMSecurity, and that cmdlet fails
+    # outright on a generation 1 VM - hence the generation check before calling it.
+    if ($VM.Generation -eq 2) {
+        try {
+            $firmware = Get-VMFirmware -VM $VM -ErrorAction SilentlyContinue
+            if ($firmware) {
+                if ($firmware.SecureBoot) { $info["SecureBoot"] = $firmware.SecureBoot.ToString() }
+                if ($firmware.SecureBootTemplate) { $info["SecureBootTemplate"] = $firmware.SecureBootTemplate.ToString() }
+            }
+        } catch {
+            Write-DebugInfo "    Error getting VM firmware: $($_.Exception.Message)"
+        }
     }
 
     return $info
@@ -677,6 +695,8 @@ function Get-VMDiscoveryData {
                 "{#VM.SECURITY.TPM}" = $securityInfo.TpmEnabled
                 "{#VM.SECURITY.SHIELDED}" = $securityInfo.Shielded
                 "{#VM.SECURITY.ENCRYPT.MIGRATION}" = $securityInfo.EncryptMigration
+                "{#VM.SECURITY.SECURE.BOOT}" = $securityInfo.SecureBoot
+                "{#VM.SECURITY.SECURE.BOOT.TEMPLATE}" = $securityInfo.SecureBootTemplate
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()
@@ -1322,6 +1342,8 @@ function Get-VMDetailsById {
                 "{#VM.SECURITY.TPM}" = $securityInfo.TpmEnabled
                 "{#VM.SECURITY.SHIELDED}" = $securityInfo.Shielded
                 "{#VM.SECURITY.ENCRYPT.MIGRATION}" = $securityInfo.EncryptMigration
+                "{#VM.SECURITY.SECURE.BOOT}" = $securityInfo.SecureBoot
+                "{#VM.SECURITY.SECURE.BOOT.TEMPLATE}" = $securityInfo.SecureBootTemplate
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()

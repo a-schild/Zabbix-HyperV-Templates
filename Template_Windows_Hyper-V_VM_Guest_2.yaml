@@ -1057,6 +1057,66 @@ zabbix_export:
           tags:
             - tag: component
               value: config
+        - uuid: 55ea1176074f48aea0a4b884a2156cf1
+          name: 'Security: secure boot'
+          type: DEPENDENT
+          key: hyperv.vm.security.secure.boot
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Secure Boot state: On, Off, or NotSupported for a Generation 1 VM, which has
+            no UEFI firmware at all - a different statement from Secure Boot being
+            switched off, hence the third value.
+            Read together with 'Security: secure boot template': Secure Boot On with the
+            wrong template is why a Linux guest fails to boot after it is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SECURITY.SECURE.BOOT}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: security
+          triggers:
+            - uuid: 9386619253724e6bbf35f2bc4c977bcb
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.security.secure.boot)="Off"'
+              name: 'Hyper-V: secure boot disabled on {HOST.NAME}'
+              status: DISABLED
+              priority: INFO
+              description: |
+                A Generation 2 VM is running with Secure Boot switched off.
+                SHIPS DISABLED ON PURPOSE: plenty of VMs have it off for good reasons,
+                so enable this only where Secure Boot is a policy you actually enforce.
+                Generation 1 VMs report NotSupported and can never match.
+        - uuid: 840108051ff949caa18581b33ec6c2cf
+          name: 'Security: secure boot template'
+          type: DEPENDENT
+          key: hyperv.vm.security.secure.boot.template
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Certificate authority Secure Boot validates against: MicrosoftWindows for
+            Windows guests, MicrosoftUEFICertificateAuthority for most Linux guests,
+            OpenSourceShieldedVM for shielded Linux.
+            Empty on a Generation 1 VM.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SECURITY.SECURE.BOOT.TEMPLATE}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: security
         - uuid: 7789c910e82f4afeae2c1cf285387669
           name: 'Security: virtual TPM'
           type: DEPENDENT

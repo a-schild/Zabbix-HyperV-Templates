@@ -100,6 +100,13 @@
     migration traffic are encrypted. One Get-VMSecurity call per VM, all values
     pure configuration, everything defaulting to False on hosts where the
     cmdlet is unavailable.
+    Secure Boot and its certificate template come from Get-VMFirmware, which
+    fails outright on a Generation 1 VM, so it is only called when the VM is
+    Generation 2. Generation 1 VMs report NotSupported, which is deliberately
+    distinct from Off: they have no UEFI firmware at all.
+    The accompanying 'secure boot disabled' trigger SHIPS DISABLED - plenty of
+    VMs run with it off for good reason. Enable it where Secure Boot is a
+    policy you enforce.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and
