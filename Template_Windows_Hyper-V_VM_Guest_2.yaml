@@ -4301,8 +4301,182 @@ zabbix_export:
           pages:
             - name: Overview
               widgets:
+                - type: item
+                  name: 'VM state'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.state
+                    - type: STRING
+                      name: reference
+                      value: VSTAT
+                - type: item
+                  name: 'Uptime'
+                  x: '18'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.uptime
+                    - type: STRING
+                      name: reference
+                      value: VUPTM
+                - type: item
+                  name: 'CPU usage (spot sample)'
+                  x: '36'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.cpu.usage
+                    - type: STRING
+                      name: reference
+                      value: VCPUU
+                - type: item
+                  name: 'Memory pressure'
+                  x: '54'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.memory.pressure
+                    - type: STRING
+                      name: reference
+                      value: VMEMP
+                - type: item
+                  name: 'Guest OS'
+                  'y': '2'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.guest.os.name
+                    - type: STRING
+                      name: reference
+                      value: VGOSN
+                - type: item
+                  name: 'Guest IPv4'
+                  x: '18'
+                  'y': '2'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.guest.ip
+                    - type: STRING
+                      name: reference
+                      value: VGIP4
+                - type: item
+                  name: 'Heartbeat'
+                  x: '36'
+                  'y': '2'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.heartbeat
+                    - type: STRING
+                      name: reference
+                      value: VHRTB
+                - type: item
+                  name: 'Checkpoints (user)'
+                  x: '54'
+                  'y': '2'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.checkpoint.user.count
+                    - type: STRING
+                      name: reference
+                      value: VCHKP
+                - type: item
+                  name: 'Replication mode'
+                  'y': '4'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.replication.mode
+                    - type: STRING
+                      name: reference
+                      value: VRMOD
+                - type: item
+                  name: 'Replication health'
+                  x: '18'
+                  'y': '4'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.replication.health
+                    - type: STRING
+                      name: reference
+                      value: VRHLT
+                - type: item
+                  name: 'Replication last sync age'
+                  x: '36'
+                  'y': '4'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.replication.last.sync.age
+                    - type: STRING
+                      name: reference
+                      value: VRAGE
+                - type: item
+                  name: 'Mounted ISO images'
+                  x: '54'
+                  'y': '4'
+                  width: '18'
+                  height: '2'
+                  fields:
+                    - type: ITEM
+                      name: itemid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        key: hyperv.vm.dvd.iso.count
+                    - type: STRING
+                      name: reference
+                      value: VISOC
                 - type: graphprototype
                   name: 'Disk Read/Writes'
+                  'y': '6'
                   width: '34'
                   height: '5'
                   fields:
@@ -4319,7 +4493,7 @@ zabbix_export:
                       value: XBVEB
                 - type: graphprototype
                   name: 'Network traffic'
-                  'y': '5'
+                  'y': '11'
                   width: '62'
                   height: '5'
                   fields:
@@ -4334,6 +4508,7 @@ zabbix_export:
                 - type: graphprototype
                   name: 'Disk size'
                   x: '34'
+                  'y': '6'
                   width: '28'
                   height: '5'
                   fields:
@@ -4350,7 +4525,7 @@ zabbix_export:
                       value: WLYNQ
                 - type: problems
                   name: 'Current problems'
-                  'y': '10'
+                  'y': '16'
                   width: '72'
                   height: '5'
                   fields:

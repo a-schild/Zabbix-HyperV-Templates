@@ -168,6 +168,15 @@
     New {$VM.HEARTBEAT.CHECK} macro (default 1) switches the check off for a
     single VM host, for anything the automatic filter does not catch.
     Template change only, no need to redeploy hyper-v-monitoring2.ps1.
+  - The VM dashboard's Overview page now leads with the VM's actual state.
+    It only ever showed disk and network graphs plus the problem list, so
+    opening a VM told you its throughput and nothing about the machine.
+    Twelve value widgets across the top: state, uptime, CPU usage and memory
+    pressure; guest OS, guest IPv4, heartbeat and user checkpoint count;
+    replication mode, health and last sync age, and whether an ISO is mounted.
+    The graphs moved down accordingly.
+    The CPU tile is labelled "spot sample" for the same reason the item is:
+    it is the value at the moment the master item ran, not an average.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and
