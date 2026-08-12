@@ -1057,6 +1057,300 @@ zabbix_export:
           tags:
             - tag: component
               value: config
+        - uuid: 14099ffa67a84fb59cde2a1ffae0e5c4
+          name: 'Guest: OS name'
+          type: DEPENDENT
+          key: hyperv.vm.guest.os.name
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Operating system as the guest itself reports it through the KVP exchange service.
+            This is what is running INSIDE the VM, learned without any agent in the guest.
+            Empty when the VM is off, or when its integration services are missing or the
+            KVP service is stopped - common on Linux guests without hyperv-daemons.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GUEST.OS.NAME}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: inventory
+        - uuid: 6d8b1891287541dc9c8de8df2d3bdfa9
+          name: 'Guest: OS version'
+          type: DEPENDENT
+          key: hyperv.vm.guest.os.version
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Guest reported OS version. Empty under the same conditions as the OS name.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GUEST.OS.VERSION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: inventory
+        - uuid: 4ef0f8c8e740427ab06ba2bcd0369b2f
+          name: 'Guest: OS build'
+          type: DEPENDENT
+          key: hyperv.vm.guest.os.build
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Guest reported build number. Useful for spotting VMs that stopped taking updates.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GUEST.OS.BUILD}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: inventory
+        - uuid: 83735bf9ff754032a8f0fab1facb49ea
+          name: 'Guest: FQDN'
+          type: DEPENDENT
+          key: hyperv.vm.guest.fqdn
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Fully qualified domain name the guest reports for itself. Worth comparing against the
+            VM name: they drift apart more often than anyone expects.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GUEST.FQDN}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: inventory
+        - uuid: c96191820fbb4c1ca38ac078b86d4f4c
+          name: 'Guest: IPv4 addresses'
+          type: DEPENDENT
+          key: hyperv.vm.guest.ip
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            IPv4 addresses the guest reports, semicolon separated when it has several.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GUEST.IP}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: inventory
+        - uuid: 2e3aa50a8f6e4456a8e8fd52a72ac52c
+          name: 'Guest: integration services version'
+          type: DEPENDENT
+          key: hyperv.vm.guest.ic.version
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Integration services version as reported BY THE GUEST. This is the trustworthy one:
+            the host side property reads 0.0 on current guests, where the components arrive
+            through Windows Update rather than from the host.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.GUEST.IC.VERSION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: inventory
+        - uuid: c544cd7262844355bd3a730c6cfbc8d0
+          name: 'Metering: average CPU'
+          type: DEPENDENT
+          key: hyperv.vm.metering.cpu
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Average processor usage in MHz since metering was last reset. Unlike the CPU usage
+            spot sample this is a true average over the period.
+            0 unless resource metering is enabled for this VM, see
+            "Resource metering enabled" and Enable-VMResourceMetering.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.CPU.MHZ}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: 00403e606dbb4e2596dc78db8160d426
+          name: 'Metering: average RAM'
+          type: DEPENDENT
+          key: hyperv.vm.metering.ram.avg
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Average memory usage in MB over the metering period. 0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.RAM.AVG.MB}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: b5c8083c38cd476cb4a617aff7c19bbe
+          name: 'Metering: maximum RAM'
+          type: DEPENDENT
+          key: hyperv.vm.metering.ram.max
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Peak memory usage in MB over the metering period. 0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.RAM.MAX.MB}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: 3c26cde35b7148308d1426f24d5210e4
+          name: 'Metering: total disk allocation'
+          type: DEPENDENT
+          key: hyperv.vm.metering.disk
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Total disk space allocated to the VM in MB. 0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.DISK.MB}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: 65b132e715364316999c4b1289e9f405
+          name: 'Metering: network inbound'
+          type: DEPENDENT
+          key: hyperv.vm.metering.net.in
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Inbound traffic in MB over the metering period, summed over every adapter.
+            0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.NET.IN.MB}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: 617f732a76074875be30d6effdeb84b3
+          name: 'Metering: network outbound'
+          type: DEPENDENT
+          key: hyperv.vm.metering.net.out
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Outbound traffic in MB over the metering period, summed over every adapter.
+            0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.NET.OUT.MB}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: 5e81078b641043ed9e7908c237ab7cc4
+          name: 'Metering: average IOPS'
+          type: DEPENDENT
+          key: hyperv.vm.metering.iops
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Average normalized IOPS over the metering period. 0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.IOPS}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: 93acb2dcc34d45428fa0f1e695debba4
+          name: 'Metering: average latency'
+          type: DEPENDENT
+          key: hyperv.vm.metering.latency
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Average disk latency in milliseconds over the metering period.
+            0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.LATENCY}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
+        - uuid: bd941145989c4a9996b65aa91cfb3693
+          name: 'Metering: period'
+          type: DEPENDENT
+          key: hyperv.vm.metering.duration
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            How long the current metering period has been running, which is what every figure
+            above refers to. Reset-VMResourceMetering starts a new one.
+            0 unless metering is enabled.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.METERING.DURATION}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: metering
         - uuid: cf6c752d4722449aa9302c6feefc3347
           name: 'Mounted ISO images'
           type: DEPENDENT
@@ -1820,6 +2114,85 @@ zabbix_export:
             - tag: component
               value: config
       discovery_rules:
+        - uuid: c3b23e9effe847e28589e061dc3f4dcc
+          name: 'VM vCPU Discovery'
+          type: DEPENDENT
+          key: hyperv.vm.vcpu.discovery
+          delay: '0'
+          status: DISABLED
+          description: |
+            Discovers the virtual processors of this VM and creates the per vCPU
+            performance counters, which are the only real source of per VM CPU
+            utilisation - the 'CPU usage' item is a spot sample taken once per
+            {$VM.DETAILS.INTERVAL} and cannot show a spike between polls.
+
+            SHIPS DISABLED ON PURPOSE, FOR PERFORMANCE. Every prototype below polls the
+            agent every minute, per vCPU: a 4 vCPU VM adds 12 agent queries a minute, and
+            that multiplies by the number of VMs on the host. A host with 20 four-vCPU VMs
+            would add 240 queries a minute on top of the ~60 per VM the disk and network
+            counters already generate.
+
+            To enable: Data collection -> Templates -> Template Windows Hyper-V VM Guest 2
+            -> Discovery rules -> VM vCPU Discovery -> Enabled. Do it on the template to
+            cover every VM, or on a single VM host to cover just that one. Consider
+            raising the prototype interval from 1m first.
+          item_prototypes:
+          - uuid: c433b7fa477a4744bdc6e484124cc875
+            name: '{#VM.NAME} vCPU {#VCPU.INDEX} - guest run time'
+            key: 'perf_counter_en["\Hyper-V Hypervisor Virtual Processor({#VCPU.COUNTER})\% Guest Run Time",30]'
+            delay: 1m
+            history: 7d
+            value_type: FLOAT
+            units: '%'
+            description: |
+              Share of time this virtual processor spent running guest code. This is the
+              number that answers "is the VM busy".
+            tags:
+              - tag: component
+                value: cpu
+          - uuid: 7e620f03b71441279f6186e08f0931e7
+            name: '{#VM.NAME} vCPU {#VCPU.INDEX} - hypervisor run time'
+            key: 'perf_counter_en["\Hyper-V Hypervisor Virtual Processor({#VCPU.COUNTER})\% Hypervisor Run Time",30]'
+            delay: 1m
+            history: 7d
+            value_type: FLOAT
+            units: '%'
+            description: |
+              Share of time spent in the hypervisor on behalf of this virtual processor.
+              Consistently high means the guest is causing a lot of intercepts.
+            tags:
+              - tag: component
+                value: cpu
+          - uuid: d6d4807f597a4ed8be25f47215133612
+            name: '{#VM.NAME} vCPU {#VCPU.INDEX} - total run time'
+            key: 'perf_counter_en["\Hyper-V Hypervisor Virtual Processor({#VCPU.COUNTER})\% Total Run Time",30]'
+            delay: 1m
+            history: 7d
+            value_type: FLOAT
+            units: '%'
+            description: |
+              Guest plus hypervisor run time. Compare against the host CPU to see how much of
+              the machine this VM is taking.
+            tags:
+              - tag: component
+                value: cpu
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          lld_macro_paths:
+            - lld_macro: '{#VCPU.COUNTER}'
+              path: '$["{#VCPU.COUNTER}"]'
+            - lld_macro: '{#VCPU.ID}'
+              path: '$["{#VCPU.ID}"]'
+            - lld_macro: '{#VCPU.INDEX}'
+              path: '$["{#VCPU.INDEX}"]'
+            - lld_macro: '{#VM.ID}'
+              path: '$["{#VM.ID}"]'
+            - lld_macro: '{#VM.NAME}'
+              path: '$["{#VM.NAME}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.vcpus
         - uuid: f88de644e4f34b72be0b4ad9ed31d27e
           name: 'VM Disks Discovery'
           type: DEPENDENT

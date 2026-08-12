@@ -125,6 +125,36 @@
     tends to be discovered at the worst possible moment.
   - The three VLAN prototypes added for regular adapters now exist for legacy
     adapters too, which are still in use on generation 1 VMs.
+  - Per virtual processor CPU counters, as a new 'VM vCPU Discovery' rule on the
+    VM Guest template. The vmdetails payload gained a 'vcpus' root, one entry
+    per virtual processor, carrying the performance counter instance name
+    ("<VM name>:Hv VP <n>"). Prototypes for guest, hypervisor and total run
+    time.
+    THE RULE SHIPS DISABLED, for performance: three counters per vCPU at a 1m
+    interval is 12 agent queries a minute for a 4 vCPU VM, multiplied by the
+    number of VMs on the host, on top of the ~60 per VM the disk and network
+    counters already generate. The README explains where to switch it on, for
+    the whole template or for a single VM.
+    This is the proper source of per VM CPU utilisation; the 'CPU usage' item
+    remains a spot sample and is documented as unsuitable for alerting.
+  - Guest reported inventory through the KVP exchange service: OS name,
+    version and build, FQDN, IPv4 addresses and the integration services
+    version. This is what is running INSIDE a VM, read without any agent in
+    the guest.
+    The integration services version from KVP is the trustworthy one - the
+    host side property reads 0.0 on current guests.
+    Empty for VMs that are off, or whose KVP service is stopped or missing
+    (common on Linux guests without hyperv-daemons).
+    The 'vms' path reads every VM's KVP data in a single CIM query and indexes
+    it by VM id, rather than querying per VM.
+  - Resource metering items: average CPU in MHz, average and maximum RAM, total
+    disk allocation, network in and out, average normalized IOPS, average
+    latency and the length of the metering period.
+    These report 0 until resource metering is enabled per VM with
+    Enable-VMResourceMetering, and the script checks the ResourceMeteringEnabled
+    flag before calling Measure-VM, so hosts that never enable it pay nothing.
+    Unlike the CPU usage spot sample, the metered CPU figure is a true average
+    over the period.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and

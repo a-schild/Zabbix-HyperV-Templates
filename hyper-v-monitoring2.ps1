@@ -180,6 +180,137 @@ function Get-CheckpointSummary {
     return $summary
 }
 
+# One LLD entry per virtual processor of a VM.
+# The performance counter instance for a vCPU is "<VM name>:Hv VP <n>", so the whole
+# list can be built from the processor count without asking Hyper-V anything.
+# The discovery rule that consumes this SHIPS DISABLED - see the README. Three counters
+# per vCPU at a 1m interval is another 12 agent queries a minute for a 4 vCPU VM, on top
+# of the ~60 a two disk VM already generates, and it multiplies by VM count.
+function Get-VCpuList {
+    param($VM, $ProcessorCount)
+
+    $list = @()
+    $count = 0
+    if ($ProcessorCount) { $count = [int]$ProcessorCount }
+
+    for ($i = 0; $i -lt $count; $i++) {
+        $list += @{
+            "{#VM.NAME}" = $VM.Name
+            "{#VM.ID}" = $VM.Id.ToString()
+            "{#VCPU.INDEX}" = $i.ToString()
+            "{#VCPU.ID}" = "$($VM.Name)_VP_$i"
+            # Exactly how the counter names the instance. Not localized.
+            "{#VCPU.COUNTER}" = "$($VM.Name):Hv VP $i"
+        }
+    }
+
+    return ,$list
+}
+
+# Guest reported inventory, read out of the KVP (key value pair) exchange service.
+# This is the only way to learn what is running INSIDE a VM without an agent in it:
+# the guest's integration services publish it and Hyper-V exposes it on the host.
+# Values are only as fresh as the guest's last publish, and a VM that is off, or whose
+# KVP service is stopped or missing, simply reports nothing.
+# Note the IC version here comes from the guest itself, unlike $vm.IntegrationServicesVersion
+# which reads 0.0 on current guests.
+function Get-GuestKvpInfo {
+    param($KvpComponent)
+
+    $info = @{
+        "OsName" = ""
+        "OsVersion" = ""
+        "OsBuild" = ""
+        "Fqdn" = ""
+        "Ipv4" = ""
+        "IcVersion" = ""
+    }
+
+    if (-not $KvpComponent) { return $info }
+
+    # Each entry is a CIM XML document holding a Name/Data pair
+    $wanted = @{
+        "OSName" = "OsName"
+        "OSVersion" = "OsVersion"
+        "OSBuildNumber" = "OsBuild"
+        "FullyQualifiedDomainName" = "Fqdn"
+        "NetworkAddressIPv4" = "Ipv4"
+        "IntegrationServicesVersion" = "IcVersion"
+    }
+
+    foreach ($entry in @($KvpComponent.GuestIntrinsicExchangeItems)) {
+        try {
+            $doc = [xml]$entry
+            $name = ""
+            $data = ""
+            foreach ($property in $doc.INSTANCE.PROPERTY) {
+                if ($property.NAME -eq "Name") { $name = $property.VALUE }
+                if ($property.NAME -eq "Data") { $data = $property.VALUE }
+            }
+            if ($name -and $wanted.ContainsKey($name)) {
+                $info[$wanted[$name]] = [string]$data
+            }
+        } catch {
+            Write-DebugInfo "    Error parsing KVP entry: $($_.Exception.Message)"
+        }
+    }
+
+    return $info
+}
+
+# Resource metering figures for one VM.
+# Metering is off by default and has to be switched on per VM with
+# Enable-VMResourceMetering, so this costs nothing at all on hosts that never enabled
+# it: the ResourceMeteringEnabled flag is checked before Measure-VM is called.
+# Everything is measured since the last Reset-VMResourceMetering, hence MeteringDuration.
+function Get-VMMeteringInfo {
+    param($VM)
+
+    $info = @{
+        "AvgCpuMhz" = "0"
+        "AvgRamMb" = "0"
+        "MaxRamMb" = "0"
+        "TotalDiskMb" = "0"
+        "NetworkInboundMb" = "0"
+        "NetworkOutboundMb" = "0"
+        "AvgIops" = "0"
+        "AvgLatency" = "0"
+        "DurationSeconds" = "0"
+    }
+
+    if (-not $VM.ResourceMeteringEnabled) { return $info }
+
+    try {
+        $measurement = @(Measure-VM -VM $VM -ErrorAction SilentlyContinue)[0]
+        if ($measurement) {
+            if ($null -ne $measurement.AverageProcessorUsage) { $info["AvgCpuMhz"] = ([int64]$measurement.AverageProcessorUsage).ToString() }
+            if ($null -ne $measurement.AverageMemoryUsage) { $info["AvgRamMb"] = ([int64]$measurement.AverageMemoryUsage).ToString() }
+            if ($null -ne $measurement.MaximumMemoryUsage) { $info["MaxRamMb"] = ([int64]$measurement.MaximumMemoryUsage).ToString() }
+            if ($null -ne $measurement.TotalDiskAllocation) { $info["TotalDiskMb"] = ([int64]$measurement.TotalDiskAllocation).ToString() }
+            if ($null -ne $measurement.NetworkMeteredTrafficReport) {
+                $inbound = 0
+                $outbound = 0
+                foreach ($report in @($measurement.NetworkMeteredTrafficReport)) {
+                    if ($report.Direction -eq "Inbound") { $inbound += [int64]$report.TotalTraffic }
+                    else { $outbound += [int64]$report.TotalTraffic }
+                }
+                $info["NetworkInboundMb"] = $inbound.ToString()
+                $info["NetworkOutboundMb"] = $outbound.ToString()
+            }
+            if ($null -ne $measurement.AggregatedAverageNormalizedIOPS) { $info["AvgIops"] = ([int64]$measurement.AggregatedAverageNormalizedIOPS).ToString() }
+            if ($null -ne $measurement.AggregatedAverageLatency) { $info["AvgLatency"] = ([int64]$measurement.AggregatedAverageLatency).ToString() }
+            if ($measurement.MeteringDuration) {
+                $info["DurationSeconds"] = ([int64]$measurement.MeteringDuration.TotalSeconds).ToString()
+            }
+            Write-DebugInfo "    Metering: cpu=$($info.AvgCpuMhz)MHz ram=$($info.AvgRamMb)MB iops=$($info.AvgIops)"
+        }
+    } catch {
+        Write-DebugInfo "    Error measuring VM: $($_.Exception.Message)"
+    }
+
+    return $info
+}
+
 # Differencing chain and storage QoS of one virtual disk.
 # Both come from objects the caller already has: ParentPath off the Get-VHD result and
 # the QoS limits off the Get-VMHardDiskDrive object, so no extra call is made.
@@ -587,6 +718,18 @@ function Get-VMDiscoveryData {
         # Measured at ~1s for a host with 11 VMs and ~1.5s for one with 14, so fetching
         # it once here and looking it up per VM is far cheaper than a call per VM.
         # Hosts without replication simply yield an empty table.
+        # KVP components for the whole host in one query, indexed by VM id. One call
+        # here beats one per VM, and a host without the KVP service just yields nothing.
+        $kvpComponents = @{}
+        try {
+            foreach ($component in @(Get-CimInstance -Namespace rootirtualization2 -ClassName Msvm_KvpExchangeComponent -ErrorAction SilentlyContinue)) {
+                if ($component -and $component.SystemName) { $kvpComponents[$component.SystemName] = $component }
+            }
+            Write-DebugInfo "KVP data available for $($kvpComponents.Count) VMs"
+        } catch {
+            Write-DebugInfo "Could not read KVP components: $($_.Exception.Message)"
+        }
+
         $replicationStats = @{}
         try {
             foreach ($stat in @(Measure-VMReplication -ErrorAction SilentlyContinue)) {
@@ -715,6 +858,8 @@ function Get-VMDiscoveryData {
             # Get replication information
             $isoInfo = Get-MountedIsoInfo -DvdDrives $vmDvdDrives
             $runtimeInfo = Get-VMRuntimeInfo -VM $vm
+            $guestInfo = Get-GuestKvpInfo -KvpComponent $kvpComponents[$vm.Id.ToString()]
+            $meteringInfo = Get-VMMeteringInfo -VM $vm
             $securityInfo = Get-VMSecurityInfo -VM $vm
             Write-DebugInfo "  Runtime: cpu=$($runtimeInfo.CpuUsage)% memoryPressure=$($runtimeInfo.MemoryPressure)% heartbeat=$($runtimeInfo.Heartbeat)"
 
@@ -752,6 +897,21 @@ function Get-VMDiscoveryData {
                 "{#VM.SECURITY.ENCRYPT.MIGRATION}" = $securityInfo.EncryptMigration
                 "{#VM.SECURITY.SECURE.BOOT}" = $securityInfo.SecureBoot
                 "{#VM.SECURITY.SECURE.BOOT.TEMPLATE}" = $securityInfo.SecureBootTemplate
+                "{#VM.GUEST.OS.NAME}" = $guestInfo.OsName
+                "{#VM.GUEST.OS.VERSION}" = $guestInfo.OsVersion
+                "{#VM.GUEST.OS.BUILD}" = $guestInfo.OsBuild
+                "{#VM.GUEST.FQDN}" = $guestInfo.Fqdn
+                "{#VM.GUEST.IP}" = $guestInfo.Ipv4
+                "{#VM.GUEST.IC.VERSION}" = $guestInfo.IcVersion
+                "{#VM.METERING.CPU.MHZ}" = $meteringInfo.AvgCpuMhz
+                "{#VM.METERING.RAM.AVG.MB}" = $meteringInfo.AvgRamMb
+                "{#VM.METERING.RAM.MAX.MB}" = $meteringInfo.MaxRamMb
+                "{#VM.METERING.DISK.MB}" = $meteringInfo.TotalDiskMb
+                "{#VM.METERING.NET.IN.MB}" = $meteringInfo.NetworkInboundMb
+                "{#VM.METERING.NET.OUT.MB}" = $meteringInfo.NetworkOutboundMb
+                "{#VM.METERING.IOPS}" = $meteringInfo.AvgIops
+                "{#VM.METERING.LATENCY}" = $meteringInfo.AvgLatency
+                "{#VM.METERING.DURATION}" = $meteringInfo.DurationSeconds
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()
@@ -1166,6 +1326,14 @@ function Get-VMDetailsById {
         $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
         $isoInfo = Get-MountedIsoInfo -DvdDrives $vmDvdDrives
         $runtimeInfo = Get-VMRuntimeInfo -VM $vm
+        $kvpComponent = $null
+        try {
+            $kvpComponent = @(Get-CimInstance -Namespace rootirtualization2 -ClassName Msvm_KvpExchangeComponent -Filter "SystemName='$($vm.Id)'" -ErrorAction SilentlyContinue)[0]
+        } catch {
+            Write-DebugInfo "Could not read KVP component: $($_.Exception.Message)"
+        }
+        $guestInfo = Get-GuestKvpInfo -KvpComponent $kvpComponent
+        $meteringInfo = Get-VMMeteringInfo -VM $vm
         $securityInfo = Get-VMSecurityInfo -VM $vm
         Write-DebugInfo "Getting replication status for $($vm.Name)"
         $replicationSummary = Get-ReplicationSummary -VM $vm
@@ -1407,6 +1575,21 @@ function Get-VMDetailsById {
                 "{#VM.SECURITY.ENCRYPT.MIGRATION}" = $securityInfo.EncryptMigration
                 "{#VM.SECURITY.SECURE.BOOT}" = $securityInfo.SecureBoot
                 "{#VM.SECURITY.SECURE.BOOT.TEMPLATE}" = $securityInfo.SecureBootTemplate
+                "{#VM.GUEST.OS.NAME}" = $guestInfo.OsName
+                "{#VM.GUEST.OS.VERSION}" = $guestInfo.OsVersion
+                "{#VM.GUEST.OS.BUILD}" = $guestInfo.OsBuild
+                "{#VM.GUEST.FQDN}" = $guestInfo.Fqdn
+                "{#VM.GUEST.IP}" = $guestInfo.Ipv4
+                "{#VM.GUEST.IC.VERSION}" = $guestInfo.IcVersion
+                "{#VM.METERING.CPU.MHZ}" = $meteringInfo.AvgCpuMhz
+                "{#VM.METERING.RAM.AVG.MB}" = $meteringInfo.AvgRamMb
+                "{#VM.METERING.RAM.MAX.MB}" = $meteringInfo.MaxRamMb
+                "{#VM.METERING.DISK.MB}" = $meteringInfo.TotalDiskMb
+                "{#VM.METERING.NET.IN.MB}" = $meteringInfo.NetworkInboundMb
+                "{#VM.METERING.NET.OUT.MB}" = $meteringInfo.NetworkOutboundMb
+                "{#VM.METERING.IOPS}" = $meteringInfo.AvgIops
+                "{#VM.METERING.LATENCY}" = $meteringInfo.AvgLatency
+                "{#VM.METERING.DURATION}" = $meteringInfo.DurationSeconds
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()
@@ -1474,6 +1657,9 @@ function Get-VMDetailsById {
             "networks" = @($networkLLD)
             "disks" = @($diskLLD)
             "checkpoints" = @($checkpointSummary.Info)
+            # No @() here: Get-VCpuList already returns the array intact (return ,$list),
+            # and wrapping it again would nest it one level deeper in the json.
+            "vcpus" = Get-VCpuList -VM $vm -ProcessorCount $vmProcessor.Count
         }
 
         Write-DebugInfo "VM details discovery completed for $($vm.Name)"
@@ -1488,6 +1674,7 @@ function Get-VMDetailsById {
             "networks" = @()
             "disks" = @()
             "checkpoints" = @()
+            "vcpus" = @()
         } | ConvertTo-Json -Depth 5
     }
 }

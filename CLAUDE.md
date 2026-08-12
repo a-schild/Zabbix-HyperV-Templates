@@ -56,8 +56,9 @@ everything else is `DEPENDENT` on it:
   call the script. VM counts, replication items, the `Hyper-V VM Discovery` LLD rule and the
   `Hyper-V VM Host Prototype Discovery` rule all hang off them as dependent items/rules.
 - Guest template: `hyperv.discovery.vmdetails[{$VM.ID}]` is the single master item; the three LLD
-  rules (disks, regular NICs, legacy NICs) and ~80 template-level items parse it. Its payload has
-  four roots — `vm_info`, `networks`, `disks`, `checkpoints`.
+  rules (disks, regular NICs, legacy NICs, plus a disabled vCPU rule) and ~95 template-level
+  items parse it. Its payload has
+  five roots — `vm_info`, `networks`, `disks`, `checkpoints`, `vcpus`.
 
 When adding anything, make it dependent on an existing master item. A new LLD rule or item that
 polls the agent directly costs another full enumeration per interval.
