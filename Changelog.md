@@ -1,5 +1,80 @@
 # Changelog
 
+- 2026-08-12 (unreleased)
+  - Checkpoint triggers no longer fire on Hyper-V Replica recovery points.
+    Get-VMSnapshot returns those next to normal checkpoints, so a replica VM
+    configured for additional hourly recovery points ("Abdeckung durch
+    zusätzliche Wiederherstellungspunkte", e.g. 24 hours) permanently carried
+    ~25 checkpoints, the oldest a day old, and kept both checkpoint triggers in
+    alarm. The script now classifies every checkpoint by its snapshot type
+    (Replica, AppConsistentReplica, SyncedReplica, Planned, Recovery and Missing
+    are Hyper-V Replica's own, Standard is a user checkpoint) and reports the
+    counts and oldest/newest figures separately. New VM Guest items:
+    'Checkpoints: user count', 'Checkpoints: user oldest age', 'Checkpoints:
+    user oldest name' and 'Checkpoints: replica recovery points'. The two
+    existing triggers now evaluate the user figures; the total count and oldest
+    age items are unchanged and still include the recovery points. The raw
+    checkpoint list gained an IsReplica flag per entry.
+    Needs the updated hyper-v-monitoring2.ps1 on the Hyper-V hosts, the new
+    items stay unsupported with the old script.
+  - Replication monitoring on the VM guest hosts. Until now replication was
+    only collected in the 'vms' payload, so it could only be seen on the
+    Hyper-V host, never on the Zabbix host that represents the VM itself.
+    The 'vmdetails' payload now carries the same fields and the VM Guest
+    template exposes them as nine items: enabled, state, mode, health,
+    frequency, last sync, last sync age, primary and replica server, with
+    triggers on health Critical (high) and Warning.
+    Collection moved into a shared Get-ReplicationSummary so both payloads
+    stay in step.
+  - Alerting on a replication that stopped running. Both payloads now report
+    the age of the last completed replication in seconds, computed on the
+    Hyper-V host so the Zabbix server does not have to guess its timezone.
+    New trigger in both templates, driven by {$VM.REPLICATION.LAG.MAX}
+    (default 1h): fires when a replicated VM has not completed a replication
+    within that time. Hyper-V's own health field can still read Normal while
+    cycles are merely slow, so this watches the clock directly.
+    Keep {$VM.REPLICATION.LAG.MAX} well above the master item interval, the
+    age is only refreshed when the item runs.
+    On the Hyper-V Host template this arrives as the new
+    'Replication last sync age {#VM.NAME}' item prototype; it reports 0
+    instead of going unsupported when the host still runs the old script.
+  - Replica recovery points that stop being merged are now caught. Both
+    payloads report the VM's configured recovery point count and VSS snapshot
+    interval (RecoveryHistory and VSSSnapshotFrequencyHour, both already
+    available from the Get-VMReplication call, so no extra cost per poll), and
+    the VM Guest template exposes them as 'Replication: recovery points
+    configured' and 'Replication: VSS snapshot frequency'.
+    The accompanying trigger fires when a Replica mode VM holds more recovery
+    points than its own settings ask for, which means Hyper-V has stopped
+    merging the old ones and the avhdx chain keeps growing. One point of slack
+    is allowed for the moment during a replication cycle when the newest point
+    exists alongside a full history.
+    This is the counterpart to the checkpoint fix above: normal checkpoint
+    alerting ignores replica recovery points, this watches them against what
+    was actually configured.
+  - Replication throughput and reliability, from Measure-VMReplication. Nine
+    new VM Guest items: pending, average and maximum replication size, average
+    and maximum latency, successful, missed and errored cycles, and the length
+    of the measuring window those figures refer to.
+    Two new triggers with tolerant defaults, since healthy VMs do miss the odd
+    cycle and log the odd error: {$VM.REPLICATION.MISSED.MAX} (default 3) and
+    {$VM.REPLICATION.ERRORS.MAX} (default 5).
+    Note the cycle counts are per measuring window, not lifetime totals, and
+    Hyper-V resets that window on its own, so never put a change() based
+    trigger on them.
+    Measure-VMReplication returns every replicated VM of a host in a single
+    call, about a second for a host with a dozen VMs, so the 'vms' path fetches
+    it once per run and looks the values up per VM instead of calling it in the
+    loop. The 'vmdetails' path measures the single VM it was asked about.
+  - Replication page on the VM dashboard. The VM Guest template's dashboard
+    gained a second page, 'Replication', with four graphs: latency and lag
+    (average and maximum cycle latency, time since the last replication, and
+    the configured frequency as a reference line), replication size (pending,
+    average and maximum), cycles (successful, missed, errors) and replica
+    recovery points (points held against points configured, with the user
+    checkpoint count alongside).
+    The existing page is now named 'Overview'.
+
 - 2026-08-10 (unreleased)
   - README: added a Requirements section and a troubleshooting section keyed on
     the actual error messages (#39). It now states that the Hyper-V host needs

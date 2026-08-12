@@ -27,7 +27,10 @@ Discovers VM guest performance counters and creates Zabbix items for each of the
 The following parameters are discovered and monitored:
 	* Hyper-V Virtual Storage Device (ops/s and Bytes/s)
 	* Hyper-V Virtual Network Adapter (Bytes/s)
-    * Hyper-V VM replication status
+    * Hyper-V VM replication status, including how long ago the last
+      replication completed
+    * Checkpoints, counted separately from the recovery points Hyper-V Replica
+      maintains by itself
 
 * Template Windows HyperV Host  
 The following _host_ parameters are monitored:

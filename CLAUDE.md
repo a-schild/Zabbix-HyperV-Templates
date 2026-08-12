@@ -56,7 +56,7 @@ everything else is `DEPENDENT` on it:
   call the script. VM counts, replication items, the `Hyper-V VM Discovery` LLD rule and the
   `Hyper-V VM Host Prototype Discovery` rule all hang off them as dependent items/rules.
 - Guest template: `hyperv.discovery.vmdetails[{$VM.ID}]` is the single master item; the three LLD
-  rules (disks, regular NICs, legacy NICs) and ~38 template-level items parse it. Its payload has
+  rules (disks, regular NICs, legacy NICs) and ~54 template-level items parse it. Its payload has
   four roots — `vm_info`, `networks`, `disks`, `checkpoints`.
 
 When adding anything, make it dependent on an existing master item. A new LLD rule or item that
@@ -114,6 +114,13 @@ which is exactly how issue #54 (discovery broken on hosts with one VM) happened.
 agent runs Windows PowerShell 5.1.) Arrays *nested inside* a hashtable are safe — only the
 top-level pipeline unrolls. Note `Get-HyperVHostInfo` deliberately returns an object, not an
 array: the host template addresses it as `$["{#HOST.VM.TOTAL.COUNT}"]`.
+
+**Not every checkpoint is a checkpoint.** `Get-VMSnapshot` also returns the recovery points
+Hyper-V Replica maintains, so a replica VM set to keep additional hourly recovery points carries
+one per covered hour forever. `Get-CheckpointSummary` splits them off by `SnapshotType`
+(`$script:ReplicaSnapshotTypes`: Replica, AppConsistentReplica, SyncedReplica, Planned, Recovery,
+Missing) and exposes both sets; the triggers watch the `USER` figures only. `SnapshotType` is not
+the VM's `CheckpointType` — a production checkpoint made by an admin is still `Standard` here.
 
 **Agent config requirements:** `UnsafeUserParameters=1` (counter paths contain backslashes) and a
 raised agent `Timeout` (15–30s; items are set to `timeout: 30s`).

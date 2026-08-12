@@ -39,7 +39,10 @@ zabbix_export:
           key: hyperv.vm.checkpoint.count
           delay: '0'
           value_type: UNSIGNED
-          description: 'Number of checkpoints (snapshots) currently present for this VM.'
+          description: |
+            Number of checkpoints (snapshots) currently present for this VM, including
+            the recovery points Hyper-V Replica maintains on a replica VM.
+            The triggers watch hyperv.vm.checkpoint.user.count instead.
           preprocessing:
             - type: JSONPATH
               parameters:
@@ -49,14 +52,6 @@ zabbix_export:
           tags:
             - tag: component
               value: checkpoints
-          triggers:
-            - uuid: aba804d6efa148fab782cf4dae64656f
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.count)>{$VM.CHECKPOINT.COUNT.MAX}'
-              name: 'Hyper-V: too many checkpoints on {HOST.NAME}'
-              priority: WARNING
-              description: |
-                Each checkpoint adds another avhdx to the differencing chain, which costs
-                read performance and disk space. Adjust with {$VM.CHECKPOINT.COUNT.MAX}.
         - uuid: 382a5623652c42c0a788083d340776f8
           name: 'Checkpoints: type'
           type: DEPENDENT
@@ -127,8 +122,9 @@ zabbix_export:
           description: |
             Age of the oldest checkpoint. Computed on the Hyper-V host, so no timezone
             correction is needed here. 0 when the VM has no checkpoints.
-            Long lived checkpoints keep growing their avhdx chain and eventually fill
-            the volume, which is what the accompanying trigger watches for.
+            On a replica VM this is the oldest Hyper-V Replica recovery point, which is
+            expected to be as old as the configured coverage. The age trigger therefore
+            watches hyperv.vm.checkpoint.user.oldest.age instead.
           preprocessing:
             - type: JSONPATH
               parameters:
@@ -138,15 +134,6 @@ zabbix_export:
           tags:
             - tag: component
               value: checkpoints
-          triggers:
-            - uuid: 84b43c71750e425cb94d85d297dad707
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.count)>0 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.oldest.age)>{$VM.CHECKPOINT.AGE.MAX}'
-              name: 'Hyper-V: checkpoint older than {$VM.CHECKPOINT.AGE.MAX} on {HOST.NAME}'
-              priority: WARNING
-              description: |
-                A checkpoint has been left behind. Its avhdx keeps growing for as long as
-                it exists and merging it back gets slower the longer it is kept.
-                The count check guards against firing on VMs that have no checkpoints.
         - uuid: 5bfbfc7c457c46d0a764cf9c554ae543
           name: 'Checkpoints: newest name'
           type: DEPENDENT
@@ -211,7 +198,10 @@ zabbix_export:
           delay: '0'
           value_type: TEXT
           trends: '0'
-          description: 'Raw json list of all checkpoints: name, creation time, age, parent and type.'
+          description: |
+            Raw json list of all checkpoints: name, creation time, age, parent, snapshot
+            type and IsReplica, which is true for the recovery points Hyper-V Replica
+            creates and removes by itself.
           preprocessing:
             - type: JSONPATH
               parameters:
@@ -224,6 +214,597 @@ zabbix_export:
           tags:
             - tag: component
               value: checkpoints
+        - uuid: 2e15f392bd3c4b10b41819ce34e07784
+          name: 'Checkpoints: user count'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.user.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Number of checkpoints excluding the recovery points Hyper-V Replica manages
+            on its own (snapshot types Replica, AppConsistentReplica, SyncedReplica,
+            Planned, Recovery and Missing).
+            A replica VM configured for additional hourly recovery points permanently
+            carries one checkpoint per covered hour; those are normal operation and
+            would otherwise keep the checkpoint triggers firing.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.USER.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+          triggers:
+            - uuid: aba804d6efa148fab782cf4dae64656f
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.user.count)>{$VM.CHECKPOINT.COUNT.MAX}'
+              name: 'Hyper-V: too many checkpoints on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                Each checkpoint adds another avhdx to the differencing chain, which costs
+                read performance and disk space. Adjust with {$VM.CHECKPOINT.COUNT.MAX}.
+                Hyper-V Replica recovery points are not counted here.
+        - uuid: 72120337a47a4a4b9e37728ba6bb9fb4
+          name: 'Checkpoints: user oldest age'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.user.oldest.age
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            Age of the oldest checkpoint that is not a Hyper-V Replica recovery point.
+            Computed on the Hyper-V host, so no timezone correction is needed here.
+            0 when the VM has no such checkpoint.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.USER.OLDEST.AGE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+          triggers:
+            - uuid: 84b43c71750e425cb94d85d297dad707
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.user.count)>0 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.user.oldest.age)>{$VM.CHECKPOINT.AGE.MAX}'
+              name: 'Hyper-V: checkpoint older than {$VM.CHECKPOINT.AGE.MAX} on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                A checkpoint has been left behind. Its avhdx keeps growing for as long as
+                it exists and merging it back gets slower the longer it is kept.
+                The count check guards against firing on VMs that have no checkpoints.
+                Hyper-V Replica recovery points are ignored, they are removed by Hyper-V
+                itself once they fall outside the configured coverage.
+        - uuid: 9140a39673a040e09afcd969d01ce2a1
+          name: 'Checkpoints: user oldest name'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.user.oldest.name
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Name of the oldest checkpoint that is not a Hyper-V Replica recovery point.
+            Empty when the VM has no such checkpoint. This is the one the age trigger
+            refers to.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.USER.OLDEST.NAME}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: 18b1e87d5601462e853e3406b441925d
+          name: 'Checkpoints: replica recovery points'
+          type: DEPENDENT
+          key: hyperv.vm.checkpoint.replica.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Number of checkpoints that belong to Hyper-V Replica. On a replica VM this
+            follows the configured recovery point coverage; on a primary VM it is
+            normally 0 except while a replication cycle is running.
+            Not alerted on, Hyper-V creates and removes these itself.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.CHECKPOINT.REPLICA.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: checkpoints
+        - uuid: 0f3737005fc54b0ba6db29f954a75f13
+          name: 'Replication: enabled'
+          type: DEPENDENT
+          key: hyperv.vm.replication.enabled
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            True when Hyper-V Replica is configured for this VM, False otherwise.
+            All other replication items carry neutral values when this is False, so a
+            VM that is not replicated does not turn them unsupported.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.ENABLED}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 4744210b850547b9a460ad5d61ed7383
+          name: 'Replication: state'
+          type: DEPENDENT
+          key: hyperv.vm.replication.state
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Replication state: Replicating, Suspended, Resynchronizing,
+            WaitingForInitialReplication, FailedOver, ... NotEnabled when the VM is not
+            replicated.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.STATE}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 6bce0d566f2f4c99849713e90fefb692
+          name: 'Replication: mode'
+          type: DEPENDENT
+          key: hyperv.vm.replication.mode
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Which side of the relationship this VM is: Primary, Replica or TestReplica.
+            None when the VM is not replicated.
+            A Replica VM permanently holds the configured recovery points, which is why
+            the checkpoint triggers ignore them.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.MODE}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: a7a4900ef0814e9eaf9d204d577b22f9
+          name: 'Replication: health'
+          type: DEPENDENT
+          key: hyperv.vm.replication.health
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Hyper-V's own verdict on the replication: Normal, Warning or Critical.
+            NotApplicable when the VM is not replicated.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.HEALTH}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+          triggers:
+            - uuid: 2939242caab64a7c82dcca276d325c38
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.health)="Critical"'
+              name: 'Hyper-V: replication health critical on {HOST.NAME}'
+              priority: HIGH
+              description: |
+                Hyper-V reports the replication of this VM as Critical: replication has
+                stopped or is failing repeatedly. The replica is stale from now on.
+            - uuid: 6a0582cee3cd40ff96f07422a355b0cc
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.health)="Warning"'
+              name: 'Hyper-V: replication health warning on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                Hyper-V reports the replication of this VM as Warning: cycles are being
+                missed or a resynchronization is pending.
+        - uuid: bb03c2a3cb5844708c09d8680e66dc91
+          name: 'Replication: frequency'
+          type: DEPENDENT
+          key: hyperv.vm.replication.frequency
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            Configured replication interval, 30, 300 or 900 seconds.
+            0 when the VM is not replicated.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.FREQUENCY}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: a1c9b0e033884a458d11b75439e6002d
+          name: 'Replication: last sync'
+          type: DEPENDENT
+          key: hyperv.vm.replication.last.sync
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            Time of the last completed replication, as local time on the Hyper-V host.
+            Empty when the VM is not replicated or has not replicated yet.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.LAST.TIME}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: f059a29509d34bca8af7340cfb82d288
+          name: 'Replication: last sync age'
+          type: DEPENDENT
+          key: hyperv.vm.replication.last.sync.age
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            Seconds since the last completed replication. Computed on the Hyper-V host,
+            so no timezone correction is needed here.
+            0 when the VM is not replicated or has never replicated, so the accompanying
+            trigger cannot fire on those.
+            Note this is only as fresh as the master item, so it can lag reality by up to
+            {$VM.DETAILS.INTERVAL}; keep {$VM.REPLICATION.LAG.MAX} comfortably above that.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.LAST.AGE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+          triggers:
+            - uuid: 8f0151bd8ff34348b9ffb4459a0abbee
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.enabled)="True" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.last.sync.age)>{$VM.REPLICATION.LAG.MAX}'
+              name: 'Hyper-V: replication of {HOST.NAME} has not run for {$VM.REPLICATION.LAG.MAX}'
+              priority: WARNING
+              description: |
+                The replica is falling behind. Hyper-V's own health field can still read
+                Normal while cycles are merely slow, so this watches the clock directly.
+                The enabled check keeps it off VMs that are not replicated.
+        - uuid: ee3b0f18de304e0cb285daff9591df22
+          name: 'Replication: primary server'
+          type: DEPENDENT
+          key: hyperv.vm.replication.primary.server
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Hyper-V host holding the primary VM. Empty when the VM is not replicated.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.PRIMARY.SERVER}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: e3a53bfb9a8449ec945ed46732c1fe99
+          name: 'Replication: replica server'
+          type: DEPENDENT
+          key: hyperv.vm.replication.replica.server
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: 'Hyper-V host receiving the replica. Empty when the VM is not replicated.'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.REPLICA.SERVER}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 0d887538ca8f4642a4699936abf317cc
+          name: 'Replication: recovery points configured'
+          type: DEPENDENT
+          key: hyperv.vm.replication.recovery.history
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            How many recovery points Hyper-V is told to keep for this VM, straight from
+            the replication settings ("additional hourly recovery points, coverage in
+            hours" in the VM settings dialog).
+            0 means only the latest recovery point is kept, which is also the value for
+            a VM that is not replicated.
+            This is the number the replica side's checkpoint count is expected to
+            follow, see 'Checkpoints: replica recovery points'.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.RECOVERY.HISTORY}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+          triggers:
+            - uuid: 6f8eeeb8f8ea4a9696e993dd55f072eb
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.mode)="Replica" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.recovery.history)>0 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.checkpoint.replica.count)>last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.recovery.history)+1'
+              name: 'Hyper-V: more replica recovery points than configured on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                A replica VM holds more recovery points than its replication settings ask
+                for, so Hyper-V is not merging the old ones away. Every one of them is
+                another avhdx in the chain, and the volume fills up from there.
+                Normal checkpoint alerting deliberately ignores replica recovery points,
+                which is exactly why this check exists.
+                The comparison allows one point of slack: the newest point can exist
+                alongside a full history for a moment during a replication cycle.
+                Only evaluated on the replica side, the primary does not keep a history.
+        - uuid: 9ce909fa85ce48febe1f4e4b20f7dac6
+          name: 'Replication: VSS snapshot frequency'
+          type: DEPENDENT
+          key: hyperv.vm.replication.vss.frequency
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Interval in HOURS between application consistent (VSS) recovery points.
+            0 when incremental VSS copies are switched off, which is the default, and
+            for a VM that is not replicated.
+            Only meaningful with recovery points configured; the guest needs current
+            integration components for it to work at all.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.VSS.FREQUENCY}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 49372bca2a654ebf85bdad4f8b841ac5
+          name: 'Replication: pending size'
+          type: DEPENDENT
+          key: hyperv.vm.replication.pending.size
+          delay: '0'
+          value_type: UNSIGNED
+          units: B
+          description: |
+            Bytes written by the VM but not yet replicated. A healthy VM sits at
+            practically nothing between cycles (4096 is the idle floor Hyper-V reports);
+            a figure that climbs cycle after cycle means the link cannot keep up with
+            the write rate.
+            0 when the VM is not replicated.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.PENDING.SIZE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 772bc531d1db4c51872e36d7e3c6595f
+          name: 'Replication: average size'
+          type: DEPENDENT
+          key: hyperv.vm.replication.avg.size
+          delay: '0'
+          value_type: UNSIGNED
+          units: B
+          description: |
+            Average bytes transferred per replication cycle over the current measuring
+            window, see 'Replication: statistics window'.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.AVG.SIZE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 7f19773aad3b41fca706ed428a49c4a1
+          name: 'Replication: maximum size'
+          type: DEPENDENT
+          key: hyperv.vm.replication.max.size
+          delay: '0'
+          value_type: UNSIGNED
+          units: B
+          description: |
+            Largest single replication cycle in the current measuring window. Usually
+            far above the average: it is the catch up cycle after a resynchronization
+            or a busy period.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.MAX.SIZE}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: baaaaf9afb9f466aa0ed6485c4379cd0
+          name: 'Replication: average latency'
+          type: DEPENDENT
+          key: hyperv.vm.replication.avg.latency
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            Average time a replication cycle took in the current measuring window.
+            Compare against 'Replication: frequency': a latency approaching the
+            frequency means cycles barely finish before the next one is due.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.AVG.LATENCY}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 5ece844497dc40ffb8f2d44530c1a79a
+          name: 'Replication: maximum latency'
+          type: DEPENDENT
+          key: hyperv.vm.replication.max.latency
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            Slowest replication cycle in the current measuring window. Expect this to be
+            several times the average, it captures the worst catch up cycle.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.MAX.LATENCY}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: c293f97c1b68446f9720d76e6632d247
+          name: 'Replication: successful cycles'
+          type: DEPENDENT
+          key: hyperv.vm.replication.success.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Replication cycles completed in the current measuring window.
+            This is NOT a lifetime counter: Hyper-V resets it together with the window,
+            so it climbs and drops back. Do not put a change() based trigger on it.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.SUCCESS.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+        - uuid: 2d3b3eba42ce45feab290d1c4d5bc6a1
+          name: 'Replication: missed cycles'
+          type: DEPENDENT
+          key: hyperv.vm.replication.missed.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Replication cycles that did not happen in the current measuring window.
+            The odd missed cycle is normal on a busy host; a number that keeps growing
+            is a link or storage problem. Resets with the window, like the successful
+            cycle count.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.MISSED.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+          triggers:
+            - uuid: 8e4bbca10f7649b6a6c403baa1c8976a
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.missed.count)>{$VM.REPLICATION.MISSED.MAX}'
+              name: 'Hyper-V: replication cycles missed on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                More replication cycles were missed in the current measuring window than
+                {$VM.REPLICATION.MISSED.MAX} allows. Hyper-V's own health field often
+                still reads Normal at this point.
+                Counts reset when Hyper-V starts a new window, so this clears by itself
+                once the trouble stops.
+        - uuid: 1ee12a1602014887bcd14d3961e5efa6
+          name: 'Replication: errors'
+          type: DEPENDENT
+          key: hyperv.vm.replication.error.count
+          delay: '0'
+          value_type: UNSIGNED
+          description: |
+            Replication errors Hyper-V recorded in the current measuring window.
+            A couple of these on an otherwise healthy VM is common, which is why the
+            trigger threshold is a macro rather than "greater than zero".
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.ERROR.COUNT}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
+          triggers:
+            - uuid: cc73d5213a17436b9a61166316a5760b
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.replication.error.count)>{$VM.REPLICATION.ERRORS.MAX}'
+              name: 'Hyper-V: replication errors on {HOST.NAME}'
+              priority: WARNING
+              description: |
+                Hyper-V recorded more replication errors than {$VM.REPLICATION.ERRORS.MAX}
+                in the current measuring window. Check the Hyper-V-VMMS event log on both
+                the primary and the replica server.
+        - uuid: 58e1bbd80bcc4d3ba117f16b8c6e0327
+          name: 'Replication: statistics window'
+          type: DEPENDENT
+          key: hyperv.vm.replication.stats.window
+          delay: '0'
+          value_type: UNSIGNED
+          units: 's'
+          description: |
+            How long the current measuring window has been running, which is the period
+            the cycle counts, sizes and latencies above refer to.
+            Hyper-V starts a new window by itself (and Reset-VMReplicationStatistics
+            forces one), so a sudden drop here explains a sudden drop in the counts.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.REPLICATION.STATS.WINDOW}"]'
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: replication
         - uuid: 5bd59090c2084b32ad5dd581f1e4172a
           name: 'VM name'
           type: DEPENDENT
@@ -2361,15 +2942,39 @@ zabbix_export:
             besides slower VM state detection.
         - macro: '{$VM.CHECKPOINT.COUNT.MAX}'
           value: '3'
-          description: 'Warn above this many checkpoints on a single VM.'
+          description: |
+            Warn above this many checkpoints on a single VM.
+            Hyper-V Replica recovery points do not count towards this.
         - macro: '{$VM.CHECKPOINT.AGE.MAX}'
           value: '7d'
-          description: 'Warn when the oldest checkpoint of a VM is older than this.'
+          description: |
+            Warn when the oldest checkpoint of a VM is older than this.
+            Hyper-V Replica recovery points are ignored.
+        - macro: '{$VM.REPLICATION.MISSED.MAX}'
+          value: '3'
+          description: |
+            Warn above this many missed replication cycles in Hyper-V's current
+            measuring window. The occasional miss is normal on a busy host.
+        - macro: '{$VM.REPLICATION.ERRORS.MAX}'
+          value: '5'
+          description: |
+            Warn above this many replication errors in Hyper-V's current measuring
+            window. Deliberately not 0: healthy VMs do log the odd error.
+        - macro: '{$VM.REPLICATION.LAG.MAX}'
+          value: 1h
+          description: |
+            Warn when a replicated VM has not completed a replication for this long.
+
+            Must stay well above {$VM.DETAILS.INTERVAL}: the age is only refreshed when
+            the master item runs, so it is already up to one interval old when Zabbix
+            sees it. The default 1h suits every replication frequency Hyper-V offers
+            (30s, 5m, 15m); lower it only together with {$VM.DETAILS.INTERVAL}.
       dashboards:
         - uuid: 2f549e6c78ab4c6fb5f31cc5394a0c1a
           name: VM
           pages:
-            - widgets:
+            - name: Overview
+              widgets:
                 - type: graphprototype
                   name: 'Disk Read/Writes'
                   width: '34'
@@ -2426,3 +3031,145 @@ zabbix_export:
                     - type: STRING
                       name: reference
                       value: GPROB
+            - name: Replication
+              widgets:
+                - type: graph
+                  name: 'Replication latency and lag'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Replication latency and lag'
+                    - type: STRING
+                      name: reference
+                      value: RPLAT
+                - type: graph
+                  name: 'Replication size'
+                  x: '36'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Replication size'
+                    - type: STRING
+                      name: reference
+                      value: RPLSZ
+                - type: graph
+                  name: 'Replication cycles'
+                  'y': '5'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Replication cycles'
+                    - type: STRING
+                      name: reference
+                      value: RPLCY
+                - type: graph
+                  name: 'Replica recovery points'
+                  x: '36'
+                  'y': '5'
+                  width: '36'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Template Windows Hyper-V VM Guest 2'
+                        name: 'Replica recovery points'
+                    - type: STRING
+                      name: reference
+                      value: RPLRP
+  graphs:
+    - uuid: ac1ca6e165fa4f7bb41dacee2a6300eb
+      name: 'Replication latency and lag'
+      height: '300'
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 1A7C11
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.avg.latency
+        - sortorder: '1'
+          color: F63100
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.max.latency
+        - sortorder: '2'
+          drawtype: BOLD_LINE
+          color: 2774A4
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.last.sync.age
+        - sortorder: '3'
+          color: A54F10
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.frequency
+    - uuid: f462765da27d40169c0f68d06308b215
+      name: 'Replication size'
+      height: '300'
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 2774A4
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.pending.size
+        - sortorder: '1'
+          color: 1A7C11
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.avg.size
+        - sortorder: '2'
+          color: F63100
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.max.size
+    - uuid: 37299fa357ba4351ad497890db640a5d
+      name: 'Replication cycles'
+      height: '300'
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 1A7C11
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.success.count
+        - sortorder: '1'
+          drawtype: BOLD_LINE
+          color: F63100
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.missed.count
+        - sortorder: '2'
+          color: A54F10
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.error.count
+    - uuid: 0d38ffbe80f1487f8305144260341be9
+      name: 'Replica recovery points'
+      height: '300'
+      graph_items:
+        - drawtype: BOLD_LINE
+          color: 2774A4
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.checkpoint.replica.count
+        - sortorder: '1'
+          color: A54F10
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.replication.recovery.history
+        - sortorder: '2'
+          color: F63100
+          item:
+            host: 'Template Windows Hyper-V VM Guest 2'
+            key: hyperv.vm.checkpoint.user.count

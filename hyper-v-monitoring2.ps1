@@ -72,6 +72,23 @@ function Get-IntegrationServiceInfo {
     return ,$info
 }
 
+# Snapshot types Hyper-V Replica creates and manages by itself. A replicated VM
+# holds one of these per configured recovery point, so on the replica server a VM
+# with "additional hourly recovery points, coverage 24 hours" permanently carries
+# ~25 of them, the oldest a day old. Those are not left-behind user checkpoints
+# and must not be alerted on, so they are counted separately.
+# The remaining type, Standard, is what New-VMCheckpoint / the UI create --
+# production checkpoints are Standard here too, Production/Standard is the VM's
+# CheckpointType property, a different enum.
+$script:ReplicaSnapshotTypes = @(
+    "Replica",
+    "AppConsistentReplica",
+    "SyncedReplica",
+    "Planned",
+    "Recovery",
+    "Missing"
+)
+
 # Summarize the checkpoints of a VM.
 # Both the 'vms' and the 'vmdetails' payload expose the same fields, so the
 # host template and the VM guest template can monitor checkpoints identically.
@@ -87,13 +104,18 @@ function Get-CheckpointSummary {
         try {
             Write-DebugInfo "    Processing checkpoint: $($checkpoint.Name)"
             $created = $checkpoint.CreationTime
+            $snapshotType = if ($checkpoint.SnapshotType) { $checkpoint.SnapshotType.ToString() } else { "Unknown" }
+            # Unknown counts as a user checkpoint: better a false alert than a
+            # silently ignored checkpoint chain.
+            $isReplica = $script:ReplicaSnapshotTypes -contains $snapshotType
             $list += @{
                 "Name" = $checkpoint.Name
                 "CreationTime" = $created.ToString("yyyy-MM-dd HH:mm:ss")
                 "CreationEpoch" = [int64]([System.DateTimeOffset]$created).ToUnixTimeSeconds()
                 "AgeSeconds" = [int64](New-TimeSpan -Start $created -End $now).TotalSeconds
                 "ParentCheckpointName" = $checkpoint.ParentCheckpointName
-                "SnapshotType" = if ($checkpoint.SnapshotType) { $checkpoint.SnapshotType.ToString() } else { "Unknown" }
+                "SnapshotType" = $snapshotType
+                "IsReplica" = $isReplica
             }
         } catch {
             Write-DebugInfo "    Error processing checkpoint: $($_.Exception.Message)"
@@ -102,6 +124,7 @@ function Get-CheckpointSummary {
 
     # Sorted oldest first. @() keeps this an array when the VM has one checkpoint.
     $sorted = @($list | Sort-Object { $_.CreationEpoch })
+    $userList = @($sorted | Where-Object { -not $_.IsReplica })
 
     $summary = @{
         "Count" = $sorted.Count
@@ -114,6 +137,18 @@ function Get-CheckpointSummary {
         "NewestCreated" = ""
         "NewestEpoch" = 0
         "NewestAge" = 0
+        # Same figures with the replica recovery points filtered out. These are
+        # what the triggers watch.
+        "UserCount" = $userList.Count
+        "UserOldestName" = ""
+        "UserOldestCreated" = ""
+        "UserOldestEpoch" = 0
+        "UserOldestAge" = 0
+        "UserNewestName" = ""
+        "UserNewestCreated" = ""
+        "UserNewestEpoch" = 0
+        "UserNewestAge" = 0
+        "ReplicaCount" = $sorted.Count - $userList.Count
     }
 
     if ($sorted.Count -gt 0) {
@@ -127,6 +162,130 @@ function Get-CheckpointSummary {
         $summary["NewestCreated"] = $newest.CreationTime
         $summary["NewestEpoch"] = $newest.CreationEpoch
         $summary["NewestAge"] = $newest.AgeSeconds
+    }
+
+    if ($userList.Count -gt 0) {
+        $oldestUser = $userList[0]
+        $newestUser = $userList[$userList.Count - 1]
+        $summary["UserOldestName"] = $oldestUser.Name
+        $summary["UserOldestCreated"] = $oldestUser.CreationTime
+        $summary["UserOldestEpoch"] = $oldestUser.CreationEpoch
+        $summary["UserOldestAge"] = $oldestUser.AgeSeconds
+        $summary["UserNewestName"] = $newestUser.Name
+        $summary["UserNewestCreated"] = $newestUser.CreationTime
+        $summary["UserNewestEpoch"] = $newestUser.CreationEpoch
+        $summary["UserNewestAge"] = $newestUser.AgeSeconds
+    }
+
+    return $summary
+}
+
+# Collect the Hyper-V Replica state of a VM.
+# Like Get-CheckpointSummary this feeds both the 'vms' and the 'vmdetails'
+# payload, so the host template and the VM guest template see the same fields.
+# The age of the last replication is computed here, on the Hyper-V host, so the
+# Zabbix server does not have to guess the host's timezone.
+# Every field has a neutral default: a VM without replication is the normal case
+# and must not make items unsupported.
+function Get-ReplicationSummary {
+    param($VM, $Statistics)
+
+    $summary = @{
+        "Enabled" = $false
+        "State" = "NotEnabled"
+        "Mode" = "None"
+        "Health" = "NotApplicable"
+        "Frequency" = 0
+        "LastTime" = ""
+        "LastEpoch" = 0
+        "LastAge" = 0
+        "PrimaryServer" = ""
+        "ReplicaServer" = ""
+        "RecoveryHistory" = 0
+        "VSSFrequencyHours" = 0
+        # From Measure-VMReplication. Everything below is measured over a window that
+        # Hyper-V resets on its own (MonitoringStartTime), so the counts are "since the
+        # last reset", not lifetime totals. StatsWindow makes that window visible.
+        "PendingSize" = 0
+        "AvgSize" = 0
+        "MaxSize" = 0
+        "AvgLatency" = 0
+        "MaxLatency" = 0
+        "SuccessCount" = 0
+        "MissedCount" = 0
+        "ErrorCount" = 0
+        "StatsWindow" = 0
+    }
+
+    try {
+        $replication = Get-VMReplication -VM $VM -ErrorAction SilentlyContinue
+        if ($replication) {
+            $summary["Enabled"] = $true
+            $summary["State"] = $replication.State.ToString()
+            $summary["Mode"] = $replication.ReplicationMode.ToString()
+            $summary["Health"] = $replication.ReplicationHealth.ToString()
+            $summary["Frequency"] = $replication.ReplicationFrequencySec
+            if ($replication.LastReplicationTime) {
+                $last = $replication.LastReplicationTime
+                $age = [int64](New-TimeSpan -Start $last -End (Get-Date)).TotalSeconds
+                # Clock skew between the replica and the primary can date the
+                # last replication a few seconds into the future. Zabbix rejects
+                # a negative value on an unsigned item, so floor it at 0.
+                if ($age -lt 0) { $age = 0 }
+                $summary["LastTime"] = $last.ToString("yyyy-MM-dd HH:mm:ss")
+                $summary["LastEpoch"] = [int64]([System.DateTimeOffset]$last).ToUnixTimeSeconds()
+                $summary["LastAge"] = $age
+            }
+            if ($replication.PrimaryServerName) { $summary["PrimaryServer"] = $replication.PrimaryServerName }
+            if ($replication.ReplicaServerName) { $summary["ReplicaServer"] = $replication.ReplicaServerName }
+            # How many recovery points Hyper-V is told to keep: 0 means "only the
+            # latest", anything else is the "additional hourly recovery points"
+            # coverage from the VM's replication settings. This is what the replica
+            # side's checkpoint count is expected to follow, so a count stuck well
+            # above it means Hyper-V has stopped merging them.
+            # A missing property just reads $null on older builds, hence the guards.
+            if ($null -ne $replication.RecoveryHistory) {
+                $summary["RecoveryHistory"] = [int]$replication.RecoveryHistory
+            }
+            if ($null -ne $replication.VSSSnapshotFrequencyHour) {
+                $summary["VSSFrequencyHours"] = [int]$replication.VSSSnapshotFrequencyHour
+            }
+
+            # Throughput and reliability figures. The caller normally hands these in:
+            # Measure-VMReplication returns every replicated VM of the host in a single
+            # call (~1s for a whole host), so the 'vms' path fetches them once and looks
+            # them up per VM. Only fall back to a per VM call when nothing was passed.
+            $stats = @($Statistics)[0]
+            if ($null -eq $stats) {
+                try {
+                    $stats = @(Measure-VMReplication -VMName $VM.Name -ErrorAction SilentlyContinue)[0]
+                } catch {
+                    Write-DebugInfo "    Error measuring replication: $($_.Exception.Message)"
+                }
+            }
+            if ($stats) {
+                if ($null -ne $stats.PendingReplicationSize) { $summary["PendingSize"] = [int64]$stats.PendingReplicationSize }
+                if ($null -ne $stats.AverageReplicationSize) { $summary["AvgSize"] = [int64]$stats.AverageReplicationSize }
+                if ($null -ne $stats.MaximumReplicationSize) { $summary["MaxSize"] = [int64]$stats.MaximumReplicationSize }
+                # Latencies come back as TimeSpan
+                if ($null -ne $stats.AverageReplicationLatency) { $summary["AvgLatency"] = [int64]$stats.AverageReplicationLatency.TotalSeconds }
+                if ($null -ne $stats.MaximumReplicationLatency) { $summary["MaxLatency"] = [int64]$stats.MaximumReplicationLatency.TotalSeconds }
+                if ($null -ne $stats.SuccessfulReplicationCount) { $summary["SuccessCount"] = [int64]$stats.SuccessfulReplicationCount }
+                if ($null -ne $stats.MissedReplicationCount) { $summary["MissedCount"] = [int64]$stats.MissedReplicationCount }
+                if ($null -ne $stats.ReplicationErrors) { $summary["ErrorCount"] = [int64]$stats.ReplicationErrors }
+                if ($stats.MonitoringStartTime -and $stats.MonitoringEndTime) {
+                    $window = [int64](New-TimeSpan -Start $stats.MonitoringStartTime -End $stats.MonitoringEndTime).TotalSeconds
+                    if ($window -lt 0) { $window = 0 }
+                    $summary["StatsWindow"] = $window
+                }
+                Write-DebugInfo "    Replication stats: pending=$($summary.PendingSize)B avgLatency=$($summary.AvgLatency)s missed=$($summary.MissedCount) errors=$($summary.ErrorCount)"
+            }
+            Write-DebugInfo "    Replication enabled: State=$($summary.State), Mode=$($summary.Mode), Health=$($summary.Health), LastAge=$($summary.LastAge)s"
+        } else {
+            Write-DebugInfo "    Replication not enabled for this VM"
+        }
+    } catch {
+        Write-DebugInfo "    Error getting replication status: $($_.Exception.Message)"
     }
 
     return $summary
@@ -258,6 +417,20 @@ function Get-VMDiscoveryData {
             Write-DebugInfo "No VMs found on this Hyper-V host"
         }
 
+        # Replication statistics for every replicated VM of this host in one call.
+        # Measured at ~1s for a host with 11 VMs and ~1.5s for one with 14, so fetching
+        # it once here and looking it up per VM is far cheaper than a call per VM.
+        # Hosts without replication simply yield an empty table.
+        $replicationStats = @{}
+        try {
+            foreach ($stat in @(Measure-VMReplication -ErrorAction SilentlyContinue)) {
+                if ($stat -and $stat.VMId) { $replicationStats[$stat.VMId.ToString()] = $stat }
+            }
+            Write-DebugInfo "Replication statistics collected for $($replicationStats.Count) VMs"
+        } catch {
+            Write-DebugInfo "Could not measure replication: $($_.Exception.Message)"
+        }
+
         $discoveryData = @()
 
         foreach ($vm in $vms) {
@@ -366,37 +539,8 @@ function Get-VMDiscoveryData {
 
             # Get replication information
             Write-DebugInfo "  Getting replication status for $($vm.Name)"
-            $vmReplication = $null
-            $replicationEnabled = $false
-            $replicationState = "NotEnabled"
-            $replicationMode = "None"
-            $replicationHealth = "NotApplicable"
-            $replicationFrequency = 0
-            $lastReplicationTime = ""
-            $primaryServer = ""
-            $replicaServer = ""
+            $replicationSummary = Get-ReplicationSummary -VM $vm -Statistics $replicationStats[$vm.Id.ToString()]
 
-            try {
-                $vmReplication = Get-VMReplication -VM $vm -ErrorAction SilentlyContinue
-                if ($vmReplication) {
-                    $replicationEnabled = $true
-                    $replicationState = $vmReplication.State.ToString()
-                    $replicationMode = $vmReplication.ReplicationMode.ToString()
-                    $replicationHealth = $vmReplication.ReplicationHealth.ToString()
-                    $replicationFrequency = $vmReplication.ReplicationFrequencySec
-                    if ($vmReplication.LastReplicationTime) {
-                        $lastReplicationTime = $vmReplication.LastReplicationTime.ToString("yyyy-MM-dd HH:mm:ss")
-                    }
-                    $primaryServer = if ($vmReplication.PrimaryServerName) { $vmReplication.PrimaryServerName } else { "" }
-                    $replicaServer = if ($vmReplication.ReplicaServerName) { $vmReplication.ReplicaServerName } else { "" }
-                    Write-DebugInfo "    Replication enabled: State=$replicationState, Mode=$replicationMode, Health=$replicationHealth"
-                } else {
-                    Write-DebugInfo "    Replication not enabled for this VM"
-                }
-            } catch {
-                Write-DebugInfo "    Error getting replication status: $($_.Exception.Message)"
-            }
-            
             $vmData = @{
                 "{#VM.NAME}" = $vm.Name
                 "{#VM.ID}" = $vm.Id.ToString()
@@ -440,6 +584,17 @@ function Get-VMDiscoveryData {
                 "{#VM.CHECKPOINT.NEWEST.CREATED}" = $checkpointSummary.NewestCreated
                 "{#VM.CHECKPOINT.NEWEST.EPOCH}" = $checkpointSummary.NewestEpoch.ToString()
                 "{#VM.CHECKPOINT.NEWEST.AGE}" = $checkpointSummary.NewestAge.ToString()
+                # Checkpoints minus the recovery points Hyper-V Replica manages itself
+                "{#VM.CHECKPOINT.USER.COUNT}" = $checkpointSummary.UserCount.ToString()
+                "{#VM.CHECKPOINT.USER.OLDEST.NAME}" = $checkpointSummary.UserOldestName
+                "{#VM.CHECKPOINT.USER.OLDEST.CREATED}" = $checkpointSummary.UserOldestCreated
+                "{#VM.CHECKPOINT.USER.OLDEST.EPOCH}" = $checkpointSummary.UserOldestEpoch.ToString()
+                "{#VM.CHECKPOINT.USER.OLDEST.AGE}" = $checkpointSummary.UserOldestAge.ToString()
+                "{#VM.CHECKPOINT.USER.NEWEST.NAME}" = $checkpointSummary.UserNewestName
+                "{#VM.CHECKPOINT.USER.NEWEST.CREATED}" = $checkpointSummary.UserNewestCreated
+                "{#VM.CHECKPOINT.USER.NEWEST.EPOCH}" = $checkpointSummary.UserNewestEpoch.ToString()
+                "{#VM.CHECKPOINT.USER.NEWEST.AGE}" = $checkpointSummary.UserNewestAge.ToString()
+                "{#VM.CHECKPOINT.REPLICA.COUNT}" = $checkpointSummary.ReplicaCount.ToString()
                 # -InputObject so a VM with a single nic/disk/dvd/checkpoint still
                 # yields a json array in these embedded payloads, not a bare object
                 "{#VM.NETWORK.INFO}" = (ConvertTo-Json -InputObject $networkInfo -Compress)
@@ -447,14 +602,27 @@ function Get-VMDiscoveryData {
                 "{#VM.DVD.INFO}" = (ConvertTo-Json -InputObject $dvdInfo -Compress)
                 "{#VM.INTEGRATION.INFO}" = (ConvertTo-Json -InputObject $integrationInfo -Compress)
                 "{#VM.CHECKPOINT.INFO}" = (ConvertTo-Json -InputObject $checkpointInfo -Compress)
-                "{#VM.REPLICATION.ENABLED}" = $replicationEnabled.ToString()
-                "{#VM.REPLICATION.STATE}" = $replicationState
-                "{#VM.REPLICATION.MODE}" = $replicationMode
-                "{#VM.REPLICATION.HEALTH}" = $replicationHealth
-                "{#VM.REPLICATION.FREQUENCY}" = $replicationFrequency.ToString()
-                "{#VM.REPLICATION.LAST.TIME}" = $lastReplicationTime
-                "{#VM.REPLICATION.PRIMARY.SERVER}" = $primaryServer
-                "{#VM.REPLICATION.REPLICA.SERVER}" = $replicaServer
+                "{#VM.REPLICATION.ENABLED}" = $replicationSummary.Enabled.ToString()
+                "{#VM.REPLICATION.STATE}" = $replicationSummary.State
+                "{#VM.REPLICATION.MODE}" = $replicationSummary.Mode
+                "{#VM.REPLICATION.HEALTH}" = $replicationSummary.Health
+                "{#VM.REPLICATION.FREQUENCY}" = $replicationSummary.Frequency.ToString()
+                "{#VM.REPLICATION.LAST.TIME}" = $replicationSummary.LastTime
+                "{#VM.REPLICATION.LAST.EPOCH}" = $replicationSummary.LastEpoch.ToString()
+                "{#VM.REPLICATION.LAST.AGE}" = $replicationSummary.LastAge.ToString()
+                "{#VM.REPLICATION.PRIMARY.SERVER}" = $replicationSummary.PrimaryServer
+                "{#VM.REPLICATION.REPLICA.SERVER}" = $replicationSummary.ReplicaServer
+                "{#VM.REPLICATION.RECOVERY.HISTORY}" = $replicationSummary.RecoveryHistory.ToString()
+                "{#VM.REPLICATION.VSS.FREQUENCY}" = $replicationSummary.VSSFrequencyHours.ToString()
+                "{#VM.REPLICATION.PENDING.SIZE}" = $replicationSummary.PendingSize.ToString()
+                "{#VM.REPLICATION.AVG.SIZE}" = $replicationSummary.AvgSize.ToString()
+                "{#VM.REPLICATION.MAX.SIZE}" = $replicationSummary.MaxSize.ToString()
+                "{#VM.REPLICATION.AVG.LATENCY}" = $replicationSummary.AvgLatency.ToString()
+                "{#VM.REPLICATION.MAX.LATENCY}" = $replicationSummary.MaxLatency.ToString()
+                "{#VM.REPLICATION.SUCCESS.COUNT}" = $replicationSummary.SuccessCount.ToString()
+                "{#VM.REPLICATION.MISSED.COUNT}" = $replicationSummary.MissedCount.ToString()
+                "{#VM.REPLICATION.ERROR.COUNT}" = $replicationSummary.ErrorCount.ToString()
+                "{#VM.REPLICATION.STATS.WINDOW}" = $replicationSummary.StatsWindow.ToString()
                 "{#VMHOST.NAME}" = $hostName
                 "{#VMHOST.FQDN}" = $hostFQDN
             }
@@ -799,6 +967,8 @@ function Get-VMDetailsById {
         $vmIntegrationServices = Get-VMIntegrationService -VM $vm -ErrorAction Stop
         $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
         $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
+        Write-DebugInfo "Getting replication status for $($vm.Name)"
+        $replicationSummary = Get-ReplicationSummary -VM $vm
 
         # Build network adapter LLD data
         Write-DebugInfo "Building network adapter LLD data for $($vm.Name)"
@@ -1043,7 +1213,39 @@ function Get-VMDetailsById {
                 "{#VM.CHECKPOINT.NEWEST.CREATED}" = $checkpointSummary.NewestCreated
                 "{#VM.CHECKPOINT.NEWEST.EPOCH}" = $checkpointSummary.NewestEpoch.ToString()
                 "{#VM.CHECKPOINT.NEWEST.AGE}" = $checkpointSummary.NewestAge.ToString()
+                # Checkpoints minus the recovery points Hyper-V Replica manages itself
+                "{#VM.CHECKPOINT.USER.COUNT}" = $checkpointSummary.UserCount.ToString()
+                "{#VM.CHECKPOINT.USER.OLDEST.NAME}" = $checkpointSummary.UserOldestName
+                "{#VM.CHECKPOINT.USER.OLDEST.CREATED}" = $checkpointSummary.UserOldestCreated
+                "{#VM.CHECKPOINT.USER.OLDEST.EPOCH}" = $checkpointSummary.UserOldestEpoch.ToString()
+                "{#VM.CHECKPOINT.USER.OLDEST.AGE}" = $checkpointSummary.UserOldestAge.ToString()
+                "{#VM.CHECKPOINT.USER.NEWEST.NAME}" = $checkpointSummary.UserNewestName
+                "{#VM.CHECKPOINT.USER.NEWEST.CREATED}" = $checkpointSummary.UserNewestCreated
+                "{#VM.CHECKPOINT.USER.NEWEST.EPOCH}" = $checkpointSummary.UserNewestEpoch.ToString()
+                "{#VM.CHECKPOINT.USER.NEWEST.AGE}" = $checkpointSummary.UserNewestAge.ToString()
+                "{#VM.CHECKPOINT.REPLICA.COUNT}" = $checkpointSummary.ReplicaCount.ToString()
                 "{#VM.CHECKPOINT.INFO}" = (ConvertTo-Json -InputObject $checkpointSummary.Info -Compress)
+                "{#VM.REPLICATION.ENABLED}" = $replicationSummary.Enabled.ToString()
+                "{#VM.REPLICATION.STATE}" = $replicationSummary.State
+                "{#VM.REPLICATION.MODE}" = $replicationSummary.Mode
+                "{#VM.REPLICATION.HEALTH}" = $replicationSummary.Health
+                "{#VM.REPLICATION.FREQUENCY}" = $replicationSummary.Frequency.ToString()
+                "{#VM.REPLICATION.LAST.TIME}" = $replicationSummary.LastTime
+                "{#VM.REPLICATION.LAST.EPOCH}" = $replicationSummary.LastEpoch.ToString()
+                "{#VM.REPLICATION.LAST.AGE}" = $replicationSummary.LastAge.ToString()
+                "{#VM.REPLICATION.PRIMARY.SERVER}" = $replicationSummary.PrimaryServer
+                "{#VM.REPLICATION.REPLICA.SERVER}" = $replicationSummary.ReplicaServer
+                "{#VM.REPLICATION.RECOVERY.HISTORY}" = $replicationSummary.RecoveryHistory.ToString()
+                "{#VM.REPLICATION.VSS.FREQUENCY}" = $replicationSummary.VSSFrequencyHours.ToString()
+                "{#VM.REPLICATION.PENDING.SIZE}" = $replicationSummary.PendingSize.ToString()
+                "{#VM.REPLICATION.AVG.SIZE}" = $replicationSummary.AvgSize.ToString()
+                "{#VM.REPLICATION.MAX.SIZE}" = $replicationSummary.MaxSize.ToString()
+                "{#VM.REPLICATION.AVG.LATENCY}" = $replicationSummary.AvgLatency.ToString()
+                "{#VM.REPLICATION.MAX.LATENCY}" = $replicationSummary.MaxLatency.ToString()
+                "{#VM.REPLICATION.SUCCESS.COUNT}" = $replicationSummary.SuccessCount.ToString()
+                "{#VM.REPLICATION.MISSED.COUNT}" = $replicationSummary.MissedCount.ToString()
+                "{#VM.REPLICATION.ERROR.COUNT}" = $replicationSummary.ErrorCount.ToString()
+                "{#VM.REPLICATION.STATS.WINDOW}" = $replicationSummary.StatsWindow.ToString()
                 "{#VM.INTEGRATION.INFO}" = (ConvertTo-Json -InputObject (Get-IntegrationServiceInfo -Services $vmIntegrationServices) -Compress)
             }
             "networks" = @($networkLLD)
