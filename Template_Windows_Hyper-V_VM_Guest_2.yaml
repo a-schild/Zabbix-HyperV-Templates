@@ -926,15 +926,26 @@ zabbix_export:
               value: state
           triggers:
             - uuid: 4ed6504fe4e44ba6a5bffa747f9ac483
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.state)="Running" and (last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.heartbeat)="NoContact" or last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.heartbeat)="LostCommunication")'
+              expression: '{$VM.HEARTBEAT.CHECK}=1 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.state)="Running" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.guest.os.name)<>"" and (last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.heartbeat)="NoContact" or last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.heartbeat)="LostCommunication")'
               name: 'Hyper-V: no heartbeat from {HOST.NAME}'
               priority: AVERAGE
               description: |
-                The VM is running but the guest is not answering the heartbeat service.
-                The operating system has hung, is still booting, or the integration
-                services are stopped or missing.
-                Only evaluated while the VM is Running, a stopped VM legitimately has
-                no heartbeat.
+                The VM is running but the guest stopped answering the heartbeat service:
+                the operating system has hung, is still booting, or its integration
+                services were stopped.
+
+                Three guards keep this off VMs that never had a heartbeat to begin with,
+                which is the normal state for an appliance or an OS Hyper-V has no
+                integration components for:
+
+                - the VM must be Running, a stopped VM legitimately has no heartbeat
+                - the guest must report an OS name over the KVP exchange service. A guest
+                  with no integration components publishes nothing, so an empty OS name
+                  means "this VM never talks to the host", not "this VM stopped talking".
+                  A guest that hangs keeps its last published values, so a genuine hang
+                  still fires.
+                - {$VM.HEARTBEAT.CHECK} must be 1. Set it to 0 on any VM host that should
+                  never be heartbeat checked, whatever the reason.
         - uuid: 17bc2489e6834cdcb20e40235c6e5298
           name: 'Operational status'
           type: DEPENDENT
@@ -4246,6 +4257,19 @@ zabbix_export:
           description: |
             Warn when the oldest checkpoint of a VM is older than this.
             Hyper-V Replica recovery points are ignored.
+        - macro: '{$VM.HEARTBEAT.CHECK}'
+          value: '1'
+          description: |
+            Set to 0 to stop checking the guest heartbeat of a VM.
+
+            The trigger already ignores VMs that never had a heartbeat, by requiring the
+            guest to report an OS name over KVP. Use this macro for the rest: an
+            appliance whose vendor ships partial integration components, a guest that
+            publishes KVP data but no heartbeat, or any VM you simply do not want
+            heartbeat alerts for.
+
+            Set it on the individual VM host, not on the template, unless you want to
+            switch the check off everywhere.
         - macro: '{$VM.MEMORY.PRESSURE.MAX}'
           value: '90'
           description: |

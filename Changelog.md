@@ -155,6 +155,19 @@
     flag before calling Measure-VM, so hosts that never enable it pay nothing.
     Unlike the CPU usage spot sample, the metered CPU figure is a true average
     over the period.
+  - The heartbeat trigger no longer fires on VMs that never had a heartbeat.
+    Reported from a real deployment: a guest with no Hyper-V integration
+    components - an appliance, an unsupported OS, a Linux guest without
+    hyperv-daemons - is reported as NoContact permanently, because it never had
+    contact to lose, and the trigger treated that as a hung VM.
+    It now also requires the guest to report an OS name over the KVP exchange
+    service. A guest with no integration components publishes nothing, so an
+    empty OS name means "never talks to the host" rather than "stopped talking".
+    A guest that hangs keeps its last published KVP values, so a genuine hang
+    still alerts.
+    New {$VM.HEARTBEAT.CHECK} macro (default 1) switches the check off for a
+    single VM host, for anything the automatic filter does not catch.
+    Template change only, no need to redeploy hyper-v-monitoring2.ps1.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and

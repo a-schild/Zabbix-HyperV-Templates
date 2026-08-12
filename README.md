@@ -255,6 +255,27 @@ averages since the last `Reset-VMResourceMetering`, which is the one honest sour
 average CPU in MHz, normalised IOPS and disk latency per VM. `Resource metering
 enabled` shows the current state.
 
+## Troubleshooting by alert
+
+**`Hyper-V: no heartbeat from <VM>`** on a VM that is perfectly healthy.
+The guest has no working Hyper-V integration components — an appliance, an OS Hyper-V
+has no components for, or a Linux guest without `hyperv-daemons` installed. Hyper-V
+reports such a VM as `NoContact` forever, because it never had contact to lose.
+
+The trigger already filters most of these out: it only fires when the guest reports an
+OS name over the KVP exchange service, which a VM without integration components never
+does. A VM whose OS *hangs* keeps its last published KVP values, so a real hang still
+alerts.
+
+If a VM still alerts wrongly — a guest that publishes KVP data but no heartbeat, for
+instance — switch the check off for that VM alone:
+
+*Data collection* → *Hosts* → the `<guid> <fqdn>` host → *Macros* → *Inherited and host
+macros* → set `{$VM.HEARTBEAT.CHECK}` to `0`.
+
+Setting it on the template instead disables the heartbeat check for every VM, which is
+rarely what you want.
+
 ## Troubleshooting by error message
 
 **`Cannot inherit LLD rule with key "hyperv.discover.vms" ... because a host
