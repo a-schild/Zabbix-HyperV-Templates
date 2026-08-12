@@ -1,6 +1,7 @@
 # Changelog
 
-- 2026-08-12 (unreleased)
+- 2026-08-12
+  - Release v2.1.0
   - Checkpoint triggers no longer fire on Hyper-V Replica recovery points.
     Get-VMSnapshot returns those next to normal checkpoints, so a replica VM
     configured for additional hourly recovery points ("Abdeckung durch
@@ -186,7 +187,7 @@
     checkpoint count alongside).
     The existing page is now named 'Overview'.
 
-- 2026-08-10 (unreleased)
+- 2026-08-10 (part of v2.1.0)
   - README: added a Requirements section and a troubleshooting section keyed on
     the actual error messages (#39). It now states that the Hyper-V host needs
     a Zabbix Agent interface, and that the VM guest items are passive checks,
