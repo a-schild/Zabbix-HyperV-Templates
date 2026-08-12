@@ -56,7 +56,7 @@ everything else is `DEPENDENT` on it:
   call the script. VM counts, replication items, the `Hyper-V VM Discovery` LLD rule and the
   `Hyper-V VM Host Prototype Discovery` rule all hang off them as dependent items/rules.
 - Guest template: `hyperv.discovery.vmdetails[{$VM.ID}]` is the single master item; the three LLD
-  rules (disks, regular NICs, legacy NICs) and ~73 template-level items parse it. Its payload has
+  rules (disks, regular NICs, legacy NICs) and ~76 template-level items parse it. Its payload has
   four roots — `vm_info`, `networks`, `disks`, `checkpoints`.
 
 When adding anything, make it dependent on an existing master item. A new LLD rule or item that
@@ -131,6 +131,11 @@ data comes from `Get-VMReplication`, never from the VM object. What *is* reliabl
 `CPUUsage` (a spot sample, not an average — see `Get-VMRuntimeInfo`), `MemoryAssigned`,
 `MemoryDemand` (populated even with dynamic memory off), `Heartbeat`, `PrimaryOperationalStatus`
 (enum, unlike the localized `Status`) and `SmartPagingFileInUse`.
+
+**VLAN needs no extra cmdlet.** `Get-VMNetworkAdapter` already returns the full VLAN setting
+object on `.VlanSetting` — the same type `Get-VMNetworkAdapterVlan` returns — so mode, native VLAN
+and allowed list are free. `AccessVlanId` on its own is ambiguous: it reads 0 both for an untagged
+adapter and for a trunk, hence `{#ADAPTER.VLAN.MODE}` alongside it.
 
 **Agent config requirements:** `UnsafeUserParameters=1` (counter paths contain backslashes) and a
 raised agent `Timeout` (15–30s; items are set to `timeout: 30s`).

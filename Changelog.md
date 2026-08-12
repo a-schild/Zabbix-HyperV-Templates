@@ -87,6 +87,19 @@
     Not collected, having been checked on a real host and found unusable:
     MemoryStatus and IntegrationServicesState are empty and
     IntegrationServicesVersion reads 0.0 on current guests.
+  - VLAN mode per network adapter. The templates already had a VLAN item, but it
+    reported AccessVlanId alone, which is ambiguous: it reads 0 for an untagged
+    adapter AND for a trunk, whose configuration actually lives in the native
+    VLAN and the allowed list. Three new item prototypes on the network
+    discovery rule report the operation mode (Untagged, Access, Trunk,
+    Private), the native VLAN and the allowed VLAN list.
+    No extra cost: Get-VMNetworkAdapter already returns the complete VLAN
+    setting object on .VlanSetting, the same type Get-VMNetworkAdapterVlan
+    hands back, so no additional cmdlet call is needed.
+  - VM security items: virtual TPM, shielded, and whether saved state and live
+    migration traffic are encrypted. One Get-VMSecurity call per VM, all values
+    pure configuration, everything defaulting to False on hosts where the
+    cmdlet is unavailable.
   - Replication page on the VM dashboard. The VM Guest template's dashboard
     gained a second page, 'Replication', with four graphs: latency and lag
     (average and maximum cycle latency, time since the last replication, and

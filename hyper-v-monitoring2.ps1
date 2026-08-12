@@ -180,6 +180,66 @@ function Get-CheckpointSummary {
     return $summary
 }
 
+# VLAN configuration of one network adapter.
+# No Get-VMNetworkAdapterVlan call needed: Get-VMNetworkAdapter already hands back the
+# whole VLAN setting object on .VlanSetting, the same type that cmdlet returns.
+# AccessVlanId on its own is ambiguous - it reads 0 for an untagged adapter AND for a
+# trunk, whose real configuration lives in the native VLAN and the allowed list - which
+# is why the mode is reported next to it.
+function Get-AdapterVlanInfo {
+    param($Adapter)
+
+    $info = @{
+        "AccessVlanId" = "0"
+        "Mode" = "Unknown"
+        "NativeVlanId" = "0"
+        "AllowedList" = ""
+    }
+
+    try {
+        $vlan = $Adapter.VlanSetting
+        if ($vlan) {
+            if ($null -ne $vlan.AccessVlanId) { $info["AccessVlanId"] = $vlan.AccessVlanId.ToString() }
+            if ($vlan.OperationMode) { $info["Mode"] = $vlan.OperationMode.ToString() }
+            if ($null -ne $vlan.NativeVlanId) { $info["NativeVlanId"] = $vlan.NativeVlanId.ToString() }
+            if ($vlan.AllowedVlanIdListString) { $info["AllowedList"] = $vlan.AllowedVlanIdListString }
+        }
+    } catch {
+        Write-DebugInfo "    Error reading VLAN settings: $($_.Exception.Message)"
+    }
+
+    return $info
+}
+
+# Security posture of a VM: TPM, shielding and encrypted state/migration traffic.
+# Get-VMSecurity is one extra call per VM, but the values are pure configuration so
+# they suit the long vmdetails interval. Everything defaults to False, which is also
+# what a host too old for the cmdlet reports.
+function Get-VMSecurityInfo {
+    param($VM)
+
+    $info = @{
+        "TpmEnabled" = "False"
+        "Shielded" = "False"
+        "EncryptMigration" = "False"
+    }
+
+    try {
+        $security = Get-VMSecurity -VM $VM -ErrorAction SilentlyContinue
+        if ($security) {
+            if ($null -ne $security.TpmEnabled) { $info["TpmEnabled"] = $security.TpmEnabled.ToString() }
+            if ($null -ne $security.Shielded) { $info["Shielded"] = $security.Shielded.ToString() }
+            if ($null -ne $security.EncryptStateAndVmMigrationTraffic) {
+                $info["EncryptMigration"] = $security.EncryptStateAndVmMigrationTraffic.ToString()
+            }
+        }
+    } catch {
+        Write-DebugInfo "    Error getting VM security: $($_.Exception.Message)"
+    }
+
+    return $info
+}
+
 # Runtime figures that the Get-VM object already carries, so collecting them costs
 # nothing beyond the Get-VM call both payloads already make.
 # Deliberately NOT taken from here: MemoryStatus and IntegrationServicesState come
@@ -508,13 +568,17 @@ function Get-VMDiscoveryData {
             foreach ($adapter in $vmNetworkAdapters) {
                 try {
                     Write-DebugInfo "    Processing adapter: $($adapter.Name)"
+                    $vlanInfo = Get-AdapterVlanInfo -Adapter $adapter
                     $networkInfo += @{
                         "Name" = $adapter.Name
                         "NameTranslated" = ConvertToEnglish -Value $adapter.Name
                         "SwitchName" = $adapter.SwitchName
                         "MacAddress" = $adapter.MacAddress
                         "Connected" = $adapter.Connected.ToString()
-                        "VlanId" = $adapter.VlanSetting.AccessVlanId
+                        "VlanId" = $vlanInfo.AccessVlanId
+                        "VlanMode" = $vlanInfo.Mode
+                        "VlanNative" = $vlanInfo.NativeVlanId
+                        "VlanAllowed" = $vlanInfo.AllowedList
                     }
                 } catch {
                     Write-DebugInfo "    Error processing adapter $($adapter.Name): $($_.Exception.Message)"
@@ -578,6 +642,7 @@ function Get-VMDiscoveryData {
 
             # Get replication information
             $runtimeInfo = Get-VMRuntimeInfo -VM $vm
+            $securityInfo = Get-VMSecurityInfo -VM $vm
             Write-DebugInfo "  Runtime: cpu=$($runtimeInfo.CpuUsage)% memoryPressure=$($runtimeInfo.MemoryPressure)% heartbeat=$($runtimeInfo.Heartbeat)"
 
             Write-DebugInfo "  Getting replication status for $($vm.Name)"
@@ -609,6 +674,9 @@ function Get-VMDiscoveryData {
                 "{#VM.SMART.PAGING.IN.USE}" = $runtimeInfo.SmartPagingInUse
                 "{#VM.CLUSTERED}" = $runtimeInfo.Clustered
                 "{#VM.METERING.ENABLED}" = $runtimeInfo.MeteringEnabled
+                "{#VM.SECURITY.TPM}" = $securityInfo.TpmEnabled
+                "{#VM.SECURITY.SHIELDED}" = $securityInfo.Shielded
+                "{#VM.SECURITY.ENCRYPT.MIGRATION}" = $securityInfo.EncryptMigration
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()
@@ -775,7 +843,7 @@ function Get-VMNetworkDiscovery {
                             "{#ADAPTER.IS.LEGACY}" = $isLegacy.ToString()
                             "{#ADAPTER.SWITCH}" = $adapter.SwitchName
                             "{#ADAPTER.MAC}" = $adapter.MacAddress
-                            "{#ADAPTER.VLAN}" = $adapter.VlanSetting.AccessVlanId.ToString()
+                            "{#ADAPTER.VLAN}" = (Get-AdapterVlanInfo -Adapter $adapter).AccessVlanId
                         }
                     } catch {
                         Write-DebugInfo "    Error processing adapter: $($_.Exception.Message)"
@@ -1020,6 +1088,7 @@ function Get-VMDetailsById {
         $checkpoints = Get-VMSnapshot -VM $vm -ErrorAction SilentlyContinue
         $checkpointSummary = Get-CheckpointSummary -Checkpoints $checkpoints
         $runtimeInfo = Get-VMRuntimeInfo -VM $vm
+        $securityInfo = Get-VMSecurityInfo -VM $vm
         Write-DebugInfo "Getting replication status for $($vm.Name)"
         $replicationSummary = Get-ReplicationSummary -VM $vm
 
@@ -1094,16 +1163,14 @@ function Get-VMDetailsById {
                     "{#ADAPTER.CONNECTED}" = if ($adapter.Connected -ne $null) { $adapter.Connected.ToString() } else { "Unknown" }
                 }
 
-                # VLAN settings - handle safely
-                try {
-                    if ($adapter.VlanSetting -and $adapter.VlanSetting.AccessVlanId) {
-                        $adapterData["{#ADAPTER.VLAN}"] = $adapter.VlanSetting.AccessVlanId.ToString()
-                    } else {
-                        $adapterData["{#ADAPTER.VLAN}"] = "0"
-                    }
-                } catch {
-                    $adapterData["{#ADAPTER.VLAN}"] = "0"
-                }
+                # VLAN settings. The mode matters as much as the id: on a trunk the
+                # id reads 0 and the configuration sits in the native vlan and the
+                # allowed list.
+                $vlanInfo = Get-AdapterVlanInfo -Adapter $adapter
+                $adapterData["{#ADAPTER.VLAN}"] = $vlanInfo.AccessVlanId
+                $adapterData["{#ADAPTER.VLAN.MODE}"] = $vlanInfo.Mode
+                $adapterData["{#ADAPTER.VLAN.NATIVE}"] = $vlanInfo.NativeVlanId
+                $adapterData["{#ADAPTER.VLAN.ALLOWED}"] = $vlanInfo.AllowedList
 
                 # Optional properties - add only if they exist
                 if ($adapter.PSObject.Properties["DynamicMacAddressEnabled"]) {
@@ -1167,6 +1234,9 @@ function Get-VMDetailsById {
                     "{#ADAPTER.MAC}" = "Error"
                     "{#ADAPTER.CONNECTED}" = "Error"
                     "{#ADAPTER.VLAN}" = "0"
+                    "{#ADAPTER.VLAN.MODE}" = "Unknown"
+                    "{#ADAPTER.VLAN.NATIVE}" = "0"
+                    "{#ADAPTER.VLAN.ALLOWED}" = ""
                 }
             }
         }
@@ -1249,6 +1319,9 @@ function Get-VMDetailsById {
                 "{#VM.SMART.PAGING.IN.USE}" = $runtimeInfo.SmartPagingInUse
                 "{#VM.CLUSTERED}" = $runtimeInfo.Clustered
                 "{#VM.METERING.ENABLED}" = $runtimeInfo.MeteringEnabled
+                "{#VM.SECURITY.TPM}" = $securityInfo.TpmEnabled
+                "{#VM.SECURITY.SHIELDED}" = $securityInfo.Shielded
+                "{#VM.SECURITY.ENCRYPT.MIGRATION}" = $securityInfo.EncryptMigration
                 "{#VM.CPU.COUNT}" = $vmProcessor.Count.ToString()
                 "{#VM.CPU.RESERVE}" = $vmProcessor.Reserve.ToString()
                 "{#VM.CPU.MAXIMUM}" = $vmProcessor.Maximum.ToString()

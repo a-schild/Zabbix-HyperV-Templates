@@ -1057,6 +1057,74 @@ zabbix_export:
           tags:
             - tag: component
               value: config
+        - uuid: 7789c910e82f4afeae2c1cf285387669
+          name: 'Security: virtual TPM'
+          type: DEPENDENT
+          key: hyperv.vm.security.tpm
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            True when the VM has a virtual TPM. Required by BitLocker and by Windows 11
+            guests. Generation 2 VMs only, a Generation 1 VM always reports False.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SECURITY.TPM}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: security
+        - uuid: c1518b245c7140d3b33c761f95bc5cc9
+          name: 'Security: shielded'
+          type: DEPENDENT
+          key: hyperv.vm.security.shielded
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            True when the VM is shielded: its disks are encrypted and the host
+            administrator cannot open a console, inspect the memory or attach a debugger.
+            Needs a Host Guardian Service, so False on a standalone host.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SECURITY.SHIELDED}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: security
+        - uuid: 9f24315460e34935a2eb3ecb8825f2ba
+          name: 'Security: state and migration traffic encrypted'
+          type: DEPENDENT
+          key: hyperv.vm.security.encrypt.migration
+          delay: '0'
+          value_type: CHAR
+          trends: '0'
+          description: |
+            True when saved state and live migration traffic are encrypted. Without it a
+            live migration moves guest memory over the network in the clear, which is
+            worth knowing on a network shared with anything else.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.vm_info["{#VM.SECURITY.ENCRYPT.MIGRATION}"]'
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1d
+          master_item:
+            key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+          tags:
+            - tag: component
+              value: security
         - uuid: 5bd59090c2084b32ad5dd581f1e4172a
           name: 'VM name'
           type: DEPENDENT
@@ -2592,6 +2660,146 @@ zabbix_export:
                       throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
               master_item:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 7e0d5c8a34fb4a6ea1c4a9e7f9c0b1d2
+              name: '{#ADAPTER.SHORTNAME} - VLAN mode'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.vlan.mode[{#ADAPTER.ID}]'
+              delay: '0'
+              description: |
+                VLAN operation mode of adapter {#ADAPTER.NAME}: Untagged, Access, Trunk, Private or Unknown.
+                Read this together with the VLAN ID: an ID of 0 means untagged on an Access
+                adapter but says nothing on a Trunk, where the native VLAN and the allowed
+                list carry the configuration.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN.MODE}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: 9a1f6b3d20e94c8fb5d7e2a8c14f6079
+              name: '{#ADAPTER.SHORTNAME} - VLAN native'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.vlan.native[{#ADAPTER.ID}]'
+              delay: '0'
+              description: |
+                Native VLAN of adapter {#ADAPTER.NAME}, the VLAN untagged frames land in on a Trunk
+                adapter. 0 on Access and Untagged adapters.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN.NATIVE}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
+            - uuid: c5b83e197d6f4a2e8093f4a1b6d2c7e5
+              name: '{#ADAPTER.SHORTNAME} - VLAN allowed list'
+              type: DEPENDENT
+              key: 'hyperv.vm.network.vlan.allowed[{#ADAPTER.ID}]'
+              delay: '0'
+              description: |
+                VLANs a Trunk adapter is allowed to carry, as Hyper-V formats the list (for example
+                "1-10,20"). Empty on Access and Untagged adapters.
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var data = JSON.parse(value);
+                      var adapterId = "{#ADAPTER.ID.JS}";
+                      var adapterIdMacro= "{"+"#ADAPTER.ID}";
+                      var searchKey= "{"+"#ADAPTER.VLAN.ALLOWED}";
+                      
+                      // Debug: Return info about what we found
+                      if (!data.networks || data.networks.length === 0) {
+                        throw "ZBX_UNSUPPORTED: No networks array found in data. Keys: " + Object.keys(data).join(", ");
+                      }
+                      
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        if (adapter[adapterIdMacro] === adapterId) {
+                          var connected = adapter[searchKey];
+                          if (connected === undefined || connected === null) {
+                            throw "ZBX_UNSUPPORTED: Field {"+searchKey+"} not found. Available fields: " + Object.keys(adapter).join(", ");
+                          }
+                          return connected;
+                        }
+                      }
+                      
+                      // Debug: Show what adapter IDs we found and their structure
+                      var foundIds = [];
+                      var firstAdapterKeys = [];
+                      for (var i = 0; i < data.networks.length; i++) {
+                        var adapter = data.networks[i];
+                        foundIds.push(adapter[adapterIdMacro] || "undefined");
+                        if (i === 0) {
+                          firstAdapterKeys = Object.keys(adapter);
+                        }
+                      }
+                      throw "ZBX_UNSUPPORTED: Adapter ID '" + adapterId + "' not found. Found " + data.networks.length + " adapters: " + foundIds.join(", ") + ". First adapter keys: " + firstAdapterKeys.join(", ");
+              master_item:
+                key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
             - uuid: 5f4cb2167042457b837dbe55575d1059
               name: '{#ADAPTER.SHORTNAME} - Broadcast Packets Received/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Network Adapter({#VM.NAME}_{#ADAPTER.NAME}_{#ADAPTER.COUNTER})\Broadcast Packets Received/sec",30]'
@@ -2855,6 +3063,12 @@ zabbix_export:
               path: '$["{#ADAPTER.SWITCH}"]'
             - lld_macro: '{#ADAPTER.VLAN}'
               path: '$["{#ADAPTER.VLAN}"]'
+            - lld_macro: '{#ADAPTER.VLAN.ALLOWED}'
+              path: '$["{#ADAPTER.VLAN.ALLOWED}"]'
+            - lld_macro: '{#ADAPTER.VLAN.MODE}'
+              path: '$["{#ADAPTER.VLAN.MODE}"]'
+            - lld_macro: '{#ADAPTER.VLAN.NATIVE}'
+              path: '$["{#ADAPTER.VLAN.NATIVE}"]'
             - lld_macro: '{#ADAPTER.VM.QUEUE}'
               path: '$["{#ADAPTER.VM.QUEUE}"]'
             - lld_macro: '{#VM.NAME}'
@@ -3162,6 +3376,12 @@ zabbix_export:
               path: '$["{#ADAPTER.SWITCH}"]'
             - lld_macro: '{#ADAPTER.VLAN}'
               path: '$["{#ADAPTER.VLAN}"]'
+            - lld_macro: '{#ADAPTER.VLAN.ALLOWED}'
+              path: '$["{#ADAPTER.VLAN.ALLOWED}"]'
+            - lld_macro: '{#ADAPTER.VLAN.MODE}'
+              path: '$["{#ADAPTER.VLAN.MODE}"]'
+            - lld_macro: '{#ADAPTER.VLAN.NATIVE}'
+              path: '$["{#ADAPTER.VLAN.NATIVE}"]'
             - lld_macro: '{#ADAPTER.VM.QUEUE}'
               path: '$["{#ADAPTER.VM.QUEUE}"]'
             - lld_macro: '{#VM.NAME}'
