@@ -229,13 +229,14 @@ function Get-GuestKvpInfo {
     if (-not $KvpComponent) { return $info }
 
     # Each entry is a CIM XML document holding a Name/Data pair
-	$wanted = @{
-		"OSName" = "OsName"
-		"OSVersion" = "OsVersion"
-		"OSBuildNumber" = "OsBuild"
-		"FullyQualifiedDomainName" = "Fqdn"
-		"IntegrationServicesVersion" = "IcVersion"
-	}
+    $wanted = @{
+        "OSName" = "OsName"
+        "OSVersion" = "OsVersion"
+        "OSBuildNumber" = "OsBuild"
+        "FullyQualifiedDomainName" = "Fqdn"
+        "NetworkAddressIPv4" = "Ipv4"
+        "IntegrationServicesVersion" = "IcVersion"
+    }
 
     foreach ($entry in @($KvpComponent.GuestIntrinsicExchangeItems)) {
         try {
@@ -257,39 +258,33 @@ function Get-GuestKvpInfo {
     return $info
 }
 
-	function Get-GuestIPv4Info {
-		param($NetworkAdapters)
+# IPv4 addresses the guest reports on its network adapters, joined with "; ".
+# Get-VMNetworkAdapter already carries them on .IPAddresses, so this costs no extra
+# cmdlet call. The list mixes IPv4 and IPv6; only IPv4 is kept. Like the KVP data it
+# is published by the guest's integration services, so a VM that is off reports nothing.
+# This is the primary source for the guest IP: the KVP value NetworkAddressIPv4 no
+# longer comes back on Windows Server 2025 hosts and is only used as a fallback.
+function Get-GuestIPv4Info {
+    param($NetworkAdapters)
 
-		$ipv4Addresses = @()
+    $ipv4Addresses = @()
 
-		foreach ($adapter in @($NetworkAdapters)) {
-			foreach ($ip in @($adapter.IPAddresses)) {
+    foreach ($adapter in @($NetworkAdapters)) {
+        if (-not $adapter) { continue }
+        foreach ($ip in @($adapter.IPAddresses)) {
+            if ([string]::IsNullOrWhiteSpace($ip)) { continue }
 
-				if ([string]::IsNullOrWhiteSpace($ip)) {
-					continue
-				}
+            $parsedAddress = $null
+            if ([System.Net.IPAddress]::TryParse([string]$ip, [ref]$parsedAddress) -and
+                $parsedAddress.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) {
+                $ipv4Addresses += $parsedAddress.IPAddressToString
+            }
+        }
+    }
 
-				$parsedAddress = $null
+    $ipv4Addresses = @($ipv4Addresses | Sort-Object -Unique)
 
-				if (
-					[System.Net.IPAddress]::TryParse(
-						[string]$ip,
-						[ref]$parsedAddress
-					) -and
-					$parsedAddress.AddressFamily -eq
-						[System.Net.Sockets.AddressFamily]::InterNetwork
-				) {
-					$ipv4Addresses += $parsedAddress.IPAddressToString
-				}
-			}
-		}
-
-		$ipv4Addresses = @(
-			$ipv4Addresses |
-			Sort-Object -Unique
-		)
-
-		return ($ipv4Addresses -join "; ")
+    return ($ipv4Addresses -join "; ")
 }
 
 # Resource metering figures for one VM.
@@ -893,7 +888,8 @@ function Get-VMDiscoveryData {
             $isoInfo = Get-MountedIsoInfo -DvdDrives $vmDvdDrives
             $runtimeInfo = Get-VMRuntimeInfo -VM $vm
             $guestInfo = Get-GuestKvpInfo -KvpComponent $kvpComponents[$vm.Id.ToString()]
-			$guestInfo["Ipv4"] = Get-GuestIPv4Info -NetworkAdapters $vmNetworkAdapters
+            $adapterIpv4 = Get-GuestIPv4Info -NetworkAdapters $vmNetworkAdapters
+            if ($adapterIpv4) { $guestInfo["Ipv4"] = $adapterIpv4 }
             $meteringInfo = Get-VMMeteringInfo -VM $vm
             $securityInfo = Get-VMSecurityInfo -VM $vm
             Write-DebugInfo "  Runtime: cpu=$($runtimeInfo.CpuUsage)% memoryPressure=$($runtimeInfo.MemoryPressure)% heartbeat=$($runtimeInfo.Heartbeat)"
@@ -1368,7 +1364,8 @@ function Get-VMDetailsById {
             Write-DebugInfo "Could not read KVP component: $($_.Exception.Message)"
         }
         $guestInfo = Get-GuestKvpInfo -KvpComponent $kvpComponent
-		$guestInfo["Ipv4"] = Get-GuestIPv4Info -NetworkAdapters $vmNetworkAdapters
+        $adapterIpv4 = Get-GuestIPv4Info -NetworkAdapters $vmNetworkAdapters
+        if ($adapterIpv4) { $guestInfo["Ipv4"] = $adapterIpv4 }
         $meteringInfo = Get-VMMeteringInfo -VM $vm
         $securityInfo = Get-VMSecurityInfo -VM $vm
         Write-DebugInfo "Getting replication status for $($vm.Name)"
