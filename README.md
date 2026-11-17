@@ -124,7 +124,7 @@ To check from the Hyper-V host that the guest now reports its data:
 ```
 
 If this lists the addresses, the guest side is fine. Zabbix picks the values up
-with the next VM details run, by default within 30 minutes.
+with the next VM details run, by default within 29 minutes.
 
 ## Usage
 * Import provided templates in this order
@@ -332,6 +332,11 @@ run in English, look up the wording in the item *VM status (host language)* whil
 an operation runs and add it to the macro. Do not set the macro to an empty value, that
 matches everything and silences the trigger; use `^$` to ignore nothing.
 
+The status also has to stay abnormal for `{$VM.STATUS.DELAY}` (default `45m`, two polls
+in a row with the default 29 minute interval) before the trigger fires, so an operation
+that is over by the next poll raises no problem. Set it to `1m` to alert on the first
+abnormal poll, as before 2.2.0.
+
 **`Disk <id> latency warning`** / **`latency high`** on hosts with slow storage or
 during backup windows.
 The thresholds are macros since 2.2.0: `{$VM.DISK.LATENCY.WARN}` (default `0.015`,
@@ -339,6 +344,10 @@ seconds) and `{$VM.DISK.LATENCY.HIGH}` (default `0.025`). `{$VM.DISK.LATENCY.CHE
 set to `0` switches both triggers off. Set them on a single VM host. The discovered VM
 hosts do not inherit macros from the Hyper-V host, so for all VMs of one Hyper-V host
 set them on the VM host prototype of that host's discovery rule instead.
+
+The fragmentation and dynamic disk allocation triggers work the same way:
+`{$VM.DISK.FRAGMENTATION.WARN}` / `.AVERAGE` / `.HIGH` (default `20` / `50` / `80`
+percent) and `{$VM.DISK.ALLOCATED.WARN}` / `.FULL` (default `80` / `99` percent).
 
 ## Troubleshooting by error message
 

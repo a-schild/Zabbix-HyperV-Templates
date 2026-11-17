@@ -1625,7 +1625,7 @@ zabbix_export:
               value: state
           triggers:
             - uuid: 060ec7d23b3d4990b0f2df73d452b71d
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"" and find(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,,"regexp","{$VM.STATUS.IGNORE}")=0'
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"" and find(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,,"regexp","{$VM.STATUS.IGNORE}")=0 and count(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,{$VM.STATUS.DELAY},"eq","Operating normally")=0 and count(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,{$VM.STATUS.DELAY},"regexp","{$VM.STATUS.IGNORE}")=0'
               name: 'Hyper-V: VM status is not normal on {HOST.NAME}'
               priority: WARNING
               description: |
@@ -1635,6 +1635,9 @@ zabbix_export:
 
                 Statuses matching {$VM.STATUS.IGNORE} are planned operations - backup,
                 checkpoint handling, storage migration, export - and do not alert.
+
+                The status also has to stay abnormal for {$VM.STATUS.DELAY}: the trigger
+                waits until that period holds neither a normal nor an ignored status.
         - uuid: ba93b78a94964e25bd11d868b49ec851
           name: 'VM status (host language)'
           type: DEPENDENT
@@ -2348,18 +2351,18 @@ zabbix_export:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
               trigger_prototypes:
                 - uuid: a9f906e6f00e4cb2a291f49452d91303
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=20 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<50'
-                  name: 'Disk {#DISK.ID} fragmentation over 20%'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>={$VM.DISK.FRAGMENTATION.WARN} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<{$VM.DISK.FRAGMENTATION.AVERAGE}'
+                  name: 'Disk {#DISK.ID} fragmentation over {$VM.DISK.FRAGMENTATION.WARN}%'
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: WARNING
                 - uuid: cd03c4cf160c48d087a64e403da62fa2
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=50 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<80'
-                  name: 'Disk {#DISK.ID} fragmentation over 50%'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>={$VM.DISK.FRAGMENTATION.AVERAGE} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<{$VM.DISK.FRAGMENTATION.HIGH}'
+                  name: 'Disk {#DISK.ID} fragmentation over {$VM.DISK.FRAGMENTATION.AVERAGE}%'
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: AVERAGE
                 - uuid: 39161df6465c4df793a72d7b83217b5b
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=80'
-                  name: 'Disk {#DISK.ID} fragmentation over 80%'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>={$VM.DISK.FRAGMENTATION.HIGH}'
+                  name: 'Disk {#DISK.ID} fragmentation over {$VM.DISK.FRAGMENTATION.HIGH}%'
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: HIGH
             - uuid: c3d4e5f678904abca0123456789abce0
@@ -2962,14 +2965,14 @@ zabbix_export:
               timeout: 30s
           trigger_prototypes:
             - uuid: ae22186d99d24d22b36f31708fffc44a
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=99 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
-              name: 'Dynamic disk {#DISK.ID} 100% allocated'
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>={$VM.DISK.ALLOCATED.FULL} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} over {$VM.DISK.ALLOCATED.FULL}% allocated'
               opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
               description: 'Disk allocated size'
             - uuid: 298cb8dd69d3438db995772e56588bdf
-              expression: '(last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=80 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])<99) and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
-              name: 'Dynamic disk {#DISK.ID} over 80% allocated'
+              expression: '(last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>={$VM.DISK.ALLOCATED.WARN} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])<{$VM.DISK.ALLOCATED.FULL}) and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} over {$VM.DISK.ALLOCATED.WARN}% allocated'
               opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
               description: 'Disk allocated'
@@ -4245,15 +4248,16 @@ zabbix_export:
           value: hyper-v-vm
       macros:
         - macro: '{$VM.DETAILS.INTERVAL}'
-          value: 10m
+          value: 29m
           description: |
             How often the Hyper-V host is asked for this VM's details.
 
             RAISE THIS IF THE HOST CPU SUFFERS. Every poll starts a
             powershell.exe, imports the Hyper-V module and walks the VM config
             including Get-VHD on every disk, and it runs once per VM per
-            interval. On a host with 20 VMs the 10m default is one such run
-            every 30 seconds; 30m or 60m makes that far less frequent.
+            interval. On a host with 20 VMs a 10m interval is one such run every
+            30 seconds; the 29m default is one about every 90 seconds, 60m halves
+            that again.
 
             The payload is configuration, inventory and checkpoint data, none of
             which changes by the second, so a longer interval costs little
@@ -4320,6 +4324,42 @@ zabbix_export:
             Never set this to an empty value - an empty expression matches every
             status and silences the trigger completely. To ignore nothing, set it
             to ^$ instead.
+        - macro: '{$VM.STATUS.DELAY}'
+          value: 45m
+          description: |
+            How long the VM status has to stay abnormal before the 'VM status is not
+            normal' trigger fires. The trigger waits until this period contains neither
+            'Operating normally' nor a status matching {$VM.STATUS.IGNORE}, so a short
+            operation that is over by the next poll raises no problem.
+
+            The status is only sampled once per {$VM.DETAILS.INTERVAL}. The default 45m
+            with the default 29m interval means two abnormal polls in a row. Keep it
+            clearly above the interval and not close to a multiple of it. A value
+            below the interval, for example 1m, switches the delay off and the trigger
+            fires on the first abnormal poll as it did before 2.2.0.
+        - macro: '{$VM.DISK.FRAGMENTATION.WARN}'
+          value: '20'
+          description: |
+            Disk fragmentation in percent from which the warning trigger fires.
+        - macro: '{$VM.DISK.FRAGMENTATION.AVERAGE}'
+          value: '50'
+          description: |
+            Disk fragmentation in percent from which the average severity trigger fires.
+            Keep it above {$VM.DISK.FRAGMENTATION.WARN}.
+        - macro: '{$VM.DISK.FRAGMENTATION.HIGH}'
+          value: '80'
+          description: |
+            Disk fragmentation in percent from which the highest fragmentation trigger
+            fires. Keep it above {$VM.DISK.FRAGMENTATION.AVERAGE}.
+        - macro: '{$VM.DISK.ALLOCATED.WARN}'
+          value: '80'
+          description: |
+            Warn when a dynamic disk has allocated this percentage of its maximum size.
+        - macro: '{$VM.DISK.ALLOCATED.FULL}'
+          value: '99'
+          description: |
+            A dynamic disk that has allocated this percentage of its maximum size counts
+            as full. Keep it above {$VM.DISK.ALLOCATED.WARN}.
         - macro: '{$VM.DISK.LATENCY.CHECK}'
           value: '1'
           description: |

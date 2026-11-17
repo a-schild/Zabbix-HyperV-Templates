@@ -9,12 +9,26 @@
     {$VM.STATUS.IGNORE}, a regular expression, are ignored (#67). The default
     covers the English status texts; on Hyper-V hosts in another language add
     the localized wording to the macro.
+  - The same trigger now waits until the status has been abnormal for
+    {$VM.STATUS.DELAY}, 45m by default, which is two polls in a row. A real
+    fault therefore alerts one poll later than before. Set the macro to 1m to
+    get the old behaviour, an alert on the first abnormal poll.
   - Disk latency triggers are configurable. The thresholds were fixed at 15 ms
     and 25 ms; they are now the macros {$VM.DISK.LATENCY.WARN} (0.015) and
     {$VM.DISK.LATENCY.HIGH} (0.025), in seconds, and {$VM.DISK.LATENCY.CHECK}
     set to 0 switches both triggers off (#65). The triggers were renamed to
     'Disk ... latency warning (> ... s)' and 'Disk ... latency high (> ... s)',
     which matters if an action filters on the old trigger names.
+  - Fragmentation and dynamic disk allocation thresholds are macros as well:
+    {$VM.DISK.FRAGMENTATION.WARN} / .AVERAGE / .HIGH (20 / 50 / 80 percent)
+    and {$VM.DISK.ALLOCATED.WARN} / .FULL (80 / 99 percent). These trigger
+    names now show the configured threshold too; 'Dynamic disk ... 100%
+    allocated' became 'Dynamic disk ... over 99% allocated'.
+  - {$VM.DETAILS.INTERVAL} defaults to 29m instead of 10m, the same interval
+    the Hyper-V Host template uses. On a host with 20 VMs the old default
+    started a PowerShell every 30 seconds. VM state, configuration and
+    checkpoint data on the VM hosts now refresh every 29 minutes; set the
+    macro back to 10m if you need the faster refresh.
   - Template only: re-import the VM Guest template. The script is unchanged.
 
 - 2026-11-17
