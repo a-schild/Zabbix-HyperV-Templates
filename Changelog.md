@@ -14,6 +14,12 @@
   - Needs the updated hyper-v-monitoring2.ps1 on the Hyper-V hosts. The
     templates only changed their version number, re-importing them alone
     fixes nothing.
+  - Expect the 'Hyper-V: no heartbeat from <VM>' trigger to become active. It
+    only fires for guests that report an OS name over KVP, and since that field
+    was always empty in 2.1.0 the trigger could never fire. With the fixed
+    script it works as intended, so a guest with a real heartbeat problem can
+    alert for the first time. Set {$VM.HEARTBEAT.CHECK} to 0 on a VM host to
+    switch the check off for that VM.
   - README: Linux guests need the Hyper-V guest daemons (on Ubuntu the package
     linux-cloud-tools-virtual) to report guest OS, FQDN and IP address. New
     section under Requirements and a troubleshooting entry.
