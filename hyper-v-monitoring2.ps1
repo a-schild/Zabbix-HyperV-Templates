@@ -255,36 +255,55 @@ function Get-GuestKvpInfo {
         }
     }
 
+    # NetworkAddressIPv4 is a deprecated KVP key. Depending on the host version it comes
+    # back empty or holds a warning text ("The following Msvm_KvpExchangeDataItem.Name
+    # keys are deprecated: ...") instead of addresses, so keep only what really is one.
+    $info["Ipv4"] = Select-IPv4Address -Values ($info["Ipv4"] -split '[;,\s]+')
+
     return $info
 }
 
-# IPv4 addresses the guest reports on its network adapters, joined with "; ".
-# Get-VMNetworkAdapter already carries them on .IPAddresses, so this costs no extra
-# cmdlet call. The list mixes IPv4 and IPv6; only IPv4 is kept. Like the KVP data it
-# is published by the guest's integration services, so a VM that is off reports nothing.
-# This is the primary source for the guest IP: the KVP value NetworkAddressIPv4 no
-# longer comes back on Windows Server 2025 hosts and is only used as a fallback.
-function Get-GuestIPv4Info {
-    param($NetworkAdapters)
+# Reduces a list of strings to the valid dotted IPv4 addresses in it, unique and sorted,
+# joined with "; ". Everything else - IPv6, empty entries, free text - is dropped.
+# The regex comes first because [IPAddress]::TryParse alone also accepts "5" or "1.2".
+function Select-IPv4Address {
+    param($Values)
 
     $ipv4Addresses = @()
 
-    foreach ($adapter in @($NetworkAdapters)) {
-        if (-not $adapter) { continue }
-        foreach ($ip in @($adapter.IPAddresses)) {
-            if ([string]::IsNullOrWhiteSpace($ip)) { continue }
+    foreach ($value in @($Values)) {
+        $candidate = ([string]$value).Trim()
+        if ($candidate -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { continue }
 
-            $parsedAddress = $null
-            if ([System.Net.IPAddress]::TryParse([string]$ip, [ref]$parsedAddress) -and
-                $parsedAddress.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) {
-                $ipv4Addresses += $parsedAddress.IPAddressToString
-            }
+        $parsedAddress = $null
+        if ([System.Net.IPAddress]::TryParse($candidate, [ref]$parsedAddress)) {
+            $ipv4Addresses += $parsedAddress.IPAddressToString
         }
     }
 
     $ipv4Addresses = @($ipv4Addresses | Sort-Object -Unique)
 
     return ($ipv4Addresses -join "; ")
+}
+
+# IPv4 addresses the guest reports on its network adapters, joined with "; ".
+# Get-VMNetworkAdapter already carries them on .IPAddresses, so this costs no extra
+# cmdlet call. The list mixes IPv4 and IPv6; only IPv4 is kept. Like the KVP data it
+# is published by the guest's integration services, so a VM that is off reports nothing.
+# This is the primary source for the guest IP: the KVP value NetworkAddressIPv4 is
+# deprecated and no longer carries the address on current hosts, so it is only a
+# fallback, and only when it holds real addresses (see Get-GuestKvpInfo).
+function Get-GuestIPv4Info {
+    param($NetworkAdapters)
+
+    $addresses = @()
+
+    foreach ($adapter in @($NetworkAdapters)) {
+        if (-not $adapter) { continue }
+        $addresses += @($adapter.IPAddresses)
+    }
+
+    return (Select-IPv4Address -Values $addresses)
 }
 
 # Resource metering figures for one VM.

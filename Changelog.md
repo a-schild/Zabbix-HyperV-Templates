@@ -1,6 +1,26 @@
 # Changelog
 
 - 2026-11-17
+  - Release v2.1.2
+  - The guest IP item could show a warning text instead of an address. On some
+    hosts the deprecated KVP value NetworkAddressIPv4 holds "The following
+    Msvm_KvpExchangeDataItem.Name keys are deprecated: ..." rather than being
+    empty, and 2.1.1 fell back to that value when the network adapters reported
+    no IPv4 address. The fallback now only accepts real IPv4 addresses (#63).
+    Needs the updated hyper-v-monitoring2.ps1 on the Hyper-V hosts.
+  - 'VM Network Legacy Adapters Discovery' became unsupported on every VM
+    without a legacy adapter, with "no data matches the specified path". Both
+    adapter discovery rules now discover nothing instead of failing when their
+    filter matches no adapter (#62). Re-import the VM Guest template.
+  - The adapter items 'VLAN mode' and 'VLAN allowed list' were numeric but
+    receive text such as "Untagged" or "1-10,20", so they were unsupported on
+    regular adapters. They are character items now, as they already were for
+    legacy adapters (#64). Re-import the VM Guest template.
+  - README: the agent on the Hyper-V host needs active checks (ServerActive) for
+    the Host template and passive checks for the VM Guest template, the F.A.Q.
+    said passive only. Template file names in the Usage section corrected (#66).
+
+- 2026-11-17
   - Release v2.1.1
   - Guest inventory (OS name, version, build, FQDN, integration services
     version, IP) was empty on every host. The script queried the KVP data in a

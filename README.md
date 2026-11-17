@@ -128,8 +128,8 @@ with the next VM details run, by default within 30 minutes.
 
 ## Usage
 * Import provided templates in this order
-  1. Template_Windows_HyperV_VM_Guest2.xml (or the yaml version)
-  2. Template_Windows_HyperV_Host2.xml (or the yaml version)
+  1. `Template_Windows_Hyper-V_VM_Guest_2.yaml`
+  2. `Template_Windows_Hyper-V_Host2.yaml`
 
 * Copy provided PowerShell script to the desired location on your HyperV host machine.
    `C:\Program Files\Zabbix Agent 2\` is the default used in the config file.
@@ -368,8 +368,12 @@ were imported.
 - Depending on the load of your Hyper-V server, you will have to increase the default
   **Zabbix Timeout from 3 to 15-30 seconds
 
-- The Hyper-V Host needs to be setup to use passive Zabbix agent.
-  The active agent won't work, as the VM's don't have an active agent inside
+- The agent on the Hyper-V host has to work in **both** modes.
+  The Hyper-V Host template uses active checks, so `ServerActive` must be set in
+  the agent configuration. Without it nothing is collected and no VMs are
+  discovered. The VM Guest template uses passive checks, because the VMs have no
+  agent of their own and are queried through the host's agent, so `Server` must
+  be set as well and the server or proxy must reach the agent on port 10050.
   See the Requirements section for what that means for firewalls and Zabbix Cloud.
   
 - Make sure the agent is allowed to execute the hyper-v-monitoring2.ps1 file.
