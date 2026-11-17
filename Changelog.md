@@ -14,6 +14,9 @@
   - Needs the updated hyper-v-monitoring2.ps1 on the Hyper-V hosts. The
     templates only changed their version number, re-importing them alone
     fixes nothing.
+  - README: Linux guests need the Hyper-V guest daemons (on Ubuntu the package
+    linux-cloud-tools-virtual) to report guest OS, FQDN and IP address. New
+    section under Requirements and a troubleshooting entry.
 
 - 2026-08-12
   - Release v2.1.0

@@ -82,6 +82,50 @@ from one of them.
 * **A Windows agent template must be linked to the Hyper-V host as well**, for
   example "Windows by Zabbix agent". See the note under Usage below.
 
+### Linux guests: install the Hyper-V guest daemons
+
+Optional, but without it a Linux VM shows no guest information.
+
+The guest items - OS name, OS version, FQDN, integration services version and
+the guest IP address - are not read by the Hyper-V host. The guest publishes
+them through the Hyper-V integration services (KVP exchange). Windows guests
+bring that service along. On Linux it is a separate daemon, `hv_kvp_daemon`,
+and many installations do not have it. Then the VM is monitored as usual
+(state, CPU, memory, disks, network counters), only the guest items stay empty.
+
+Install the package inside the Linux guest. Nothing changes on the Hyper-V host
+or in Zabbix.
+
+| Distribution | Package | Service |
+|---|---|---|
+| Ubuntu | `linux-cloud-tools-virtual` | `hv-kvp-daemon` |
+| Debian | `hyperv-daemons` | `hv-kvp-daemon` |
+| RHEL, AlmaLinux, Rocky, Fedora | `hyperv-daemons` | `hypervkvpd` |
+| SUSE, openSUSE | `hyper-v` | `hv_kvp_daemon` |
+
+Only the Ubuntu row is tested with these templates, the others are the
+distributions' own package names.
+
+On Ubuntu:
+
+```bash
+sudo apt install linux-cloud-tools-virtual
+systemctl status hv-kvp-daemon
+```
+
+`linux-cloud-tools-virtual` belongs to the `linux-virtual` kernel. A VM running
+the generic kernel (`uname -r` ends in `-generic`) needs
+`linux-cloud-tools-generic` instead, the package has to match the kernel.
+
+To check from the Hyper-V host that the guest now reports its data:
+
+```powershell
+(Get-VMNetworkAdapter -VMName <vm name>).IPAddresses
+```
+
+If this lists the addresses, the guest side is fine. Zabbix picks the values up
+with the next VM details run, by default within 30 minutes.
+
 ## Usage
 * Import provided templates in this order
   1. Template_Windows_HyperV_VM_Guest2.xml (or the yaml version)
@@ -304,6 +348,14 @@ come from.
 or **`ZBX_UNSUPPORTED: Field {#VM.REPLICATION.PRIMARY.SERVER} not found or
 empty`**.
 Both fixed in 2.0.6, re-import the templates.
+
+**Guest OS, FQDN, IP address or integration services version are empty** for a
+VM, with no error anywhere.
+On a Linux guest the Hyper-V guest daemons are missing, see "Linux guests:
+install the Hyper-V guest daemons" under Requirements. If the fields are empty
+for *every* VM including Windows guests, the script on the Hyper-V host is older
+than 2.1.1 - upgrade `hyper-v-monitoring2.ps1`, re-importing the templates alone
+does not help. A VM that is switched off never reports guest data.
 
 **VM hosts are never created**, and the discovery shows no error.
 Discovery runs hourly and the VM details every 29 minutes, so allow up to about
