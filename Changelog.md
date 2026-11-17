@@ -1,5 +1,23 @@
 # Changelog
 
+- 2026-11-17
+  - Release v2.1.1
+  - Guest inventory (OS name, version, build, FQDN, integration services
+    version, IP) was empty on every host. The script queried the KVP data in a
+    malformed CIM namespace - the backslashes of root\virtualization\v2 had
+    been lost - and the failing query was silent. Thanks to sokolum (#60).
+  - The guest IPv4 address is now read from the VM's network adapters
+    (Get-VMNetworkAdapter IPAddresses) instead of the KVP value
+    NetworkAddressIPv4, which no longer comes back on Windows Server 2025
+    hosts. IPv6 addresses are left out, several IPv4 addresses are joined with
+    "; ". The KVP value is still used when the adapters report no address.
+  - Needs the updated hyper-v-monitoring2.ps1 on the Hyper-V hosts. The
+    templates only changed their version number, re-importing them alone
+    fixes nothing.
+  - README: Linux guests need the Hyper-V guest daemons (on Ubuntu the package
+    linux-cloud-tools-virtual) to report guest OS, FQDN and IP address. New
+    section under Requirements and a troubleshooting entry.
+
 - 2026-08-12
   - Release v2.1.0
   - Checkpoint triggers no longer fire on Hyper-V Replica recovery points.
