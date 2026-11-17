@@ -1,6 +1,23 @@
 # Changelog
 
 - 2026-11-17
+  - Release v2.2.0
+  - The trigger 'VM status is not normal' no longer fires during planned
+    operations. Hyper-V reports backups, checkpoint handling, storage
+    migration, export, import and move in the VM status, so nightly backups
+    raised a problem for every VM. Statuses matching the new macro
+    {$VM.STATUS.IGNORE}, a regular expression, are ignored (#67). The default
+    covers the English status texts; on Hyper-V hosts in another language add
+    the localized wording to the macro.
+  - Disk latency triggers are configurable. The thresholds were fixed at 15 ms
+    and 25 ms; they are now the macros {$VM.DISK.LATENCY.WARN} (0.015) and
+    {$VM.DISK.LATENCY.HIGH} (0.025), in seconds, and {$VM.DISK.LATENCY.CHECK}
+    set to 0 switches both triggers off (#65). The triggers were renamed to
+    'Disk ... latency warning (> ... s)' and 'Disk ... latency high (> ... s)',
+    which matters if an action filters on the old trigger names.
+  - Template only: re-import the VM Guest template. The script is unchanged.
+
+- 2026-11-17
   - Release v2.1.2
   - The guest IP item could show a warning text instead of an address. On some
     hosts the deprecated KVP value NetworkAddressIPv4 holds "The following

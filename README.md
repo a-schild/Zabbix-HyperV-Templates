@@ -320,6 +320,26 @@ macros* → set `{$VM.HEARTBEAT.CHECK}` to `0`.
 Setting it on the template instead disables the heartbeat check for every VM, which is
 rarely what you want.
 
+**`Hyper-V: VM status is not normal on <VM>`** every night, or during a storage
+migration or checkpoint operation.
+Hyper-V reports planned operations in the VM status too: `Backing up`, `Creating
+checkpoint`, `Merging disks`, `Storage migration - ...`, `Exporting` and so on. Since
+2.2.0 the trigger ignores every status matching the macro `{$VM.STATUS.IGNORE}`, a
+regular expression that covers these by default.
+
+The status text comes from Windows and is localized. On a Hyper-V host that does not
+run in English, look up the wording in the item *VM status (host language)* while such
+an operation runs and add it to the macro. Do not set the macro to an empty value, that
+matches everything and silences the trigger; use `^$` to ignore nothing.
+
+**`Disk <id> latency warning`** / **`latency high`** on hosts with slow storage or
+during backup windows.
+The thresholds are macros since 2.2.0: `{$VM.DISK.LATENCY.WARN}` (default `0.015`,
+seconds) and `{$VM.DISK.LATENCY.HIGH}` (default `0.025`). `{$VM.DISK.LATENCY.CHECK}`
+set to `0` switches both triggers off. Set them on a single VM host. The discovered VM
+hosts do not inherit macros from the Hyper-V host, so for all VMs of one Hyper-V host
+set them on the VM host prototype of that host's discovery rule instead.
+
 ## Troubleshooting by error message
 
 **`Cannot inherit LLD rule with key "hyperv.discover.vms" ... because a host

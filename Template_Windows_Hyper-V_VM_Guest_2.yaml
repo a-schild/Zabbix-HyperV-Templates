@@ -13,7 +13,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V VM Guest 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.1.2'
+        version: '2.2.0'
       description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template. See https://github.com/a-schild/Zabbix-HyperV-Templates'
       groups:
         - name: 'HyperV VM'
@@ -1625,13 +1625,16 @@ zabbix_export:
               value: state
           triggers:
             - uuid: 060ec7d23b3d4990b0f2df73d452b71d
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>""'
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"" and find(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,,"regexp","{$VM.STATUS.IGNORE}")=0'
               name: 'Hyper-V: VM status is not normal on {HOST.NAME}'
               priority: WARNING
               description: |
                 The Hyper-V host reports a degraded status for this VM, for example a
                 failed checkpoint merge, a paused-critical state or a lost connection to
                 its storage.
+
+                Statuses matching {$VM.STATUS.IGNORE} are planned operations - backup,
+                checkpoint handling, storage migration, export - and do not alert.
         - uuid: ba93b78a94964e25bd11d868b49ec851
           name: 'VM status (host language)'
           type: DEPENDENT
@@ -2828,16 +2831,16 @@ zabbix_export:
                   status: DISABLED
                   priority: INFO
                 - uuid: 1a9d660132a440af8b2052f6e5bfbcd8
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.015'
-                  name: 'Disk {#DISK.ID} latency warning > 15ms'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>{$VM.DISK.LATENCY.WARN} and {$VM.DISK.LATENCY.CHECK}=1'
+                  name: 'Disk {#DISK.ID} latency warning (> {$VM.DISK.LATENCY.WARN} s)'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: WARNING
                   dependencies:
-                    - name: 'Disk {#DISK.ID} latency warning > 25ms'
-                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.025'
+                    - name: 'Disk {#DISK.ID} latency high (> {$VM.DISK.LATENCY.HIGH} s)'
+                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>{$VM.DISK.LATENCY.HIGH} and {$VM.DISK.LATENCY.CHECK}=1'
                 - uuid: ac4a41a939ac4eee8d7077bbd4f46e52
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.025'
-                  name: 'Disk {#DISK.ID} latency warning > 25ms'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>{$VM.DISK.LATENCY.HIGH} and {$VM.DISK.LATENCY.CHECK}=1'
+                  name: 'Disk {#DISK.ID} latency high (> {$VM.DISK.LATENCY.HIGH} s)'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: AVERAGE
             - uuid: 25678901abcd4f018678901abc012347
@@ -4303,6 +4306,39 @@ zabbix_export:
             the master item runs, so it is already up to one interval old when Zabbix
             sees it. The default 1h suits every replication frequency Hyper-V offers
             (30s, 5m, 15m); lower it only together with {$VM.DETAILS.INTERVAL}.
+        - macro: '{$VM.STATUS.IGNORE}'
+          value: '^(Storage migration|Backing up|Creating checkpoint|Merging disks|Exporting|Importing|Applying checkpoint|Deleting checkpoint|Moving)'
+          description: |
+            Regular expression for VM statuses the 'VM status is not normal' trigger
+            ignores. The default covers planned operations that are not a fault:
+            backups, checkpoint handling, storage migration, export, import and move.
+
+            The status text comes from Windows. On a Hyper-V host that does not run in
+            English the texts are localized: look up the wording in the item
+            'VM status (host language)' while such an operation runs and add it here.
+
+            Never set this to an empty value - an empty expression matches every
+            status and silences the trigger completely. To ignore nothing, set it
+            to ^$ instead.
+        - macro: '{$VM.DISK.LATENCY.CHECK}'
+          value: '1'
+          description: |
+            Set to 0 to switch off both disk latency triggers.
+
+            Set it on a single VM host. For all VMs of one Hyper-V host, set it on
+            the VM host prototype of the discovery rule on that Hyper-V host - the
+            discovered VM hosts do not inherit macros from the Hyper-V host itself.
+            Setting it on the template switches the triggers off everywhere.
+        - macro: '{$VM.DISK.LATENCY.WARN}'
+          value: '0.015'
+          description: |
+            Disk latency in seconds above which the warning trigger fires.
+            The default 0.015 is 15 ms.
+        - macro: '{$VM.DISK.LATENCY.HIGH}'
+          value: '0.025'
+          description: |
+            Disk latency in seconds above which the higher severity trigger fires.
+            The default 0.025 is 25 ms. Keep it above {$VM.DISK.LATENCY.WARN}.
       dashboards:
         - uuid: 2f549e6c78ab4c6fb5f31cc5394a0c1a
           name: VM
