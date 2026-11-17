@@ -1,6 +1,42 @@
 # Changelog
 
 - 2026-11-17
+  - Release v2.2.0
+  - The trigger 'VM status is not normal' no longer fires during planned
+    operations. Hyper-V reports backups, checkpoint handling, storage
+    migration, export, import and move in the VM status, so nightly backups
+    raised a problem for every VM. Statuses matching the new macro
+    {$VM.STATUS.IGNORE}, a regular expression, are ignored (#67). The default
+    covers the English status texts; on Hyper-V hosts in another language add
+    the localized wording to the macro.
+  - The same trigger now waits until the status has been abnormal for
+    {$VM.STATUS.DELAY}, 45m by default, which is two polls in a row. A real
+    fault therefore alerts one poll later than before. Set the macro to 1m to
+    get the old behaviour, an alert on the first abnormal poll.
+  - Disk latency triggers are configurable. The thresholds were fixed at 15 ms
+    and 25 ms; they are now the macros {$VM.DISK.LATENCY.WARN} (0.015) and
+    {$VM.DISK.LATENCY.HIGH} (0.025), in seconds, and {$VM.DISK.LATENCY.CHECK}
+    set to 0 switches both triggers off (#65). The triggers were renamed to
+    'Disk ... latency warning (> ... s)' and 'Disk ... latency high (> ... s)',
+    which matters if an action filters on the old trigger names.
+  - Fragmentation and dynamic disk allocation thresholds are macros as well:
+    {$VM.DISK.FRAGMENTATION.WARN} / .AVERAGE / .HIGH (20 / 50 / 80 percent)
+    and {$VM.DISK.ALLOCATED.WARN} / .FULL (80 / 99 percent). These trigger
+    names now show the configured threshold too; 'Dynamic disk ... 100%
+    allocated' became 'Dynamic disk ... over 99% allocated'.
+  - {$VM.DETAILS.INTERVAL} defaults to 29m instead of 10m, the same interval
+    the Hyper-V Host template uses. On a host with 20 VMs the old default
+    started a PowerShell every 30 seconds. VM state, configuration and
+    checkpoint data on the VM hosts now refresh every 29 minutes; set the
+    macro back to 10m if you need the faster refresh.
+  - Items that were polled every 5 minutes are polled every 7 minutes: the 21
+    disk counters per disk in the VM Guest template, and the five hypervisor
+    counters and the VMMS service state in the Hyper-V Host template. An odd
+    interval drifts against jobs on a fixed schedule such as hourly backups
+    or 5 minute replication instead of always coinciding with them.
+  - Re-import both templates. The script is unchanged.
+
+- 2026-11-17
   - Release v2.1.2
   - The guest IP item could show a warning text instead of an address. On some
     hosts the deprecated KVP value NetworkAddressIPv4 holds "The following

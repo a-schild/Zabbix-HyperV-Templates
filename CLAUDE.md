@@ -66,7 +66,7 @@ polls the agent directly costs another full enumeration per interval.
 **Know what a poll actually costs.** The vmdetails master item runs once *per VM per interval*,
 and each run starts a `powershell.exe`, imports the Hyper-V module and calls `Get-VHD` on every
 disk. On a 20-VM host a 10-minute interval is a fresh PowerShell every 30 seconds — the cause of
-the CPU spikes in issue #40. The interval is the `{$VM.DETAILS.INTERVAL}` macro (default 30m).
+the CPU spikes in issue #40. The interval is the `{$VM.DETAILS.INTERVAL}` macro (default 29m).
 Separately, the guest template's `perf_counter_en[...]` prototypes poll at 1m and there are ~21
 per disk and ~19 per NIC, so a VM with two disks and a NIC is ~60 agent queries a minute. Those
 are agent-side and cheap individually, but they multiply by VM count.

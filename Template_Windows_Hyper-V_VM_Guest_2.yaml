@@ -13,7 +13,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V VM Guest 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.1.2'
+        version: '2.2.0'
       description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template. See https://github.com/a-schild/Zabbix-HyperV-Templates'
       groups:
         - name: 'HyperV VM'
@@ -1625,13 +1625,19 @@ zabbix_export:
               value: state
           triggers:
             - uuid: 060ec7d23b3d4990b0f2df73d452b71d
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>""'
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"Operating normally" and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status)<>"" and find(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,,"regexp","{$VM.STATUS.IGNORE}")=0 and count(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,{$VM.STATUS.DELAY},"eq","Operating normally")=0 and count(/Template Windows Hyper-V VM Guest 2/hyperv.vm.status,{$VM.STATUS.DELAY},"regexp","{$VM.STATUS.IGNORE}")=0'
               name: 'Hyper-V: VM status is not normal on {HOST.NAME}'
               priority: WARNING
               description: |
                 The Hyper-V host reports a degraded status for this VM, for example a
                 failed checkpoint merge, a paused-critical state or a lost connection to
                 its storage.
+
+                Statuses matching {$VM.STATUS.IGNORE} are planned operations - backup,
+                checkpoint handling, storage migration, export - and do not alert.
+
+                The status also has to stay abnormal for {$VM.STATUS.DELAY}: the trigger
+                waits until that period holds neither a normal nor an ignored status.
         - uuid: ba93b78a94964e25bd11d868b49ec851
           name: 'VM status (host language)'
           type: DEPENDENT
@@ -2345,18 +2351,18 @@ zabbix_export:
                 key: 'hyperv.discovery.vmdetails[{$VM.ID}]'
               trigger_prototypes:
                 - uuid: a9f906e6f00e4cb2a291f49452d91303
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=20 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<50'
-                  name: 'Disk {#DISK.ID} fragmentation over 20%'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>={$VM.DISK.FRAGMENTATION.WARN} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<{$VM.DISK.FRAGMENTATION.AVERAGE}'
+                  name: 'Disk {#DISK.ID} fragmentation over {$VM.DISK.FRAGMENTATION.WARN}%'
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: WARNING
                 - uuid: cd03c4cf160c48d087a64e403da62fa2
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=50 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<80'
-                  name: 'Disk {#DISK.ID} fragmentation over 50%'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>={$VM.DISK.FRAGMENTATION.AVERAGE} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])<{$VM.DISK.FRAGMENTATION.HIGH}'
+                  name: 'Disk {#DISK.ID} fragmentation over {$VM.DISK.FRAGMENTATION.AVERAGE}%'
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: AVERAGE
                 - uuid: 39161df6465c4df793a72d7b83217b5b
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>=80'
-                  name: 'Disk {#DISK.ID} fragmentation over 80%'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.fragmentation[{#DISK.ID}])>={$VM.DISK.FRAGMENTATION.HIGH}'
+                  name: 'Disk {#DISK.ID} fragmentation over {$VM.DISK.FRAGMENTATION.HIGH}%'
                   opdata: 'Fragmentation ({ITEM.VALUE1})'
                   priority: HIGH
             - uuid: c3d4e5f678904abca0123456789abce0
@@ -2767,7 +2773,7 @@ zabbix_export:
             - uuid: 36789012abcd4f018789012abc012348
               name: 'Disk {#DISK.ID} - Average Write Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2777,14 +2783,14 @@ zabbix_export:
             - uuid: 9cf62d67d8d747929da2e9cce796d966
               name: 'Disk {#DISK.ID} - Byte Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Byte Quota Replenishment Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Byte Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: e15ccda5219a4584bbc142f441dc1a59
               name: 'Disk {#DISK.ID} - Error Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Error Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
@@ -2799,14 +2805,14 @@ zabbix_export:
             - uuid: 0024b57796ba443eaf2e96c1f9517c35
               name: 'Disk {#DISK.ID} - Flush Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 32aee40dd4b748da85efc088efbe58d7
               name: 'Disk {#DISK.ID} - IO Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2815,7 +2821,7 @@ zabbix_export:
             - uuid: cffaaddc2de34fcc8c61bdcb07af71cd
               name: 'Disk {#DISK.ID} - Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: s
               description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
@@ -2828,22 +2834,22 @@ zabbix_export:
                   status: DISABLED
                   priority: INFO
                 - uuid: 1a9d660132a440af8b2052f6e5bfbcd8
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.015'
-                  name: 'Disk {#DISK.ID} latency warning > 15ms'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>{$VM.DISK.LATENCY.WARN} and {$VM.DISK.LATENCY.CHECK}=1'
+                  name: 'Disk {#DISK.ID} latency warning (> {$VM.DISK.LATENCY.WARN} s)'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: WARNING
                   dependencies:
-                    - name: 'Disk {#DISK.ID} latency warning > 25ms'
-                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.025'
+                    - name: 'Disk {#DISK.ID} latency high (> {$VM.DISK.LATENCY.HIGH} s)'
+                      expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>{$VM.DISK.LATENCY.HIGH} and {$VM.DISK.LATENCY.CHECK}=1'
                 - uuid: ac4a41a939ac4eee8d7077bbd4f46e52
-                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>0.025'
-                  name: 'Disk {#DISK.ID} latency warning > 25ms'
+                  expression: 'last(/Template Windows Hyper-V VM Guest 2/perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300])>{$VM.DISK.LATENCY.HIGH} and {$VM.DISK.LATENCY.CHECK}=1'
+                  name: 'Disk {#DISK.ID} latency high (> {$VM.DISK.LATENCY.HIGH} s)'
                   opdata: 'Latency ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
                   priority: AVERAGE
             - uuid: 25678901abcd4f018678901abc012347
               name: 'Disk {#DISK.ID} - Lower Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: s
               description: 'Lower Latency for {#DISK.ID} at {#DISK.PATH}'
@@ -2851,7 +2857,7 @@ zabbix_export:
             - uuid: 5aa9ba08dcb9470fa66f6c137ef6a301
               name: 'Disk {#DISK.ID} - Lower Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Queue Length"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: s
               description: 'Lower Queue Length for {#DISK.ID} at {#DISK.PATH}'
@@ -2859,21 +2865,21 @@ zabbix_export:
             - uuid: be5ed5f2658d46f4b8bb5ad79c93c7cc
               name: 'Disk {#DISK.ID} - Maximum Adapter Worker Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Adapter Worker Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Maximum Adapter Worker Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: cb22af897eaf4ea9a878fe2a34f4e190
               name: 'Disk {#DISK.ID} - Maximum Bandwidth'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Bandwidth"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Maximum Bandwidth for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 4e662b9c9ac14cb1a79177c58120ef66
               name: 'Disk {#DISK.ID} - Maximum IO Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2882,7 +2888,7 @@ zabbix_export:
             - uuid: 33085294c6b649dbbb3ccb7deced1f6b
               name: 'Disk {#DISK.ID} - Minimum IO Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2891,7 +2897,7 @@ zabbix_export:
             - uuid: 5851d1ef4a7748ffb53ee514c9afffe4
               name: 'Disk {#DISK.ID} - Normalized Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2899,14 +2905,14 @@ zabbix_export:
             - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
               name: 'Disk {#DISK.ID} - Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Queue Length"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Queue Length for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: e1f234567890472d9f0123456789abc0
               name: 'Disk {#DISK.ID} - Read Bytes/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: Bps
               description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2914,14 +2920,14 @@ zabbix_export:
             - uuid: 1913a23214b54c4c8c1fbc3b04367a4a
               name: 'Disk {#DISK.ID} - Read Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Read Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 03456789abcd4f018456789abc012345
               name: 'Disk {#DISK.ID} - Read Operations/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
@@ -2929,7 +2935,7 @@ zabbix_export:
             - uuid: bc0d3ed4e9c94cf992201a8dfb557805
               name: 'Disk {#DISK.ID} - Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2937,7 +2943,7 @@ zabbix_export:
             - uuid: f2345678abcd4f0183456789abc01234
               name: 'Disk {#DISK.ID} - Write Bytes/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: Bps
               description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2945,28 +2951,28 @@ zabbix_export:
             - uuid: 5417373178af40a4a86da68f8accc1bf
               name: 'Disk {#DISK.ID} - Write Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Write Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 14567890abcd4f018567890abc012346
               name: 'Disk {#DISK.ID} - Write Operations/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
           trigger_prototypes:
             - uuid: ae22186d99d24d22b36f31708fffc44a
-              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=99 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
-              name: 'Dynamic disk {#DISK.ID} 100% allocated'
+              expression: 'last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>={$VM.DISK.ALLOCATED.FULL} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} over {$VM.DISK.ALLOCATED.FULL}% allocated'
               opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
               description: 'Disk allocated size'
             - uuid: 298cb8dd69d3438db995772e56588bdf
-              expression: '(last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>=80 and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])<99) and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
-              name: 'Dynamic disk {#DISK.ID} over 80% allocated'
+              expression: '(last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])>={$VM.DISK.ALLOCATED.WARN} and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.allocated[{#DISK.ID}])<{$VM.DISK.ALLOCATED.FULL}) and last(/Template Windows Hyper-V VM Guest 2/hyperv.vm.disk.type[{#DISK.ID}])="Dynamic"'
+              name: 'Dynamic disk {#DISK.ID} over {$VM.DISK.ALLOCATED.WARN}% allocated'
               opdata: 'Allocated: ({ITEM.LASTVALUE1} {ITEM.VALUE1})'
               priority: WARNING
               description: 'Disk allocated'
@@ -4242,15 +4248,16 @@ zabbix_export:
           value: hyper-v-vm
       macros:
         - macro: '{$VM.DETAILS.INTERVAL}'
-          value: 10m
+          value: 29m
           description: |
             How often the Hyper-V host is asked for this VM's details.
 
             RAISE THIS IF THE HOST CPU SUFFERS. Every poll starts a
             powershell.exe, imports the Hyper-V module and walks the VM config
             including Get-VHD on every disk, and it runs once per VM per
-            interval. On a host with 20 VMs the 10m default is one such run
-            every 30 seconds; 30m or 60m makes that far less frequent.
+            interval. On a host with 20 VMs a 10m interval is one such run every
+            30 seconds; the 29m default is one about every 90 seconds, 60m halves
+            that again.
 
             The payload is configuration, inventory and checkpoint data, none of
             which changes by the second, so a longer interval costs little
@@ -4303,6 +4310,75 @@ zabbix_export:
             the master item runs, so it is already up to one interval old when Zabbix
             sees it. The default 1h suits every replication frequency Hyper-V offers
             (30s, 5m, 15m); lower it only together with {$VM.DETAILS.INTERVAL}.
+        - macro: '{$VM.STATUS.IGNORE}'
+          value: '^(Storage migration|Backing up|Creating checkpoint|Merging disks|Exporting|Importing|Applying checkpoint|Deleting checkpoint|Moving)'
+          description: |
+            Regular expression for VM statuses the 'VM status is not normal' trigger
+            ignores. The default covers planned operations that are not a fault:
+            backups, checkpoint handling, storage migration, export, import and move.
+
+            The status text comes from Windows. On a Hyper-V host that does not run in
+            English the texts are localized: look up the wording in the item
+            'VM status (host language)' while such an operation runs and add it here.
+
+            Never set this to an empty value - an empty expression matches every
+            status and silences the trigger completely. To ignore nothing, set it
+            to ^$ instead.
+        - macro: '{$VM.STATUS.DELAY}'
+          value: 45m
+          description: |
+            How long the VM status has to stay abnormal before the 'VM status is not
+            normal' trigger fires. The trigger waits until this period contains neither
+            'Operating normally' nor a status matching {$VM.STATUS.IGNORE}, so a short
+            operation that is over by the next poll raises no problem.
+
+            The status is only sampled once per {$VM.DETAILS.INTERVAL}. The default 45m
+            with the default 29m interval means two abnormal polls in a row. Keep it
+            clearly above the interval and not close to a multiple of it. A value
+            below the interval, for example 1m, switches the delay off and the trigger
+            fires on the first abnormal poll as it did before 2.2.0.
+        - macro: '{$VM.DISK.FRAGMENTATION.WARN}'
+          value: '20'
+          description: |
+            Disk fragmentation in percent from which the warning trigger fires.
+        - macro: '{$VM.DISK.FRAGMENTATION.AVERAGE}'
+          value: '50'
+          description: |
+            Disk fragmentation in percent from which the average severity trigger fires.
+            Keep it above {$VM.DISK.FRAGMENTATION.WARN}.
+        - macro: '{$VM.DISK.FRAGMENTATION.HIGH}'
+          value: '80'
+          description: |
+            Disk fragmentation in percent from which the highest fragmentation trigger
+            fires. Keep it above {$VM.DISK.FRAGMENTATION.AVERAGE}.
+        - macro: '{$VM.DISK.ALLOCATED.WARN}'
+          value: '80'
+          description: |
+            Warn when a dynamic disk has allocated this percentage of its maximum size.
+        - macro: '{$VM.DISK.ALLOCATED.FULL}'
+          value: '99'
+          description: |
+            A dynamic disk that has allocated this percentage of its maximum size counts
+            as full. Keep it above {$VM.DISK.ALLOCATED.WARN}.
+        - macro: '{$VM.DISK.LATENCY.CHECK}'
+          value: '1'
+          description: |
+            Set to 0 to switch off both disk latency triggers.
+
+            Set it on a single VM host. For all VMs of one Hyper-V host, set it on
+            the VM host prototype of the discovery rule on that Hyper-V host - the
+            discovered VM hosts do not inherit macros from the Hyper-V host itself.
+            Setting it on the template switches the triggers off everywhere.
+        - macro: '{$VM.DISK.LATENCY.WARN}'
+          value: '0.015'
+          description: |
+            Disk latency in seconds above which the warning trigger fires.
+            The default 0.015 is 15 ms.
+        - macro: '{$VM.DISK.LATENCY.HIGH}'
+          value: '0.025'
+          description: |
+            Disk latency in seconds above which the higher severity trigger fires.
+            The default 0.025 is 25 ms. Keep it above {$VM.DISK.LATENCY.WARN}.
       dashboards:
         - uuid: 2f549e6c78ab4c6fb5f31cc5394a0c1a
           name: VM

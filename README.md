@@ -124,7 +124,7 @@ To check from the Hyper-V host that the guest now reports its data:
 ```
 
 If this lists the addresses, the guest side is fine. Zabbix picks the values up
-with the next VM details run, by default within 30 minutes.
+with the next VM details run, by default within 29 minutes.
 
 ## Usage
 * Import provided templates in this order
@@ -280,7 +280,7 @@ rules* → *VM vCPU Discovery* → set *Enabled* and *Update*.
 machine: open that VM's host (*Data collection* → *Hosts* → the `<guid> <fqdn>` host) →
 *Discovery rules* → *VM vCPU Discovery* → *Enabled*.
 
-Consider raising the item prototypes' interval from `1m` to `5m` before enabling it
+Consider raising the item prototypes' interval from `1m` to `7m` before enabling it
 broadly — the counters are averages and stay useful at a lower resolution.
 
 ### Resource metering items
@@ -319,6 +319,35 @@ macros* → set `{$VM.HEARTBEAT.CHECK}` to `0`.
 
 Setting it on the template instead disables the heartbeat check for every VM, which is
 rarely what you want.
+
+**`Hyper-V: VM status is not normal on <VM>`** every night, or during a storage
+migration or checkpoint operation.
+Hyper-V reports planned operations in the VM status too: `Backing up`, `Creating
+checkpoint`, `Merging disks`, `Storage migration - ...`, `Exporting` and so on. Since
+2.2.0 the trigger ignores every status matching the macro `{$VM.STATUS.IGNORE}`, a
+regular expression that covers these by default.
+
+The status text comes from Windows and is localized. On a Hyper-V host that does not
+run in English, look up the wording in the item *VM status (host language)* while such
+an operation runs and add it to the macro. Do not set the macro to an empty value, that
+matches everything and silences the trigger; use `^$` to ignore nothing.
+
+The status also has to stay abnormal for `{$VM.STATUS.DELAY}` (default `45m`, two polls
+in a row with the default 29 minute interval) before the trigger fires, so an operation
+that is over by the next poll raises no problem. Set it to `1m` to alert on the first
+abnormal poll, as before 2.2.0.
+
+**`Disk <id> latency warning`** / **`latency high`** on hosts with slow storage or
+during backup windows.
+The thresholds are macros since 2.2.0: `{$VM.DISK.LATENCY.WARN}` (default `0.015`,
+seconds) and `{$VM.DISK.LATENCY.HIGH}` (default `0.025`). `{$VM.DISK.LATENCY.CHECK}`
+set to `0` switches both triggers off. Set them on a single VM host. The discovered VM
+hosts do not inherit macros from the Hyper-V host, so for all VMs of one Hyper-V host
+set them on the VM host prototype of that host's discovery rule instead.
+
+The fragmentation and dynamic disk allocation triggers work the same way:
+`{$VM.DISK.FRAGMENTATION.WARN}` / `.AVERAGE` / `.HIGH` (default `20` / `50` / `80`
+percent) and `{$VM.DISK.ALLOCATED.WARN}` / `.FULL` (default `80` / `99` percent).
 
 ## Troubleshooting by error message
 
