@@ -13,7 +13,7 @@ zabbix_export:
       name: 'Template Windows Hyper-V VM Guest 2'
       vendor:
         name: 'https://github.com/a-schild/Zabbix-HyperV-Templates'
-        version: '2.1.1'
+        version: '2.1.2'
       description: 'Child template, to create new Hyper-V VM monitoring from the "Template Windows HyperV Host 2" template. See https://github.com/a-schild/Zabbix-HyperV-Templates'
       groups:
         - name: 'HyperV VM'
@@ -3357,6 +3357,8 @@ zabbix_export:
               type: DEPENDENT
               key: 'hyperv.vm.network.vlan.mode[{#ADAPTER.ID}]'
               delay: '0'
+              value_type: CHAR
+              trends: '0'
               description: |
                 VLAN operation mode of adapter {#ADAPTER.NAME}: Untagged, Access, Trunk, Private or Unknown.
                 Read this together with the VLAN ID: an ID of 0 means untagged on an Access
@@ -3451,6 +3453,8 @@ zabbix_export:
               type: DEPENDENT
               key: 'hyperv.vm.network.vlan.allowed[{#ADAPTER.ID}]'
               delay: '0'
+              value_type: CHAR
+              trends: '0'
               description: |
                 VLANs a Trunk adapter is allowed to carry, as Hyper-V formats the list (for example
                 "1-10,20"). Empty on Access and Untagged adapters.
@@ -3769,6 +3773,8 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.networks[?(@[''{#ADAPTER.IS.LEGACY}''] == ''False'')]'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '[]'
         - uuid: 4cfc8e3c94704581b29bdc9f78ce0b7b
           name: 'VM Network Legacy Adapters Discovery'
           type: DEPENDENT
@@ -4225,6 +4231,8 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.networks[?(@[''{#ADAPTER.IS.LEGACY}''] == ''True'')]'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '[]'
       tags:
         - tag: class
           value: software
