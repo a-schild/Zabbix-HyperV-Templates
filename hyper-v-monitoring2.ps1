@@ -229,14 +229,13 @@ function Get-GuestKvpInfo {
     if (-not $KvpComponent) { return $info }
 
     # Each entry is a CIM XML document holding a Name/Data pair
-    $wanted = @{
-        "OSName" = "OsName"
-        "OSVersion" = "OsVersion"
-        "OSBuildNumber" = "OsBuild"
-        "FullyQualifiedDomainName" = "Fqdn"
-        "NetworkAddressIPv4" = "Ipv4"
-        "IntegrationServicesVersion" = "IcVersion"
-    }
+	$wanted = @{
+		"OSName" = "OsName"
+		"OSVersion" = "OsVersion"
+		"OSBuildNumber" = "OsBuild"
+		"FullyQualifiedDomainName" = "Fqdn"
+		"IntegrationServicesVersion" = "IcVersion"
+	}
 
     foreach ($entry in @($KvpComponent.GuestIntrinsicExchangeItems)) {
         try {
@@ -256,6 +255,41 @@ function Get-GuestKvpInfo {
     }
 
     return $info
+}
+
+	function Get-GuestIPv4Info {
+		param($NetworkAdapters)
+
+		$ipv4Addresses = @()
+
+		foreach ($adapter in @($NetworkAdapters)) {
+			foreach ($ip in @($adapter.IPAddresses)) {
+
+				if ([string]::IsNullOrWhiteSpace($ip)) {
+					continue
+				}
+
+				$parsedAddress = $null
+
+				if (
+					[System.Net.IPAddress]::TryParse(
+						[string]$ip,
+						[ref]$parsedAddress
+					) -and
+					$parsedAddress.AddressFamily -eq
+						[System.Net.Sockets.AddressFamily]::InterNetwork
+				) {
+					$ipv4Addresses += $parsedAddress.IPAddressToString
+				}
+			}
+		}
+
+		$ipv4Addresses = @(
+			$ipv4Addresses |
+			Sort-Object -Unique
+		)
+
+		return ($ipv4Addresses -join "; ")
 }
 
 # Resource metering figures for one VM.
@@ -722,7 +756,7 @@ function Get-VMDiscoveryData {
         # here beats one per VM, and a host without the KVP service just yields nothing.
         $kvpComponents = @{}
         try {
-            foreach ($component in @(Get-CimInstance -Namespace rootirtualization2 -ClassName Msvm_KvpExchangeComponent -ErrorAction SilentlyContinue)) {
+            foreach ($component in @(Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_KvpExchangeComponent -ErrorAction SilentlyContinue)) {
                 if ($component -and $component.SystemName) { $kvpComponents[$component.SystemName] = $component }
             }
             Write-DebugInfo "KVP data available for $($kvpComponents.Count) VMs"
@@ -859,6 +893,7 @@ function Get-VMDiscoveryData {
             $isoInfo = Get-MountedIsoInfo -DvdDrives $vmDvdDrives
             $runtimeInfo = Get-VMRuntimeInfo -VM $vm
             $guestInfo = Get-GuestKvpInfo -KvpComponent $kvpComponents[$vm.Id.ToString()]
+			$guestInfo["Ipv4"] = Get-GuestIPv4Info -NetworkAdapters $vmNetworkAdapters
             $meteringInfo = Get-VMMeteringInfo -VM $vm
             $securityInfo = Get-VMSecurityInfo -VM $vm
             Write-DebugInfo "  Runtime: cpu=$($runtimeInfo.CpuUsage)% memoryPressure=$($runtimeInfo.MemoryPressure)% heartbeat=$($runtimeInfo.Heartbeat)"
@@ -1328,11 +1363,12 @@ function Get-VMDetailsById {
         $runtimeInfo = Get-VMRuntimeInfo -VM $vm
         $kvpComponent = $null
         try {
-            $kvpComponent = @(Get-CimInstance -Namespace rootirtualization2 -ClassName Msvm_KvpExchangeComponent -Filter "SystemName='$($vm.Id)'" -ErrorAction SilentlyContinue)[0]
+            $kvpComponent = @(Get-CimInstance -Namespace root\virtualization\v2 -ClassName Msvm_KvpExchangeComponent -Filter "SystemName='$($vm.Id)'" -ErrorAction SilentlyContinue)[0]
         } catch {
             Write-DebugInfo "Could not read KVP component: $($_.Exception.Message)"
         }
         $guestInfo = Get-GuestKvpInfo -KvpComponent $kvpComponent
+		$guestInfo["Ipv4"] = Get-GuestIPv4Info -NetworkAdapters $vmNetworkAdapters
         $meteringInfo = Get-VMMeteringInfo -VM $vm
         $securityInfo = Get-VMSecurityInfo -VM $vm
         Write-DebugInfo "Getting replication status for $($vm.Name)"
