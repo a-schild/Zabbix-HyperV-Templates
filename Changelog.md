@@ -29,7 +29,12 @@
     started a PowerShell every 30 seconds. VM state, configuration and
     checkpoint data on the VM hosts now refresh every 29 minutes; set the
     macro back to 10m if you need the faster refresh.
-  - Template only: re-import the VM Guest template. The script is unchanged.
+  - Items that were polled every 5 minutes are polled every 7 minutes: the 21
+    disk counters per disk in the VM Guest template, and the five hypervisor
+    counters and the VMMS service state in the Hyper-V Host template. An odd
+    interval drifts against jobs on a fixed schedule such as hourly backups
+    or 5 minute replication instead of always coinciding with them.
+  - Re-import both templates. The script is unchanged.
 
 - 2026-11-17
   - Release v2.1.2

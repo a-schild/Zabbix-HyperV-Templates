@@ -2773,7 +2773,7 @@ zabbix_export:
             - uuid: 36789012abcd4f018789012abc012348
               name: 'Disk {#DISK.ID} - Average Write Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Average sec/Write"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2783,14 +2783,14 @@ zabbix_export:
             - uuid: 9cf62d67d8d747929da2e9cce796d966
               name: 'Disk {#DISK.ID} - Byte Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Byte Quota Replenishment Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Byte Quota Replenishment Rate for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: e15ccda5219a4584bbc142f441dc1a59
               name: 'Disk {#DISK.ID} - Error Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Error Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Error Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
@@ -2805,14 +2805,14 @@ zabbix_export:
             - uuid: 0024b57796ba443eaf2e96c1f9517c35
               name: 'Disk {#DISK.ID} - Flush Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Flush Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Flush Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 32aee40dd4b748da85efc088efbe58d7
               name: 'Disk {#DISK.ID} - IO Quota Replenishment Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Io Quota Replenishment Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2821,7 +2821,7 @@ zabbix_export:
             - uuid: cffaaddc2de34fcc8c61bdcb07af71cd
               name: 'Disk {#DISK.ID} - Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Latency",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: s
               description: 'Latency for {#DISK.ID} at {#DISK.PATH}'
@@ -2849,7 +2849,7 @@ zabbix_export:
             - uuid: 25678901abcd4f018678901abc012347
               name: 'Disk {#DISK.ID} - Lower Latency'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Latency"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: s
               description: 'Lower Latency for {#DISK.ID} at {#DISK.PATH}'
@@ -2857,7 +2857,7 @@ zabbix_export:
             - uuid: 5aa9ba08dcb9470fa66f6c137ef6a301
               name: 'Disk {#DISK.ID} - Lower Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Lower Queue Length"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: s
               description: 'Lower Queue Length for {#DISK.ID} at {#DISK.PATH}'
@@ -2865,21 +2865,21 @@ zabbix_export:
             - uuid: be5ed5f2658d46f4b8bb5ad79c93c7cc
               name: 'Disk {#DISK.ID} - Maximum Adapter Worker Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Adapter Worker Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Maximum Adapter Worker Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: cb22af897eaf4ea9a878fe2a34f4e190
               name: 'Disk {#DISK.ID} - Maximum Bandwidth'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum Bandwidth"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Maximum Bandwidth for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 4e662b9c9ac14cb1a79177c58120ef66
               name: 'Disk {#DISK.ID} - Maximum IO Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Maximum IO Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2888,7 +2888,7 @@ zabbix_export:
             - uuid: 33085294c6b649dbbb3ccb7deced1f6b
               name: 'Disk {#DISK.ID} - Minimum IO Rate'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Minimum IO Rate"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               status: DISABLED
               discover: NO_DISCOVER
@@ -2897,7 +2897,7 @@ zabbix_export:
             - uuid: 5851d1ef4a7748ffb53ee514c9afffe4
               name: 'Disk {#DISK.ID} - Normalized Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Normalized Throughput"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Normalized Throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2905,14 +2905,14 @@ zabbix_export:
             - uuid: 7f3975ad1e2a4e8d843aa56f5a564e86
               name: 'Disk {#DISK.ID} - Queue Length'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Queue Length"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Queue Length for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: e1f234567890472d9f0123456789abc0
               name: 'Disk {#DISK.ID} - Read Bytes/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Bytes/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: Bps
               description: 'Disk read throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2920,14 +2920,14 @@ zabbix_export:
             - uuid: 1913a23214b54c4c8c1fbc3b04367a4a
               name: 'Disk {#DISK.ID} - Read Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Read Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 03456789abcd4f018456789abc012345
               name: 'Disk {#DISK.ID} - Read Operations/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Read Operations/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Disk read IOPS for {#DISK.ID} at {#DISK.PATH}'
@@ -2935,7 +2935,7 @@ zabbix_export:
             - uuid: bc0d3ed4e9c94cf992201a8dfb557805
               name: 'Disk {#DISK.ID} - Throughput'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Throughput"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2943,7 +2943,7 @@ zabbix_export:
             - uuid: f2345678abcd4f0183456789abc01234
               name: 'Disk {#DISK.ID} - Write Bytes/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Bytes/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: Bps
               description: 'Disk write throughput for {#DISK.ID} at {#DISK.PATH}'
@@ -2951,14 +2951,14 @@ zabbix_export:
             - uuid: 5417373178af40a4a86da68f8accc1bf
               name: 'Disk {#DISK.ID} - Write Count'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Count"]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               description: 'Write Count for {#DISK.ID} at {#DISK.PATH}'
               timeout: 30s
             - uuid: 14567890abcd4f018567890abc012346
               name: 'Disk {#DISK.ID} - Write Operations/sec'
               key: 'perf_counter_en["\Hyper-V Virtual Storage Device({#DISK.PATH_COUNTER})\Write Operations/sec",300]'
-              delay: 5m
+              delay: 7m
               value_type: FLOAT
               units: ops
               description: 'Disk write IOPS for {#DISK.ID} at {#DISK.PATH}'

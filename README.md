@@ -280,7 +280,7 @@ rules* → *VM vCPU Discovery* → set *Enabled* and *Update*.
 machine: open that VM's host (*Data collection* → *Hosts* → the `<guid> <fqdn>` host) →
 *Discovery rules* → *VM vCPU Discovery* → *Enabled*.
 
-Consider raising the item prototypes' interval from `1m` to `5m` before enabling it
+Consider raising the item prototypes' interval from `1m` to `7m` before enabling it
 broadly — the counters are averages and stay useful at a lower resolution.
 
 ### Resource metering items
